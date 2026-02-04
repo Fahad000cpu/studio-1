@@ -8,6 +8,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  GeoPoint,
 } from 'firebase/firestore';
 import {
   Avatar,
@@ -41,7 +42,6 @@ import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
 import type { ChatContact, Message } from '@/types/chat';
-import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
@@ -49,6 +49,24 @@ import { uploadToCloudinary } from '@/lib/cloudinary';
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
 }
+
+// Haversine distance formula to calculate distance between two points on Earth
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    if (lat1 === lat2 && lon1 === lon2) {
+        return 0;
+    }
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in km
+    return distance;
+}
+
 
 export default function ChatPage() {
   const isMobile = useIsMobile();
@@ -73,43 +91,63 @@ export default function ChatPage() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (allUsersLoading || !allUsers) return;
+      if (allUsersLoading || !allUsers || !user) return;
       setUsersLoading(true);
       try {
-        const validUsers = allUsers.filter(u => u.id && u.name && u.email);
+        const otherUsers = allUsers.filter((u) => u.id !== user.uid);
         
-        const plainUsers = validUsers.map(u => ({
-          ...u,
-          coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null
-        }));
+        let sortedUsers: UserProfile[] = [];
 
-        const suggestions = await suggestUsersByLocation({
-          latitude: 37.7749,
-          longitude: -122.4194,
-          users: plainUsers,
-        });
-        const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
-        setContacts(filteredUsers as UserProfile[]);
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    sortedUsers = otherUsers.sort((a, b) => {
+                        const locationA = a.coordinates;
+                        const locationB = b.coordinates;
+
+                        if (locationA && locationB) {
+                            const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);
+                            const distanceB = getDistance(latitude, longitude, locationB.latitude, locationB.longitude);
+                            return distanceA - distanceB;
+                        }
+                        if (locationA) return -1;
+                        if (locationB) return 1;
+                        return (a.name || "").localeCompare(b.name || "");
+                    });
+                    setContacts(sortedUsers);
+                }, 
+                () => {
+                    // On failure, sort alphabetically
+                    sortedUsers = otherUsers.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+                    setContacts(sortedUsers);
+                }
+            );
+        } else {
+            // If geolocation is not available, sort alphabetically
+            sortedUsers = otherUsers.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+            setContacts(sortedUsers);
+        }
+
       } catch (error) {
         console.error("Failed to fetch users:", error);
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Could not load user suggestions for chat.",
+          description: "Could not load user contacts for chat.",
         });
       } finally {
         setUsersLoading(false);
       }
     };
-    if (user?.uid) {
-      fetchUsers();
-    }
-  }, [user?.uid, toast, allUsers, allUsersLoading]);
+    fetchUsers();
+  }, [user, toast, allUsers, allUsersLoading]);
 
     const filteredContacts = useMemo(() => {
     if (!contacts) return [];
     return contacts.filter(contact =>
-      contact.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      (contact.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (contact.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [contacts, searchTerm]);
 

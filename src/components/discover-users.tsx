@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, GeoPoint } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -16,11 +16,28 @@ import { Button } from '@/components/ui/button';
 import { MessageSquarePlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { suggestUsersByLocation } from '@/ai/flows/suggest-users-by-location';
 
 interface DiscoverUsersProps {
   searchTerm: string;
 }
+
+// Haversine distance formula to calculate distance between two points on Earth
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    if (lat1 === lat2 && lon1 === lon2) {
+        return 0;
+    }
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in km
+    return distance;
+}
+
 
 export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   const router = useRouter();
@@ -34,38 +51,38 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   const { data: usersCollection, isLoading: usersCollectionLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   React.useEffect(() => {
-    const fetchUsers = async (latitude?: number, longitude?: number) => {
+    const fetchAndSortUsers = async (latitude?: number, longitude?: number) => {
       setIsLoading(true);
       if (usersCollectionLoading) return;
 
       try {
         if (!usersCollection) {
           setAllSuggestedUsers([]);
+          setIsLoading(false);
           return;
         }
 
         const otherUsers = usersCollection.filter((u) => u.id !== user?.uid);
 
-        // Prepare users for the server flow, ensuring 'name' and 'email' are strings.
-        // The Zod schema in the flow requires them.
-        const usersForFlow = otherUsers
-          .filter(u => u.id && u.email) // Ensure email exists as the schema requires it
-          .map(u => ({
-            ...u,
-            name: u.name || u.email, // Fallback to email if name is missing
-            coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null,
-          }));
+        // Sort users directly on the client
+        const sortedUsers = otherUsers.sort((a, b) => {
+            if (latitude && longitude) {
+                const locationA = a.coordinates;
+                const locationB = b.coordinates;
 
-        if (latitude && longitude) {
-            const suggestions = await suggestUsersByLocation({
-              latitude,
-              longitude,
-              users: usersForFlow,
-            });
-            setAllSuggestedUsers(suggestions as UserProfile[]);
-        } else {
-             setAllSuggestedUsers(usersForFlow);
-        }
+                if (locationA && locationB) {
+                    const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);
+                    const distanceB = getDistance(latitude, longitude, locationB.latitude, locationB.longitude);
+                    return distanceA - distanceB;
+                }
+                if (locationA) return -1; // A has location, B does not
+                if (locationB) return 1;  // B has location, A does not
+            }
+            return (a.name || "").localeCompare(b.name || ""); // Fallback sort by name
+        });
+        
+        setAllSuggestedUsers(sortedUsers);
+
       } catch (error) {
         console.error("Failed to fetch or sort users:", error);
         toast({
@@ -78,36 +95,40 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
       }
     };
 
-    if (user && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          fetchUsers(position.coords.latitude, position.coords.longitude);
-        },
-        (error: GeolocationPositionError) => {
-          if (error.code === error.PERMISSION_DENIED) {
+    if (user) {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
+                },
+                (error: GeolocationPositionError) => {
+                if (error.code === error.PERMISSION_DENIED) {
+                    toast({
+                    title: 'Location Access Denied',
+                    description: 'Showing default user suggestions sorted alphabetically.',
+                    });
+                } else {
+                    console.error('Geolocation error:', error.message);
+                    toast({
+                    variant: 'destructive',
+                    title: 'Location Error',
+                    description: 'Could not retrieve location. Showing default suggestions.',
+                    });
+                }
+                fetchAndSortUsers();
+                }
+            );
+        } else {
             toast({
-              title: 'Location Access Denied',
-              description: 'Showing default user suggestions.',
+                title: "Geolocation not supported",
+                description: "Showing default user suggestions sorted alphabetically.",
             });
-          } else {
-            console.error('Geolocation error:', error.message);
-            toast({
-              variant: 'destructive',
-              title: 'Location Error',
-              description: 'Could not retrieve location. Showing default suggestions.',
-            });
-          }
-          fetchUsers();
+            fetchAndSortUsers();
         }
-      );
-    } else if (user) {
-      toast({
-        title: "Geolocation not supported",
-        description: "Showing default user suggestions.",
-      });
-      fetchUsers();
+    } else if (!usersCollectionLoading) {
+        setIsLoading(false);
     }
-  }, [user?.uid, firestore, toast, user, usersCollection, usersCollectionLoading]);
+  }, [user, firestore, toast, usersCollection, usersCollectionLoading]);
 
   const filteredUsers = React.useMemo(() => {
     if (!allSuggestedUsers) return [];
@@ -115,8 +136,9 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     
     return allSuggestedUsers.filter(u => {
       const searchTermLower = searchTerm.toLowerCase();
-      const nameMatch = u.name && u.name.toLowerCase().includes(searchTermLower);
-      const emailMatch = u.email && u.email.toLowerCase().includes(searchTermLower);
+      // Ensure name and email are treated as strings even if null/undefined
+      const nameMatch = (u.name || '').toLowerCase().includes(searchTermLower);
+      const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
       return nameMatch || emailMatch;
     });
   }, [allSuggestedUsers, searchTerm]);
@@ -126,7 +148,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     router.push('/chat');
   };
 
-  if (isLoading || usersCollectionLoading) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
         {Array.from({ length: 8 }).map((_, i) => (
@@ -164,17 +186,17 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
              <div className='absolute -bottom-12 left-1/2 -translate-x-1/2'>
                 <Avatar className="w-24 h-24 border-4 border-card bg-background ring-1 ring-border">
                     <AvatarImage
-                    src={`https://picsum.photos/seed/${userProfile.id}/200/200`}
-                    alt={userProfile.name}
+                    src={userProfile.profilePictureUrl || `https://picsum.photos/seed/${userProfile.id}/200/200`}
+                    alt={userProfile.name || ''}
                     data-ai-hint="person portrait"
                     />
-                    <AvatarFallback>{userProfile.name?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback>{userProfile.name?.charAt(0) || userProfile.email?.charAt(0)}</AvatarFallback>
                 </Avatar>
              </div>
           </div>
           
           <CardContent className="pt-16 pb-6 px-6">
-            <h3 className="font-headline text-xl font-bold">{userProfile.name || userProfile.email}</h3>
+            <h3 className="font-headline text-xl font-bold truncate">{userProfile.name || userProfile.email}</h3>
             <p className="text-muted-foreground mt-1 text-sm h-10">{userProfile.bio || 'Loves connecting with new people.'}</p>
           </CardContent>
           <CardFooter className="px-6 pb-6">
@@ -187,7 +209,3 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     </div>
   );
 }
-
-    
-
-    
