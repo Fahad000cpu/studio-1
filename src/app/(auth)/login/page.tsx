@@ -98,14 +98,24 @@ export default function LoginPage() {
   useEffect(() => {
     if (!auth) return;
 
-    if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'invisible',
-            'callback': () => {
-                // This callback is for when reCAPTCHA is solved.
-            }
-        });
-    }
+    const recaptchaContainer = document.getElementById('recaptcha-container');
+    if (!recaptchaContainer) return;
+
+    // Initialize RecaptchaVerifier
+    const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
+      size: 'invisible',
+      callback: (response: any) => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+      },
+    });
+
+    recaptchaVerifierRef.current = verifier;
+
+    // Cleanup function to clear the verifier when the component unmounts
+    return () => {
+      verifier.clear();
+      recaptchaVerifierRef.current = null;
+    };
   }, [auth]);
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
@@ -153,8 +163,12 @@ export default function LoginPage() {
   const handleSendOtp = async (values: z.infer<typeof phoneFormSchema>) => {
     const verifier = recaptchaVerifierRef.current;
     if (!verifier) {
-        console.error("reCAPTCHA verifier not initialized.");
-        toast({ variant: "destructive", title: "Error", description: "Could not initialize reCAPTCHA. Please refresh." });
+        console.error("reCAPTCHA verifier not initialized. Please refresh the page.");
+        toast({ 
+            variant: "destructive", 
+            title: "Error", 
+            description: "Security verification failed to initialize. Please refresh and try again." 
+        });
         return;
     }
     
@@ -173,8 +187,8 @@ export default function LoginPage() {
             toast({
                 variant: "destructive",
                 title: "Action Required: Authorize Domain",
-                description: `To use phone sign-in, you must add the domain "${currentDomain}" to the 'Authorised domains' list in your Firebase Authentication settings.`,
-                duration: 15000,
+                description: `To use phone sign-in, add "${currentDomain}" to the 'Authorised domains' list in your Firebase Authentication settings and wait a few minutes.`,
+                duration: 20000,
             });
         } else {
             toast({
