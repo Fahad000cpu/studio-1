@@ -66,14 +66,6 @@ const GoogleIcon = () => (
     </svg>
   );
 
-// Augment the window interface
-declare global {
-  interface Window {
-    // We keep confirmationResult on window to survive re-renders between sending and verifying OTP
-    confirmationResult?: ConfirmationResult;
-  }
-}
-
 export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
@@ -85,6 +77,7 @@ export default function LoginPage() {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -123,6 +116,9 @@ export default function LoginPage() {
   }, [auth]);
 
   const handlePostLogin = async (user: User) => {
+    // This is now handled by the (auth) layout which redirects on user state change.
+    // We can keep this for any additional logic after login if needed, like analytics.
+    // For now, it just ensures the user profile exists, which is good practice.
     try {
         const userRef = doc(firestore, "users", user.uid);
         const userDoc = await getDoc(userRef);
@@ -130,7 +126,6 @@ export default function LoginPage() {
         if (!userDoc.exists()) {
            console.warn("User profile not found on login for UID:", user.uid);
         }
-        router.push('/discover');
     } catch (error) {
         console.error("Post-login actions failed:", error);
     }
@@ -140,13 +135,13 @@ export default function LoginPage() {
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
-      await handlePostLogin(creds.user);
+      // Let the layout handle the redirect
     } catch (error: any) {
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
             toast({
                 variant: "destructive",
                 title: "Login Failed",
-                description: "Invalid email or password. If you signed up using Google or Phone, please use that method to log in.",
+                description: "Invalid email or password. If you signed up using another method, please use that to log in.",
             });
         }
         else {
@@ -164,8 +159,8 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-        const result = await signInWithPopup(auth, provider);
-        await handlePostLogin(result.user);
+        await signInWithPopup(auth, provider);
+        // Let the layout handle the redirect
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
@@ -191,7 +186,7 @@ export default function LoginPage() {
     try {
         const phoneNumber = values.phone.startsWith('+') ? values.phone : `+${values.phone}`;
         const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
-        window.confirmationResult = confirmationResult;
+        confirmationResultRef.current = confirmationResult;
         setIsOtpSent(true);
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
@@ -203,15 +198,16 @@ export default function LoginPage() {
   };
 
   const handleVerifyOtp = async (values: z.infer<typeof phoneFormSchema>) => {
-     if (!window.confirmationResult || !values.otp) {
+     const confirmationResult = confirmationResultRef.current;
+     if (!confirmationResult || !values.otp) {
         toast({ variant: "destructive", title: "Error", description: "Something went wrong. Please try sending the OTP again." });
         return;
      }
 
      setIsVerifyingOtp(true);
      try {
-        const result = await window.confirmationResult.confirm(values.otp);
-        await handlePostLogin(result.user);
+        await confirmationResult.confirm(values.otp);
+        // Let the layout handle the redirect
      } catch (error: any) {
         console.error("Error verifying OTP:", error);
         toast({ variant: "destructive", title: "Invalid OTP", description: "The code you entered is incorrect. Please try again." });
