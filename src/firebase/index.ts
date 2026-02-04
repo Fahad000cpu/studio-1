@@ -2,28 +2,18 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { Auth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence } from 'firebase/auth';
+import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  return getSdks(app);
-}
-
-export function getSdks(firebaseApp: FirebaseApp) {
-  // Replace getAuth with initializeAuth to explicitly set persistence.
-  // This explicitly tells Firebase to prefer IndexedDB or LocalStorage for session
-  // persistence, avoiding SessionStorage which can cause issues in some
-  // mobile/partitioned environments.
-  const auth = initializeAuth(firebaseApp, {
-    persistence: [indexedDBLocalPersistence, browserLocalPersistence]
-  });
-  const firestore = getFirestore(firebaseApp);
+  const auth = getAuth(app);
+  const firestore = getFirestore(app);
   
   return {
-    firebaseApp,
+    firebaseApp: app,
     auth,
     firestore,
   };
