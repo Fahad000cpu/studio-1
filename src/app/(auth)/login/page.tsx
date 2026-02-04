@@ -88,7 +88,7 @@ export default function LoginPage() {
     } catch (error) {
         console.error("Post-login actions failed:", error);
     } finally {
-        router.push('/');
+        router.push('/discover');
     }
   }
 

@@ -122,7 +122,7 @@ export default function SignupPage() {
     } catch (error) {
         console.error("Post-signup actions failed:", error);
     } finally {
-        router.push('/');
+        router.push('/discover');
     }
   }
 
@@ -164,7 +164,7 @@ export default function SignupPage() {
         } else {
            // Existing user is just logging in via the signup page's Google button.
            // Their profile should already exist. Just redirect.
-           router.push('/');
+           router.push('/discover');
         }
 
     } catch (error: any) {

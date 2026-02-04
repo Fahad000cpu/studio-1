@@ -61,7 +61,7 @@ export default function MainLayout({
   }, [user, firestore]);
 
 
-  if (isUserLoading || !user) {
+  if (isUserLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
@@ -71,6 +71,10 @@ export default function MainLayout({
         </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (
