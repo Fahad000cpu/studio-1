@@ -2,7 +2,7 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { Auth, getAuth, browserLocalPersistence, initializeAuth } from 'firebase/auth';
+import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
 
@@ -10,10 +10,8 @@ import { Firestore, getFirestore } from 'firebase/firestore';
 export function initializeFirebase() {
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
   
-  // Use initializeAuth for IndexedDB persistence, which is more reliable.
-  const auth = initializeAuth(app, {
-    persistence: browserLocalPersistence,
-  });
+  // Use the standard getAuth() which is idempotent and handles persistence.
+  const auth = getAuth(app);
 
   const firestore = getFirestore(app);
   
