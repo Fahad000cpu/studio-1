@@ -101,19 +101,20 @@ export default function LoginPage() {
     const recaptchaContainer = document.getElementById('recaptcha-container');
     if (!recaptchaContainer) return;
 
-    // Initialize RecaptchaVerifier
-    const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
-      size: 'invisible',
-      callback: (response: any) => {
-        // reCAPTCHA solved, allow signInWithPhoneNumber.
-      },
-    });
-
-    recaptchaVerifierRef.current = verifier;
+    // Initialize RecaptchaVerifier only once
+    if (!recaptchaVerifierRef.current) {
+        const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
+          size: 'invisible',
+          callback: (response: any) => {
+            // reCAPTCHA solved, allow signInWithPhoneNumber.
+          },
+        });
+        recaptchaVerifierRef.current = verifier;
+    }
 
     // Cleanup function to clear the verifier when the component unmounts
     return () => {
-      verifier.clear();
+      recaptchaVerifierRef.current?.clear();
       recaptchaVerifierRef.current = null;
     };
   }, [auth]);
@@ -186,8 +187,8 @@ export default function LoginPage() {
             const currentDomain = window.location.hostname;
             toast({
                 variant: "destructive",
-                title: "Action Required: Authorize Domain",
-                description: `To use phone sign-in, add "${currentDomain}" to the 'Authorised domains' list in your Firebase Authentication settings and wait a few minutes.`,
+                title: "Action Required: Configuration Error",
+                description: `Phone sign-in is not allowed. Please check two things: 1) The domain "${currentDomain}" is in the 'Authorised domains' list in Firebase Auth settings. 2) App Check is correctly set up and your app is registered with reCAPTCHA v3.`,
                 duration: 20000,
             });
         } else {
