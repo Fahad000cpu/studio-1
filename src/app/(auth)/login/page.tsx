@@ -135,7 +135,7 @@ export default function LoginPage() {
             toast({
                 variant: "destructive",
                 title: "Login Failed",
-                description: "Invalid email or password. Please try again.",
+                description: "Invalid email or password. If you signed up using Google or Phone, please use that method to log in.",
             });
         }
         else {
