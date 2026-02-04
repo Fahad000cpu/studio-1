@@ -26,9 +26,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, requestPermission } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { Flame } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 
@@ -61,7 +60,6 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const auth = useAuth();
-  const router = useRouter();
   const firestore = useFirestore();
   const { toast } = useToast();
   
@@ -87,8 +85,6 @@ export default function LoginPage() {
         }
     } catch (error) {
         console.error("Post-login actions failed:", error);
-    } finally {
-        router.push('/discover');
     }
   }
 
@@ -97,6 +93,7 @@ export default function LoginPage() {
     try {
       const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
       await handlePostLogin(creds.user);
+      // The redirect is now handled by the (auth) layout based on auth state.
     } catch (error: any) {
         if (error.code === 'auth/invalid-credential') {
             try {
@@ -147,6 +144,7 @@ export default function LoginPage() {
         // On login, we assume the user profile already exists from signup.
         // We just need to perform post-login actions.
         await handlePostLogin(result.user);
+        // The redirect is now handled by the (auth) layout based on auth state.
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return; // User cancelled the popup, do nothing.

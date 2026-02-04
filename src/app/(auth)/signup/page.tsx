@@ -6,7 +6,6 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useRouter } from "next/navigation";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo } from "firebase/auth";
 import { doc, GeoPoint, getDoc } from "firebase/firestore";
 
@@ -64,7 +63,6 @@ const GoogleIcon = () => (
 export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
-  const router = useRouter();
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -121,8 +119,6 @@ export default function SignupPage() {
         
     } catch (error) {
         console.error("Post-signup actions failed:", error);
-    } finally {
-        router.push('/discover');
     }
   }
 
@@ -133,6 +129,7 @@ export default function SignupPage() {
       if (user) {
         await updateProfile(user, { displayName: values.name });
         await handlePostSignup(user, values.name, values.email, values.phoneNumber, user.photoURL);
+        // The redirect is now handled by the (auth) layout based on auth state.
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -162,9 +159,8 @@ export default function SignupPage() {
         if (additionalInfo?.isNewUser) {
            await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
         } else {
-           // Existing user is just logging in via the signup page's Google button.
-           // Their profile should already exist. Just redirect.
-           router.push('/discover');
+           // Existing user logging in via Google. Auth state will change, 
+           // and the layout will handle the redirect automatically.
         }
 
     } catch (error: any) {
