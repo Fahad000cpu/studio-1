@@ -106,12 +106,12 @@ export default function LoginPage() {
             }
         });
     }
-  }, []);
+  }, [auth]);
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      // The (auth) layout will handle the redirect on user state change.
+      router.push("/discover");
     } catch (error: any) {
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
             toast({
@@ -169,11 +169,12 @@ export default function LoginPage() {
     } catch (error: any) {
         console.error("Error sending OTP:", error);
         if (error.code === 'auth/operation-not-allowed') {
+            const currentDomain = window.location.hostname;
             toast({
                 variant: "destructive",
-                title: "Configuration Error",
-                description: "Phone sign-in is not allowed from this website's domain. Please add this app's domain to the 'Authorized domains' list in your Firebase console under Authentication > Settings.",
-                duration: 9000,
+                title: "Action Required: Authorize Domain",
+                description: `To use phone sign-in, you must add the domain "${currentDomain}" to the 'Authorised domains' list in your Firebase Authentication settings.`,
+                duration: 15000,
             });
         } else {
             toast({
@@ -197,7 +198,7 @@ export default function LoginPage() {
      setIsVerifyingOtp(true);
      try {
         await confirmationResult.confirm(values.otp);
-        // The (auth) layout will handle the redirect on user state change.
+        router.push("/discover");
      } catch (error: any) {
         console.error("Error verifying OTP:", error);
         toast({ variant: "destructive", title: "Invalid OTP", description: "The code you entered is incorrect. Please try again." });
