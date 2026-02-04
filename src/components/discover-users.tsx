@@ -44,15 +44,13 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
           return;
         }
 
-        const validUsers = usersCollection.filter(u => u.id && u.name && u.email);
+        const validUsers = usersCollection.filter(u => u.id && u.name);
 
         if (latitude && longitude) {
             const plainUsers = validUsers.map(u => ({
               ...u,
               // Convert GeoPoint to a plain object for server action
               coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null,
-              createdAt: undefined, // Remove any other complex objects
-              lastLogin: undefined,
             }));
 
             const suggestions = await suggestUsersByLocation({
@@ -110,7 +108,8 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   }, [user?.uid, firestore, toast, user, usersCollection, usersCollectionLoading]);
 
   const filteredUsers = React.useMemo(() => {
-    return allSuggestedUsers.filter(u => u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (!allSuggestedUsers) return [];
+    return allSuggestedUsers.filter(u => u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [allSuggestedUsers, searchTerm]);
 
 
