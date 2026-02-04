@@ -7,6 +7,7 @@ import { FirebaseClientProvider } from '@/firebase';
 export const metadata: Metadata = {
   title: 'ConnectSphere',
   description: 'A modern chat application.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
