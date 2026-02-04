@@ -44,25 +44,27 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
           return;
         }
 
-        const validUsers = usersCollection.filter(u => u.id && u.name);
+        const otherUsers = usersCollection.filter((u) => u.id !== user?.uid);
+
+        // Prepare users for the server flow, ensuring 'name' and 'email' are strings.
+        // The Zod schema in the flow requires them.
+        const usersForFlow = otherUsers
+          .filter(u => u.id && u.email) // Ensure email exists as the schema requires it
+          .map(u => ({
+            ...u,
+            name: u.name || u.email, // Fallback to email if name is missing
+            coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null,
+          }));
 
         if (latitude && longitude) {
-            const plainUsers = validUsers.map(u => ({
-              ...u,
-              // Convert GeoPoint to a plain object for server action
-              coordinates: u.coordinates ? { latitude: u.coordinates.latitude, longitude: u.coordinates.longitude } : null,
-            }));
-
             const suggestions = await suggestUsersByLocation({
               latitude,
               longitude,
-              users: plainUsers,
+              users: usersForFlow,
             });
-            const filteredUsers = suggestions.filter((u) => u.id !== user?.uid);
-            setAllSuggestedUsers(filteredUsers as UserProfile[]);
+            setAllSuggestedUsers(suggestions as UserProfile[]);
         } else {
-             const filteredUsers = validUsers.filter((u) => u.id !== user?.uid);
-             setAllSuggestedUsers(filteredUsers);
+             setAllSuggestedUsers(usersForFlow);
         }
       } catch (error) {
         console.error("Failed to fetch or sort users:", error);
@@ -109,7 +111,14 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
 
   const filteredUsers = React.useMemo(() => {
     if (!allSuggestedUsers) return [];
-    return allSuggestedUsers.filter(u => u.name && u.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    if (!searchTerm) return allSuggestedUsers;
+    
+    return allSuggestedUsers.filter(u => {
+      const searchTermLower = searchTerm.toLowerCase();
+      const nameMatch = u.name && u.name.toLowerCase().includes(searchTermLower);
+      const emailMatch = u.email && u.email.toLowerCase().includes(searchTermLower);
+      return nameMatch || emailMatch;
+    });
   }, [allSuggestedUsers, searchTerm]);
 
 
@@ -165,7 +174,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
           </div>
           
           <CardContent className="pt-16 pb-6 px-6">
-            <h3 className="font-headline text-xl font-bold">{userProfile.name}</h3>
+            <h3 className="font-headline text-xl font-bold">{userProfile.name || userProfile.email}</h3>
             <p className="text-muted-foreground mt-1 text-sm h-10">{userProfile.bio || 'Loves connecting with new people.'}</p>
           </CardContent>
           <CardFooter className="px-6 pb-6">
@@ -178,5 +187,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     </div>
   );
 }
+
+    
 
     
