@@ -26,7 +26,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
 
     if (permission === 'granted') {
       const currentToken = await getToken(messaging, {
-        vapidKey: 'BM_xqZMh6RwDGXDr5L3AwT_A-T6qXRnAKpAy-EZGndn7TgrAIbUiUxUvbCJrnMeCb2FzC9hLic6-SjpsBpFNl3o'
+        vapidKey: 'BNr51L1oTD3rDTFl-Cxw2h4cZdXoz6q7uiXbYoZ5rTJGXwMy4bEgYNaSU5_GEHXuSDdCURItdHu6eDSHw5RqDpw'
       });
       
       if (currentToken) {
