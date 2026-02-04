@@ -12,7 +12,11 @@ export interface NotificationStatus {
   serviceWorkerActive: boolean | null;
   permissionGranted: boolean | null;
   tokenInFirestore: boolean | null;
-  isLoading: boolean;
+  isLoading: {
+    auth: boolean;
+    profile: boolean;
+    serviceWorker: boolean;
+  };
   permission: NotificationPermission;
 }
 
@@ -28,28 +32,31 @@ export function useNotificationStatus(): NotificationStatus {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   
   const [swActive, setSwActive] = useState<boolean|null>(null);
+  const [isSwLoading, setIsSwLoading] = useState(true);
 
   useEffect(() => {
-    // Check Service Worker status once on the client side.
     async function checkSw() {
+      setIsSwLoading(true);
       if (!isSupported || typeof navigator === 'undefined' || !navigator.serviceWorker) {
         setSwActive(false);
+        setIsSwLoading(false);
         return;
       }
       try {
-        const swRegistration = await navigator.serviceWorker.ready;
+        // Use getRegistration() for a potentially faster initial check
+        const swRegistration = await navigator.serviceWorker.getRegistration();
         setSwActive(!!swRegistration?.active);
       } catch (e) {
         console.warn("Could not check service worker status:", e);
         setSwActive(false);
+      } finally {
+        setIsSwLoading(false);
       }
     }
     checkSw();
   }, [isSupported]);
 
 
-  const isLoading = isAuthLoading || isProfileLoading || swActive === null;
-  
   const permissionGranted = isSupported && notificationPermission === 'granted';
   
   // A token is considered in Firestore if the fcmTokens array exists and contains at least one non-empty string.
@@ -60,7 +67,13 @@ export function useNotificationStatus(): NotificationStatus {
     serviceWorkerActive: swActive,
     permissionGranted,
     tokenInFirestore,
-    isLoading,
+    isLoading: {
+        auth: isAuthLoading,
+        profile: isProfileLoading,
+        serviceWorker: isSwLoading,
+    },
     permission: notificationPermission,
   };
 }
+
+    

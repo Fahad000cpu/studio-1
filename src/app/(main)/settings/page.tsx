@@ -53,7 +53,7 @@ export default function SettingsPage() {
       serviceWorkerActive,
       permissionGranted,
       tokenInFirestore,
-      isLoading: isStatusLoading,
+      isLoading,
       permission
   } = useNotificationStatus();
 
@@ -294,24 +294,24 @@ export default function SettingsPage() {
                 <div className="space-y-3 p-4 border rounded-md bg-muted/50">
                     <StatusCheckItem
                         label="Browser supports push notifications"
-                        checked={isStatusLoading ? null : isSupported}
+                        checked={isSupported}
                     />
                      <StatusCheckItem
                         label="Browser permission granted"
-                        checked={isStatusLoading ? null : permissionGranted}
+                        checked={permissionGranted}
                     />
                     <StatusCheckItem
                         label="Service worker is active"
-                        checked={isStatusLoading ? null : serviceWorkerActive}
+                        checked={isLoading.serviceWorker ? null : serviceWorkerActive}
                     />
                     <StatusCheckItem
                         label="Notification token is saved to your profile"
-                        checked={isStatusLoading ? null : tokenInFirestore}
+                        checked={isLoading.auth || isLoading.profile ? null : tokenInFirestore}
                     />
                 </div>
 
                 <div className="pt-4">
-                    { !isStatusLoading && isSupported && (
+                    { isSupported && (
                         <>
                             {permission === 'prompt' && (
                                 <Button onClick={handleEnableNotifications}>
@@ -325,14 +325,14 @@ export default function SettingsPage() {
                                     <p>You have blocked notifications. Please enable them in your browser settings to receive updates.</p>
                                 </div>
                             )}
-                             {permissionGranted && !tokenInFirestore && (
+                             {!isLoading.auth && !isLoading.profile && !isLoading.serviceWorker && permissionGranted && !tokenInFirestore && (
                                 <div className="flex items-start gap-2.5 text-muted-foreground text-sm p-3 bg-amber-500/10 border border-amber-500/20 rounded-md">
                                     <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                     <p>Permission is granted, but we couldn't save your notification token. Please try again.</p>
                                     <Button onClick={handleEnableNotifications} size="sm" variant="outline" className="ml-auto">Retry</Button>
                                 </div>
                             )}
-                             {permissionGranted && tokenInFirestore && serviceWorkerActive &&(
+                             {!isLoading.auth && !isLoading.profile && !isLoading.serviceWorker && permissionGranted && tokenInFirestore && serviceWorkerActive && (
                                <div className="flex items-center gap-2 text-green-600 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
                                   <CheckCircle2 className="h-5 w-5" />
                                   <p className="font-medium">You are all set to receive notifications!</p>
@@ -368,3 +368,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    
