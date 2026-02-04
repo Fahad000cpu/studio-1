@@ -96,26 +96,27 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
+    // We need the auth instance. If it's not ready, wait.
     if (!auth) return;
 
+    // We only want to create the verifier ONCE.
+    // If the ref already has a verifier, we don't need to do anything.
+    if (recaptchaVerifierRef.current) return;
+    
     const recaptchaContainer = document.getElementById('recaptcha-container');
     if (!recaptchaContainer) return;
 
-    // Initialize RecaptchaVerifier only once
-    if (!recaptchaVerifierRef.current) {
-        const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
-          size: 'invisible',
-          callback: (response: any) => {
-            // reCAPTCHA solved, allow signInWithPhoneNumber.
-          },
-        });
-        recaptchaVerifierRef.current = verifier;
-    }
+    const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
+      size: 'invisible',
+      callback: (response: any) => {
+        // reCAPTCHA solved, allow signInWithPhoneNumber.
+      },
+    });
+    recaptchaVerifierRef.current = verifier;
 
     // Cleanup function to clear the verifier when the component unmounts
     return () => {
       recaptchaVerifierRef.current?.clear();
-      recaptchaVerifierRef.current = null;
     };
   }, [auth]);
 
