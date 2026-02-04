@@ -26,7 +26,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, updateDocumentNonBlocking, requestPermission } from "@/firebase";
+import { useAuth, useFirestore, requestPermission } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -79,17 +79,12 @@ export default function LoginPage() {
         const userRef = doc(firestore, "users", user.uid);
         const userDoc = await getDoc(userRef);
 
-        if (userDoc.exists()) {
-            const userData = userDoc.data();
-            updateDocumentNonBlocking(userRef, { lastLogin: new Date() });
-            
-            if (!userData.fcmTokens || userData.fcmTokens.length === 0) {
-                await requestPermission(firestore, user.uid);
-            }
+        if (!userDoc.exists()) {
+           // If the doc doesn't exist, it means something went wrong during signup.
+           // The signup flow is the single source of truth for profile creation.
+           // We will not create a profile here to avoid inconsistencies.
+           console.warn("User profile not found on login for UID:", user.uid);
         }
-        // If the doc doesn't exist, it means something went wrong during signup.
-        // The signup flow is the single source of truth for profile creation.
-        // We will not create a profile here to avoid inconsistencies.
     } catch (error) {
         console.error("Post-login actions failed:", error);
     } finally {

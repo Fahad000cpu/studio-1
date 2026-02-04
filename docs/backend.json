@@ -20,16 +20,20 @@
           "type": "string",
           "description": "User's display name."
         },
-        "location": {
-          "type": "string",
-          "description": "User's location (e.g., city, state). Collected during signup."
+        "coordinates": {
+            "type": "object",
+            "description": "User's geographical coordinates.",
+            "properties": {
+                "latitude": { "type": "number" },
+                "longitude": { "type": "number" }
+            }
         },
-        "profilePicture": {
+        "profilePictureUrl": {
           "type": "string",
           "description": "URL of the user's profile picture.",
           "format": "uri"
         },
-        "signUpTimestamp": {
+        "createdAt": {
           "type": "string",
           "description": "Timestamp of when the user signed up.",
           "format": "date-time"
@@ -42,13 +46,21 @@
         "phoneNumber": {
           "type": "string",
           "description": "User's phone number."
+        },
+        "bio": {
+            "type": "string",
+            "description": "A short bio about the user."
+        },
+        "fcmTokens": {
+            "type": "array",
+            "description": "Firebase Cloud Messaging tokens for push notifications.",
+            "items": { "type": "string" }
         }
       },
       "required": [
         "id",
         "email",
-        "name",
-        "location"
+        "name"
       ]
     },
     "ChatMessage": {
@@ -158,6 +170,11 @@
           "type": "string",
           "description": "Reference to UserProfile. (Relationship: UserProfile 1:N GroupChatMessage - Sender)"
         },
+        "memberIds": {
+          "type": "array",
+          "description": "Denormalized list of member IDs for authorization.",
+          "items": { "type": "string" }
+        },
         "content": {
           "type": "string",
           "description": "Content of the group chat message."
@@ -181,6 +198,7 @@
         "id",
         "groupId",
         "senderId",
+        "memberIds",
         "content",
         "timestamp",
         "type"
@@ -418,5 +436,3 @@
     "reasoning": "The Firestore structure is designed to support ConnectSphere's features while adhering to the principles of Authorization Independence, Structural Segregation, Access Modeling, and Data Clarity.  \n\n1.  **User Profiles:** User profiles are stored under `/users/{userId}`. This path-based ownership is secure and efficient.\n2.  **One-to-One Chats:** Chat messages between users are stored in a subcollection `/users/{userId}/chats/{chatId}/messages/{messageId}`. While this initially seems hierarchical, the security rules will depend on the `userId` and sender/recipient data within the `ChatMessage` itself, ensuring Authorization Independence. The `chatId` is generated client-side.\n3.  **Group Chats:** Group chat information is stored under `/groups/{groupId}`. Group membership is managed via a `members` map within each `ChatGroup` document, where keys are user IDs and values are roles (e.g., 'member', 'admin'). This `members` map is denormalized into each `GroupChatMessage` document to ensure Authorization Independence (no `get()` calls). Group chat messages are then stored in `/groups/{groupId}/messages/{messageId}`.\n4.  **Status Updates:** Status updates are stored under `/status_updates/{statusUpdateId}`.  Each status update contains the `userId` of the user who posted it.  A query can efficiently retrieve status updates for a specific user, and security rules can easily enforce that only the user can delete their own status updates.  Because status updates are ephemeral, storing them at the top level simplifies cleanup via a Cloud Function.\n5.  **Affiliate Products:** Affiliate products are stored under `/affiliate_products/{productId}`. Access is restricted to admins. The `adminId` field within each `AffiliateProduct` document indicates which admin added the product.\n6.  **Admin Roles:** Admin status is managed through the `/roles_admin/{userId}` collection. The existence of a document at this path indicates admin privileges.\n\n**Authorization Independence:** Achieved by denormalizing authorization data (e.g., `members` map in group chats, `userId` in status updates) into child documents, eliminating the need for `get()` calls in security rules.\n\n**QAPs Support:**\n\n*   **List operations for users:**  Using `/users/{userId}`, we can list all users (with pagination) and filter. Security rules can restrict which fields are visible based on the requesting user's role or relationship to the target user.\n*   **List operations for group chat messages:** By denormalizing the `members` map into the `GroupChatMessage`, rules can validate if a user is a member of a group when listing messages.\n*   **Admin-only access to Affiliate Products:** The `/affiliate_products` collection is secured such that only users with admin roles (verified by `/roles_admin/{userId}`) can create, update, or delete products. List operations are public.\n"
   }
 }
-    
-    

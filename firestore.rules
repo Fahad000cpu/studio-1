@@ -17,10 +17,9 @@
  * - /roles_admin/{userId}: Indicates admin privileges.
  *
  * Key Security Decisions:
- * - User profiles are private and only accessible to the owner.
- * - Group chat access is determined by membership, enforced through denormalized data.
- * - Affiliate products are only manageable by admins.
- * - User listing is allowed, but can be refined in the future to restrict field visibility.
+ * - User profiles are readable by any authenticated user to enable discovery, but writable only by the owner.
+ * - Group chat access is determined by membership, enforced through denormalized data to avoid costly 'get' calls.
+ * - Affiliate products are only manageable by admins, identified via the roles_admin collection.
  *
  * Denormalization for Authorization:
  * - Group chat messages contain a denormalized 'members' map from the parent group document
@@ -29,6 +28,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
 
     /**
      * @description Protects user profiles. Any authenticated user can read profiles, but only the owner can write.
@@ -39,14 +52,11 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes, restricting access to a user's own data tree.
      */
     match /users/{userId} {
-      function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      allow get: if request.auth != null;
-      allow list: if request.auth != null; 
-      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow get: if isSignedIn();
+      allow list: if isSignedIn(); 
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
     }
     
     /**
@@ -57,11 +67,11 @@ service cloud.firestore {
      * @path /status_updates/{statusId}
      */
     match /status_updates/{statusId} {
-        function isOwner() {
-          return request.auth != null && request.auth.uid == resource.data.userId;
+        function isStatusOwner() {
+          return isOwner(resource.data.userId);
         }
         function isCreatingOwnStatus() {
-           return request.auth != null && request.auth.uid == request.resource.data.userId;
+           return isSignedIn() && request.auth.uid == request.resource.data.userId;
         }
         
         function isUpdatingLikesOrViews() {
@@ -70,10 +80,10 @@ service cloud.firestore {
           return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
         }
 
-        allow read: if request.auth != null;
+        allow read: if isSignedIn();
         allow create: if isCreatingOwnStatus();
-        allow update: if request.auth != null && isUpdatingLikesOrViews();
-        allow delete: if isOwner();
+        allow update: if isSignedIn() && isUpdatingLikesOrViews();
+        allow delete: if isStatusOwner();
     }
 
 
@@ -86,10 +96,10 @@ service cloud.firestore {
      */
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
-        return request.auth != null && request.auth.uid in chatId.split('_');
+        return isSignedIn() && request.auth.uid in chatId.split('_');
       }
       function isSender() {
-        return request.auth != null && request.auth.uid == resource.data.senderId;
+        return isOwner(resource.data.senderId);
       }
       allow read, create: if isChatParticipant();
       allow delete: if isSender();
@@ -107,40 +117,35 @@ service cloud.firestore {
      * @principle Enforces group membership for updates, creator-only access for deletion.
      */
     match /groups/{groupId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
       function isMember() {
         return isSignedIn() && request.auth.uid in resource.data.memberIds;
       }
       function isGroupCreator() {
-        return isSignedIn() && resource.data.creatorId == request.auth.uid;
+        return isOwner(resource.data.creatorId);
       }
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow create: if isOwner(request.resource.data.creatorId);
       allow update: if isMember();
       allow delete: if isGroupCreator();
     }
 
     /**
-     * @description Secures group chat messages.  Membership is enforced via the denormalized 'members' map.
+     * @description Secures group chat messages. Membership is enforced via a denormalized 'memberIds' field.
      * @path /groups/{groupId}/messages/{messageId}
-     * @allow (create) User 'user123' can create a message if they are a member of the group.
-     * @allow (get, list) Any group member can read messages.
-     * @deny (update, delete) No one can update or delete a message once it's sent.
-     * @principle Enforces group membership for message creation; messages are immutable.
+     * @allow (get, list, create) User can read/write messages if their UID is in the denormalized memberIds list.
+     * @deny (update, delete) Messages are immutable to preserve chat history integrity.
+     * @principle Authorization Independence: Avoids 'get()' call by checking denormalized data on the document itself.
      */
     match /groups/{groupId}/messages/{messageId} {
-      function isSignedIn() {
-        return request.auth != null;
+       function isReadingMember() {
+        return isSignedIn() && request.auth.uid in resource.data.memberIds;
       }
-      function isMember() {
-          return isSignedIn() && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+       function isCreatingMember() {
+        return isSignedIn() && request.auth.uid in request.resource.data.memberIds;
       }
-      allow get: if isMember();
-      allow list: if isMember();
-      allow create: if request.auth != null && isMember() && request.resource.data.groupId == groupId;
+      allow get, list: if isReadingMember();
+      allow create: if isCreatingMember() && request.resource.data.groupId == groupId;
       allow update: if false;
       allow delete: if false;
     }
@@ -150,30 +155,21 @@ service cloud.firestore {
      * @path /affiliate_products/{productId}
      * @allow (get, list) Any authenticated user can read the affiliate products.
      * @allow (create, update, delete) Only admins can manage affiliate products.
-     * @principle Enforces admin-only access for management operations.
+     * @principle Enforces admin-only access for management operations using a roles collection.
      */
     match /affiliate_products/{productId} {
-      function isAdmin() {
-          return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
-      }
-      allow read: if request.auth != null;
+      allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
 
      /**
-      * @description Secures admin roles. Only admins can grant admin roles.
+      * @description Secures admin roles. Only existing admins can grant or revoke admin roles.
       * @path /roles_admin/{userId}
       */
     match /roles_admin/{userId} {
-       function isAdmin() {
-           return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
-       }
-
-       allow get: if isAdmin();
-       allow list: if isAdmin();
-       allow create: if isAdmin();
-       allow update: if false;
-       allow delete: if isAdmin();
+       allow get, list: if isAdmin();
+       allow create, delete: if isAdmin();
+       allow update: if false; // Role documents are either created or deleted, not updated.
     }
   }
 }

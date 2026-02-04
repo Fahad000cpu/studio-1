@@ -11,6 +11,7 @@ export type UserProfile = {
     coordinates?: GeoPoint | null;
     fcmTokens: string[];
     profilePictureUrl?: string;
+    createdAt?: Date;
 };
 
 export type AffiliateProduct = {
