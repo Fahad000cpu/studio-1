@@ -72,6 +72,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   
+  const [activeTab, setActiveTab] = useState("email");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -95,30 +96,43 @@ export default function LoginPage() {
     },
   });
 
-  useEffect(() => {
-    // We need the auth instance. If it's not ready, wait.
-    if (!auth) return;
+ useEffect(() => {
+    // Only initialize reCAPTCHA when the phone tab is active
+    if (activeTab !== 'phone' || !auth) {
+      return;
+    }
 
-    // We only want to create the verifier ONCE.
-    // If the ref already has a verifier, we don't need to do anything.
-    if (recaptchaVerifierRef.current) return;
-    
+    // Avoid re-initializing if it already exists
+    if (recaptchaVerifierRef.current) {
+      return;
+    }
+
     const recaptchaContainer = document.getElementById('recaptcha-container');
-    if (!recaptchaContainer) return;
+    if (!recaptchaContainer) {
+      console.error("reCAPTCHA container not found");
+      return;
+    }
+    
+    try {
+      const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
+        size: 'invisible',
+        callback: (response: any) => {
+          // reCAPTCHA solved, allow signInWithPhoneNumber.
+        },
+      });
+      recaptchaVerifierRef.current = verifier;
+    } catch (e) {
+      console.error("Error creating RecaptchaVerifier", e);
+    }
 
-    const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
-      size: 'invisible',
-      callback: (response: any) => {
-        // reCAPTCHA solved, allow signInWithPhoneNumber.
-      },
-    });
-    recaptchaVerifierRef.current = verifier;
-
-    // Cleanup function to clear the verifier when the component unmounts
+    // Cleanup function: clears the verifier when the tab is switched or component unmounts
     return () => {
-      recaptchaVerifierRef.current?.clear();
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
     };
-  }, [auth]);
+  }, [auth, activeTab]);
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -169,7 +183,7 @@ export default function LoginPage() {
         toast({ 
             variant: "destructive", 
             title: "Error", 
-            description: "Security verification failed to initialize. Please refresh and try again." 
+            description: "Security verification failed to initialize. Please switch tabs or refresh and try again." 
         });
         return;
     }
@@ -184,7 +198,14 @@ export default function LoginPage() {
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
         console.error("Error sending OTP:", error);
-        if (error.code === 'auth/operation-not-allowed') {
+        if (error.code === 'auth/internal-error') {
+            toast({
+                variant: "destructive",
+                title: "Configuration Error",
+                description: "An internal error occurred. This can happen if the Identity Platform API is not enabled in your Google Cloud project, or if App Check is misconfigured. Please check your Firebase project settings.",
+                duration: 20000,
+            });
+        } else if (error.code === 'auth/operation-not-allowed') {
             const currentDomain = window.location.hostname;
             toast({
                 variant: "destructive",
@@ -234,7 +255,7 @@ export default function LoginPage() {
         <CardDescription>Sign in to your ConnectSphere account</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="email" className="w-full">
+        <Tabs defaultValue="email" className="w-full" onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="email">Email</TabsTrigger>
                 <TabsTrigger value="phone">Phone</TabsTrigger>
