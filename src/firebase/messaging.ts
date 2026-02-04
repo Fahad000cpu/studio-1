@@ -25,9 +25,18 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     const permission = await Notification.requestPermission();
 
     if (permission === 'granted') {
-      const currentToken = await getToken(messaging, {
-        vapidKey: 'BNr51L1oTD3rDTFl-Cxw2h4cZdXoz6q7uiXbYoZ5rTJGXwMy4bEgYNaSU5_GEHXuSDdCURItdHu6eDSHw5RqDpw'
-      });
+      const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
+      if (!vapidKey) {
+        console.error("VAPID key is not set in environment variables.");
+        toast({
+            variant: "destructive",
+            title: "Configuration Error",
+            description: "Cannot enable notifications due to a missing configuration key.",
+        });
+        return null;
+      }
+
+      const currentToken = await getToken(messaging, { vapidKey });
       
       if (currentToken) {
         const userDocRef = doc(firestore, 'users', userId);
