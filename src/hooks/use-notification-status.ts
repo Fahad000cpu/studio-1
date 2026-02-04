@@ -2,8 +2,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { useNotificationPermission } from './use-notification-permission';
+import type { UserProfile } from '@/types';
+
 
 export interface NotificationStatus {
   isSupported: boolean;
@@ -15,8 +18,15 @@ export interface NotificationStatus {
 }
 
 export function useNotificationStatus() {
-  const { user, isUserLoading } = useUser();
+  const { user: authUser, isUserLoading: isAuthLoading } = useUser();
+  const firestore = useFirestore();
   const { permission: notificationPermission, isSupported } = useNotificationPermission();
+
+  const userDocRef = useMemoFirebase(
+    () => (authUser ? doc(firestore, 'users', authUser.uid) : null),
+    [authUser, firestore]
+  );
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   
   const [status, setStatus] = useState<NotificationStatus>({
     isSupported: true,
@@ -29,14 +39,13 @@ export function useNotificationStatus() {
 
   useEffect(() => {
     const checkStatus = async () => {
-        // Set loading state true at the beginning of the check
-        setStatus(prev => ({...prev, isLoading: true}));
+        const isLoading = isAuthLoading || (!!authUser && isProfileLoading);
+        setStatus(prev => ({...prev, isLoading }));
 
-        if (isUserLoading) {
-            return; // Wait until user data is loaded, isLoading is already true
+        if (isLoading) {
+            return;
         }
         
-        // 1. Check for browser support
         if (!isSupported) {
             setStatus({
                 isSupported: false,
@@ -49,7 +58,6 @@ export function useNotificationStatus() {
             return;
         }
 
-        // 2. Check Service Worker status
         let swActive = false;
         try {
             const swRegistration = await navigator.serviceWorker.ready;
@@ -58,13 +66,9 @@ export function useNotificationStatus() {
             console.warn("Could not check service worker status:", e);
         }
         
-
-        // 3. Check Notification Permission
         const permGranted = notificationPermission === 'granted';
-
-        // 4. Check for FCM token in user's Firestore document
-        // This check is simple: does the user object we have contain a non-empty fcmTokens array?
-        const tokenPresent = !!(user?.fcmTokens && user.fcmTokens.length > 0);
+        
+        const tokenPresent = !!(userProfile?.fcmTokens && userProfile.fcmTokens.length > 0);
 
         setStatus({
             isSupported: true,
@@ -78,8 +82,7 @@ export function useNotificationStatus() {
 
     checkStatus();
     
-    // Rerun when user object changes (e.g., after token is added) or permission changes
-  }, [isSupported, notificationPermission, user, isUserLoading]);
+  }, [isSupported, notificationPermission, authUser, isAuthLoading, userProfile, isProfileLoading]);
 
   return status;
 }
