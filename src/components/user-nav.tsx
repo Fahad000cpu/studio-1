@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getInitials } from "@/lib/utils";
 
 export function UserNav() {
   const auth = useAuth();
@@ -31,15 +32,6 @@ export function UserNav() {
   if (!user) {
     return null;
   }
-
-  const getInitials = (name?: string | null) => {
-    if (!name) return "";
-    const nameParts = name.split(" ");
-    if (nameParts.length === 1 && nameParts[0].length > 1) {
-      return nameParts[0].substring(0, 2).toUpperCase();
-    }
-    return nameParts.map((part) => part[0]).join("").toUpperCase();
-  };
 
   return (
     <DropdownMenu>

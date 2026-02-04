@@ -17,6 +17,7 @@ import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 import { useNotificationStatus } from "@/hooks/use-notification-status";
 import { cn } from "@/lib/utils";
+import { getInitials } from "@/lib/utils";
 
 
 const StatusCheckItem = ({ label, checked }: { label: string; checked: boolean | null }) => (
@@ -132,15 +133,6 @@ export default function SettingsPage() {
     }
   };
 
-    const getInitials = (name?: string | null) => {
-    if (!name) return "";
-    const nameParts = name.split(" ");
-    if (nameParts.length === 1 && nameParts[0].length > 1) {
-      return nameParts[0].substring(0, 2).toUpperCase();
-    }
-    return nameParts.map((part) => part[0]).join("").toUpperCase();
-  };
-  
   const handleAvatarSave = async (imageBlob: Blob) => {
     if (!user || !auth.currentUser) return;
     
