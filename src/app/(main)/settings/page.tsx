@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,16 +11,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BellRing, MapPin, Camera, Bell } from "lucide-react";
+import { BellRing, MapPin, Camera, Bell, CheckCircle2, XCircle, Loader2, AlertCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import { useNotificationPermission } from "@/hooks/use-notification-permission";
-import { NotificationPermissionAlert } from "@/components/notification-permission-alert";
+import { useNotificationStatus } from "@/hooks/use-notification-status";
+import { cn } from "@/lib/utils";
+
+
+const StatusCheckItem = ({ label, checked }: { label: string; checked: boolean | null }) => (
+    <div className={cn("flex items-center gap-3", checked === false ? "text-destructive" : "text-muted-foreground")}>
+        {checked === true ? (
+            <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+        ) : (
+            <XCircle className="h-5 w-5 shrink-0" />
+        )}
+        <span className="text-sm">{label}</span>
+    </div>
+);
 
 
 export default function SettingsPage() {
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -32,8 +45,15 @@ export default function SettingsPage() {
   const [isUploading, setIsUploading] = useState(false);
   
   const [avatarKey, setAvatarKey] = useState(Date.now());
-  const { permission: notificationPermission } = useNotificationPermission();
-
+  
+  const {
+      isSupported,
+      serviceWorkerActive,
+      permissionGranted,
+      tokenInFirestore,
+      isLoading: isStatusLoading,
+      permission
+  } = useNotificationStatus();
 
   useEffect(() => {
     if (user) {
@@ -154,6 +174,18 @@ export default function SettingsPage() {
     }
   };
 
+  const handleEnableNotifications = async () => {
+    if (!user || !firestore) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Cannot enable notifications right now. Please try again later.',
+      });
+      return;
+    }
+    await requestPermission(firestore, user.uid);
+  };
+
 
   return (
     <div className="container mx-auto max-w-3xl">
@@ -172,7 +204,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center gap-6">
+             <div className="flex items-center gap-6">
                 <div className="relative group">
                     <Avatar className="h-24 w-24">
                         <AvatarImage key={avatarKey} src={user?.photoURL || ''} alt={user?.displayName || ''} />
@@ -201,6 +233,7 @@ export default function SettingsPage() {
                     id="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    disabled={isUserLoading}
                   />
                 </div>
             </div>
@@ -219,6 +252,7 @@ export default function SettingsPage() {
                 id="bio"
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
+                 disabled={isUserLoading}
               />
             </div>
             <div className="flex items-center justify-between pt-2">
@@ -257,39 +291,90 @@ export default function SettingsPage() {
         </Card>
         
         <Card>
-          <CardHeader>
-            <CardTitle>Notifications</CardTitle>
-            <CardDescription>
-              Manage how you receive notifications.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <NotificationPermissionAlert />
-            {notificationPermission === 'granted' && (
-                <div className="flex items-center space-x-2 text-green-600">
-                    <BellRing className="h-5 w-5" />
-                    <p className="font-medium">Broadcast notifications are enabled.</p>
+           <CardHeader>
+                <CardTitle>Notifications</CardTitle>
+                <CardDescription>
+                    Manage how you receive notifications and check your setup status.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {isStatusLoading ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Checking notification status...</span>
+                    </div>
+                ) : !isSupported ? (
+                    <div className="flex items-center gap-2 text-destructive">
+                        <XCircle className="h-5 w-5" />
+                        <p className="font-medium">Push notifications are not supported in this browser.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        <StatusCheckItem
+                            label="Browser permission granted"
+                            checked={permissionGranted}
+                        />
+                        <StatusCheckItem
+                            label="Service worker active"
+                            checked={serviceWorkerActive}
+                        />
+                        <StatusCheckItem
+                            label="Notification token saved to profile"
+                            checked={tokenInFirestore}
+                        />
+                    </div>
+                )}
+
+                <div className="pt-4 border-t">
+                    { !isStatusLoading && isSupported && (
+                        <>
+                            {permission === 'prompt' && (
+                                <Button onClick={handleEnableNotifications}>
+                                    <Bell className="mr-2 h-4 w-4" />
+                                    Enable Notifications
+                                </Button>
+                            )}
+                             {permission === 'denied' && (
+                                <p className="text-sm text-destructive">
+                                    You have blocked notifications. Please enable them in your browser settings to receive updates.
+                                </p>
+                            )}
+                             {permissionGranted && !tokenInFirestore && (
+                                <div className="flex items-start gap-2.5 text-muted-foreground text-sm">
+                                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                    <p>Permission is granted, but we couldn't save your notification token. Please try again.</p>
+                                    <Button onClick={handleEnableNotifications} size="sm" variant="outline" className="ml-auto">Retry</Button>
+                                </div>
+                            )}
+                             {permissionGranted && tokenInFirestore && serviceWorkerActive &&(
+                               <div className="flex items-center gap-2 text-green-600">
+                                  <CheckCircle2 className="h-5 w-5" />
+                                  <p className="font-medium">You are all set to receive notifications!</p>
+                               </div>
+                             )}
+                        </>
+                    )}
                 </div>
-            )}
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div>
-                <Label>PushAll Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                    Subscribe to our PushAll channel for more notification options.
-                </p>
-              </div>
-              <Button asChild variant="outline">
-                <a href="https://pushall.ru/?fs=5965" target="_blank" rel="noopener noreferrer">
-                    <Bell className="mr-2 h-4 w-4" />
-                    Subscribe
-                </a>
-              </Button>
-            </div>
-          </CardContent>
+
+                <div className="flex items-center justify-between pt-4 border-t">
+                    <div>
+                        <Label>PushAll Notifications</Label>
+                        <p className="text-sm text-muted-foreground">
+                            Subscribe to our PushAll channel for more notification options.
+                        </p>
+                    </div>
+                    <Button asChild variant="outline">
+                        <a href="https://pushall.ru/?fs=5965" target="_blank" rel="noopener noreferrer">
+                            <Bell className="mr-2 h-4 w-4" />
+                            Subscribe
+                        </a>
+                    </Button>
+                </div>
+            </CardContent>
         </Card>
 
         <div className="flex justify-end">
-            <Button onClick={handleSaveChanges} disabled={isSaving} className="bg-accent text-accent-foreground hover:bg-accent/90">
+            <Button onClick={handleSaveChanges} disabled={isSaving || isUserLoading} className="bg-accent text-accent-foreground hover:bg-accent/90">
                 {isSaving ? "Saving..." : "Save Changes"}
             </Button>
         </div>

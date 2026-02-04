@@ -1,17 +1,25 @@
+
 'use client';
 
 import { useFirebase, requestPermission } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Bell, BellRing } from 'lucide-react';
-import { useNotificationPermission } from '@/hooks/use-notification-permission';
+import { Bell, BellRing, Loader2 } from 'lucide-react';
+import { useNotificationStatus } from '@/hooks/use-notification-status';
 import { cn } from '@/lib/utils';
+
 
 export function NotificationPermissionAlert({ className }: { className?: string }) {
   const { user, firestore } = useFirebase();
   const { toast } = useToast();
-  const { permission: notificationPermission, isSupported } = useNotificationPermission();
+  const { 
+      isSupported, 
+      permissionGranted, 
+      tokenInFirestore, 
+      isLoading,
+      permission,
+  } = useNotificationStatus();
 
   const handleEnableNotifications = async () => {
     if (!user || !firestore) {
@@ -22,40 +30,49 @@ export function NotificationPermissionAlert({ className }: { className?: string 
         });
         return;
     }
-
-    if (notificationPermission === 'prompt') {
-        const token = await requestPermission(firestore, user.uid);
-        if (token) {
-            toast({
-                title: "Notifications Enabled!",
-                description: "You'll now receive broadcast messages from the admin.",
-            });
-        }
-    }
+    await requestPermission(firestore, user.uid);
   };
   
-  if (!isSupported || notificationPermission === 'granted') {
+  if (isLoading) {
+     return (
+        <Alert className={cn("flex items-center gap-2", className)}>
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <AlertDescription>Checking notification status...</AlertDescription>
+        </Alert>
+    );
+  }
+
+  // Don't show if not supported or if everything is perfectly set up
+  if (!isSupported || (permissionGranted && tokenInFirestore)) {
     return null;
   }
 
+  let title = "Enable Push Notifications";
+  let description = "Receive broadcast messages and updates from the admin by enabling notifications.";
+  let showButton = true;
+  let buttonText = "Allow Notifications";
+
+  if (permission === 'denied') {
+    title = 'Push Notifications Blocked';
+    description = 'To receive important updates, you must enable notifications in your browser settings.';
+    showButton = false;
+  } else if (permissionGranted && !tokenInFirestore) {
+    title = 'Action Required';
+    description = "We couldn't save your notification token. Please click to try again.";
+    showButton = true;
+    buttonText = "Retry";
+  }
+
   return (
-    <Alert variant={notificationPermission === 'denied' ? 'destructive' : 'default'} className={cn(className)}>
+    <Alert variant={permission === 'denied' ? 'destructive' : 'default'} className={cn(className)}>
         <BellRing className="h-4 w-4" />
-        <AlertTitle>
-            {notificationPermission === 'denied'
-                ? 'Push Notifications Blocked'
-                : 'Enable Push Notifications'}
-        </AlertTitle>
-        <AlertDescription className="flex items-center justify-between gap-4">
-            <span>
-              {notificationPermission === 'denied'
-                  ? 'To receive important updates, you must enable them in your browser settings.'
-                  : 'Receive broadcast messages and updates from the admin by enabling notifications.'}
-            </span>
-            {notificationPermission === 'prompt' && (
-                <Button onClick={handleEnableNotifications} size="sm" className="whitespace-nowrap">
+        <AlertTitle>{title}</AlertTitle>
+        <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <span>{description}</span>
+            {showButton && (
+                <Button onClick={handleEnableNotifications} size="sm" className="whitespace-nowrap mt-2 sm:mt-0">
                     <Bell className="mr-2 h-4 w-4" />
-                    Allow Notifications
+                    {buttonText}
                 </Button>
             )}
         </AlertDescription>
