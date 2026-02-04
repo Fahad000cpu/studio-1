@@ -17,7 +17,7 @@ export interface NotificationStatus {
   permission: NotificationPermission;
 }
 
-export function useNotificationStatus() {
+export function useNotificationStatus(): NotificationStatus {
   const { user: authUser, isUserLoading: isAuthLoading } = useUser();
   const firestore = useFirestore();
   const { permission: notificationPermission, isSupported } = useNotificationPermission();
@@ -28,61 +28,37 @@ export function useNotificationStatus() {
   );
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
   
-  const [status, setStatus] = useState<NotificationStatus>({
-    isSupported: true,
-    serviceWorkerActive: null,
-    permissionGranted: null,
-    tokenInFirestore: null,
-    isLoading: true,
-    permission: 'default',
-  });
+  const [swActive, setSwActive] = useState<boolean|null>(null);
 
   useEffect(() => {
-    const checkStatus = async () => {
-        const isLoading = isAuthLoading || (!!authUser && isProfileLoading);
-        setStatus(prev => ({...prev, isLoading }));
+    // Check Service Worker status once on the client side.
+    async function checkSw() {
+      if (!isSupported || typeof navigator === 'undefined' || !navigator.serviceWorker) {
+        setSwActive(false);
+        return;
+      }
+      try {
+        const swRegistration = await navigator.serviceWorker.ready;
+        setSwActive(!!swRegistration?.active);
+      } catch (e) {
+        console.warn("Could not check service worker status:", e);
+        setSwActive(false);
+      }
+    }
+    checkSw();
+  }, [isSupported]);
 
-        if (isLoading) {
-            return;
-        }
-        
-        if (!isSupported) {
-            setStatus({
-                isSupported: false,
-                serviceWorkerActive: false,
-                permissionGranted: false,
-                tokenInFirestore: false,
-                isLoading: false,
-                permission: 'default',
-            });
-            return;
-        }
 
-        let swActive = false;
-        try {
-            const swRegistration = await navigator.serviceWorker.ready;
-            swActive = !!swRegistration?.active;
-        } catch (e) {
-            console.warn("Could not check service worker status:", e);
-        }
-        
-        const permGranted = notificationPermission === 'granted';
-        
-        const tokenPresent = !!(userProfile?.fcmTokens?.some(token => token && token.length > 0));
+  const isLoading = isAuthLoading || isProfileLoading || swActive === null;
+  const permissionGranted = isSupported && notificationPermission === 'granted';
+  const tokenInFirestore = !!(userProfile?.fcmTokens?.some(token => token && token.length > 0));
 
-        setStatus({
-            isSupported: true,
-            serviceWorkerActive: swActive,
-            permissionGranted: permGranted,
-            tokenInFirestore: tokenPresent,
-            isLoading: false,
-            permission: notificationPermission,
-        });
-    };
-
-    checkStatus();
-    
-  }, [isSupported, notificationPermission, authUser, isAuthLoading, userProfile, isProfileLoading]);
-
-  return status;
+  return {
+    isSupported,
+    serviceWorkerActive: swActive,
+    permissionGranted,
+    tokenInFirestore,
+    isLoading,
+    permission: notificationPermission,
+  };
 }
