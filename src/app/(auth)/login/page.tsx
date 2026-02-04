@@ -106,15 +106,6 @@ export default function LoginPage() {
             }
         });
     }
-
-    return () => {
-        if (recaptchaVerifierRef.current) {
-            // It's safer to not call .clear() here on every re-render,
-            // as it can cause the "client element has been removed" error
-            // if a re-render happens during the sign-in process.
-            // The verifier should persist for the component's lifetime.
-        }
-    };
   }, []);
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
@@ -177,7 +168,20 @@ export default function LoginPage() {
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
         console.error("Error sending OTP:", error);
-        toast({ variant: "destructive", title: "Failed to Send OTP", description: error.message || "Could not send OTP. Please check the phone number and try again." });
+        if (error.code === 'auth/operation-not-allowed') {
+            toast({
+                variant: "destructive",
+                title: "Configuration Error",
+                description: "Phone sign-in is not allowed from this website's domain. Please add this app's domain to the 'Authorized domains' list in your Firebase console under Authentication > Settings.",
+                duration: 9000,
+            });
+        } else {
+            toast({
+                variant: "destructive",
+                title: "Failed to Send OTP",
+                description: error.message || "An unexpected error occurred. Please check the number and try again.",
+            });
+        }
     } finally {
         setIsSendingOtp(false);
     }
@@ -335,5 +339,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    
