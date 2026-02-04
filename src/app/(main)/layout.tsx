@@ -31,6 +31,7 @@ export default function MainLayout({
   const router = useRouter();
 
   useEffect(() => {
+    // If auth state is confirmed and there is NO user, redirect them to the login page.
     if (!isUserLoading && !user) {
       router.push("/login");
     }
@@ -61,7 +62,8 @@ export default function MainLayout({
   }, [user, firestore]);
 
 
-  if (isUserLoading) {
+  // While checking auth state, or if we have confirmed there is no user (and are about to redirect), show a loader.
+  if (isUserLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-screen relative overflow-hidden">
         <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
@@ -73,10 +75,7 @@ export default function MainLayout({
     );
   }
 
-  if (!user) {
-    return null;
-  }
-
+  // If we have a user, render the main app layout.
   return (
     <div className="relative min-h-screen">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
