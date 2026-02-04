@@ -35,7 +35,6 @@ const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
-  phoneNumber: z.string().optional(),
 });
 
 const GoogleIcon = () => (
@@ -71,18 +70,17 @@ export default function SignupPage() {
       name: "",
       email: "",
       password: "",
-      phoneNumber: "",
     },
   });
 
-  const createUserProfile = (user: User, name: string, email: string, phoneNumber?: string, photoURL?: string | null) => {
+  const createUserProfile = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
     const userRef = doc(firestore, "users", user.uid);
     const createUserDoc = (coordinates: GeoPoint | null) => {
         const userProfile = {
             id: user.uid,
             name: name,
             email: email,
-            phoneNumber: phoneNumber || null,
+            phoneNumber: phoneNumber || user.phoneNumber || null,
             profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
             coordinates,
             fcmTokens: [],
@@ -107,7 +105,7 @@ export default function SignupPage() {
   };
 
 
-  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string, photoURL?: string | null) => {
+  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
     const userRef = doc(firestore, 'users', user.uid);
     try {
         const userDoc = await getDoc(userRef);
@@ -128,7 +126,7 @@ export default function SignupPage() {
       const user = userCredential.user;
       if (user) {
         await updateProfile(user, { displayName: values.name });
-        await handlePostSignup(user, values.name, values.email, values.phoneNumber, user.photoURL);
+        await handlePostSignup(user, values.name, values.email, user.phoneNumber, user.photoURL);
         // The redirect is now handled by the (auth) layout based on auth state.
       }
     } catch (error: any) {
@@ -158,14 +156,10 @@ export default function SignupPage() {
 
         if (additionalInfo?.isNewUser) {
            await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
-        } else {
-           // Existing user logging in via Google. Auth state will change, 
-           // and the layout will handle the redirect automatically.
         }
-
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
-            return; // User cancelled the popup, do nothing.
+            return;
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
              toast({
@@ -235,19 +229,6 @@ export default function SignupPage() {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="phoneNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number (Optional)</FormLabel>
-                  <FormControl>
-                    <Input type="tel" placeholder="Your Phone Number" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Creating Account..." : "Create Account"}
             </Button>
@@ -281,3 +262,5 @@ export default function SignupPage() {
     </Card>
   );
 }
+
+    

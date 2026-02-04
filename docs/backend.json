@@ -58,9 +58,7 @@
         }
       },
       "required": [
-        "id",
-        "email",
-        "name"
+        "id"
       ]
     },
     "ChatMessage": {
@@ -307,7 +305,8 @@
     "providers": [
       "password",
       "anonymous",
-      "google.com"
+      "google.com",
+      "phone"
     ]
   },
   "firestore": {
@@ -436,3 +435,5 @@
     "reasoning": "The Firestore structure is designed to support ConnectSphere's features while adhering to the principles of Authorization Independence, Structural Segregation, Access Modeling, and Data Clarity.  \n\n1.  **User Profiles:** User profiles are stored under `/users/{userId}`. This path-based ownership is secure and efficient.\n2.  **One-to-One Chats:** Chat messages between users are stored in a subcollection `/users/{userId}/chats/{chatId}/messages/{messageId}`. While this initially seems hierarchical, the security rules will depend on the `userId` and sender/recipient data within the `ChatMessage` itself, ensuring Authorization Independence. The `chatId` is generated client-side.\n3.  **Group Chats:** Group chat information is stored under `/groups/{groupId}`. Group membership is managed via a `members` map within each `ChatGroup` document, where keys are user IDs and values are roles (e.g., 'member', 'admin'). This `members` map is denormalized into each `GroupChatMessage` document to ensure Authorization Independence (no `get()` calls). Group chat messages are then stored in `/groups/{groupId}/messages/{messageId}`.\n4.  **Status Updates:** Status updates are stored under `/status_updates/{statusUpdateId}`.  Each status update contains the `userId` of the user who posted it.  A query can efficiently retrieve status updates for a specific user, and security rules can easily enforce that only the user can delete their own status updates.  Because status updates are ephemeral, storing them at the top level simplifies cleanup via a Cloud Function.\n5.  **Affiliate Products:** Affiliate products are stored under `/affiliate_products/{productId}`. Access is restricted to admins. The `adminId` field within each `AffiliateProduct` document indicates which admin added the product.\n6.  **Admin Roles:** Admin status is managed through the `/roles_admin/{userId}` collection. The existence of a document at this path indicates admin privileges.\n\n**Authorization Independence:** Achieved by denormalizing authorization data (e.g., `members` map in group chats, `userId` in status updates) into child documents, eliminating the need for `get()` calls in security rules.\n\n**QAPs Support:**\n\n*   **List operations for users:**  Using `/users/{userId}`, we can list all users (with pagination) and filter. Security rules can restrict which fields are visible based on the requesting user's role or relationship to the target user.\n*   **List operations for group chat messages:** By denormalizing the `members` map into the `GroupChatMessage`, rules can validate if a user is a member of a group when listing messages.\n*   **Admin-only access to Affiliate Products:** The `/affiliate_products` collection is secured such that only users with admin roles (verified by `/roles_admin/{userId}`) can create, update, or delete products. List operations are public.\n"
   }
 }
+
+    

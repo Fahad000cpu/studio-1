@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import React from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, fetchSignInMethodsForEmail } from "firebase/auth";
+import React, { useEffect, useState } from "react";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, fetchSignInMethodsForEmail, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { doc, getDoc } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
@@ -27,14 +27,21 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth, useFirestore } from "@/firebase";
-import { Flame } from "lucide-react";
+import { Flame, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
+
+const phoneFormSchema = z.object({
+    phone: z.string().min(10, { message: "Please enter a valid phone number." }),
+    otp: z.string().optional(),
+});
+
 
 const GoogleIcon = () => (
     <svg className="h-5 w-5" viewBox="0 0 24 24" >
@@ -58,29 +65,59 @@ const GoogleIcon = () => (
     </svg>
   );
 
+// Augment the window interface
+declare global {
+  interface Window {
+    recaptchaVerifier?: RecaptchaVerifier;
+    confirmationResult?: ConfirmationResult;
+  }
+}
+
 export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const form = useForm<z.infer<typeof formSchema>>({
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
+  const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       email: "",
       password: "",
     },
   });
+  
+  const phoneForm = useForm<z.infer<typeof phoneFormSchema>>({
+    resolver: zodResolver(phoneFormSchema),
+    defaultValues: {
+        phone: "",
+        otp: "",
+    },
+  });
+
+  useEffect(() => {
+    if (!auth) return;
+    // This effect should only run once to set up the verifier
+    if (!window.recaptchaVerifier) {
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+        'size': 'invisible',
+        'callback': (response: any) => {
+          // reCAPTCHA solved, allow signInWithPhoneNumber.
+          console.log("reCAPTCHA verified");
+        }
+      });
+    }
+  }, [auth]);
 
   const handlePostLogin = async (user: User) => {
-    // This function handles logic after any successful login.
     try {
         const userRef = doc(firestore, "users", user.uid);
         const userDoc = await getDoc(userRef);
 
         if (!userDoc.exists()) {
-           // If the doc doesn't exist, it means something went wrong during signup.
-           // The signup flow is the single source of truth for profile creation.
-           // We will not create a profile here to avoid inconsistencies.
            console.warn("User profile not found on login for UID:", user.uid);
         }
     } catch (error) {
@@ -89,37 +126,13 @@ export default function LoginPage() {
   }
 
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
       await handlePostLogin(creds.user);
-      // The redirect is now handled by the (auth) layout based on auth state.
     } catch (error: any) {
-        if (error.code === 'auth/invalid-credential') {
-            try {
-                const methods = await fetchSignInMethodsForEmail(auth, values.email);
-                if (methods.includes('google.com')) {
-                    toast({
-                        variant: "destructive",
-                        title: "Google Account Detected",
-                        description: "This account uses Google. Please sign in with Google.",
-                    });
-                } else {
-                    toast({
-                        variant: "destructive",
-                        title: "Login Failed",
-                        description: "Invalid email or password. Please try again.",
-                    });
-                }
-            } catch (fetchError) {
-                 toast({
-                    variant: "destructive",
-                    title: "Login Failed",
-                    description: "Invalid email or password. Please try again.",
-                });
-            }
-        } else if (error.code === 'auth/user-not-found') {
-             toast({
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+            toast({
                 variant: "destructive",
                 title: "Login Failed",
                 description: "Invalid email or password. Please try again.",
@@ -141,13 +154,10 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
         const result = await signInWithPopup(auth, provider);
-        // On login, we assume the user profile already exists from signup.
-        // We just need to perform post-login actions.
         await handlePostLogin(result.user);
-        // The redirect is now handled by the (auth) layout based on auth state.
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
-            return; // User cancelled the popup, do nothing.
+            return;
         }
         console.error("Google Sign-In Error:", error);
         toast({
@@ -157,6 +167,53 @@ export default function LoginPage() {
         });
     }
   };
+  
+  const handleSendOtp = async (values: z.infer<typeof phoneFormSchema>) => {
+    if (!window.recaptchaVerifier) {
+        console.error("reCAPTCHA verifier not initialized.");
+        toast({ variant: "destructive", title: "Error", description: "Could not initialize reCAPTCHA. Please refresh." });
+        return;
+    }
+    
+    setIsSendingOtp(true);
+    try {
+        // Ensure phone number has a + prefix
+        const phoneNumber = values.phone.startsWith('+') ? values.phone : `+${values.phone}`;
+        const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
+        window.confirmationResult = confirmationResult;
+        setIsOtpSent(true);
+        toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
+    } catch (error: any) {
+        console.error("Error sending OTP:", error);
+        toast({ variant: "destructive", title: "Failed to Send OTP", description: error.message || "Could not send OTP. Please check the phone number." });
+        // In case of error, reset reCAPTCHA
+        window.recaptchaVerifier.render().then(widgetId => {
+            // @ts-ignore
+            grecaptcha.reset(widgetId);
+        });
+    } finally {
+        setIsSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async (values: z.infer<typeof phoneFormSchema>) => {
+     if (!window.confirmationResult || !values.otp) {
+        toast({ variant: "destructive", title: "Error", description: "Something went wrong. Please try sending the OTP again." });
+        return;
+     }
+
+     setIsVerifyingOtp(true);
+     try {
+        const result = await window.confirmationResult.confirm(values.otp);
+        await handlePostLogin(result.user);
+     } catch (error: any) {
+        console.error("Error verifying OTP:", error);
+        toast({ variant: "destructive", title: "Invalid OTP", description: "The code you entered is incorrect. Please try again." });
+     } finally {
+        setIsVerifyingOtp(false);
+     }
+  }
+
 
   return (
     <Card className="w-full max-w-md mx-4">
@@ -168,56 +225,117 @@ export default function LoginPage() {
         <CardDescription>Sign in to your ConnectSphere account</CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Logging in..." : "Login"}
-            </Button>
-          </form>
-        </Form>
+        <Tabs defaultValue="email" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="email">Email</TabsTrigger>
+                <TabsTrigger value="phone">Phone</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="email">
+                <Form {...emailForm}>
+                <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
+                    <FormField
+                    control={emailForm.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                            <Input placeholder="name@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={emailForm.control}
+                    name="password"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <Button type="submit" className="w-full" disabled={emailForm.formState.isSubmitting}>
+                    {emailForm.formState.isSubmitting ? "Logging in..." : "Login"}
+                    </Button>
+                </form>
+                </Form>
 
-        <div className="relative my-6">
-          <Separator />
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">
-              Or continue with
-            </span>
-          </div>
-        </div>
+                <div className="relative my-6">
+                <Separator />
+                <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                    Or continue with
+                    </span>
+                </div>
+                </div>
 
-        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-          <GoogleIcon />
-          <span className="ml-2">Sign in with Google</span>
-        </Button>
+                <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+                <GoogleIcon />
+                <span className="ml-2">Sign in with Google</span>
+                </Button>
+            </TabsContent>
+
+            <TabsContent value="phone">
+                 <Form {...phoneForm}>
+                    <form onSubmit={phoneForm.handleSubmit(isOtpSent ? handleVerifyOtp : handleSendOtp)} className="space-y-4 pt-4">
+                        {!isOtpSent ? (
+                            <FormField
+                                control={phoneForm.control}
+                                name="phone"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Phone Number</FormLabel>
+                                    <FormControl>
+                                        <div className="relative">
+                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            <Input placeholder="+91 98765 43210" {...field} className="pl-10" />
+                                        </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        ) : (
+                            <FormField
+                                control={phoneForm.control}
+                                name="otp"
+                                render={({ field }) => (
+                                    <FormItem>
+                                    <FormLabel>Verification Code</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Enter the 6-digit code" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                             />
+                        )}
+                        <Button type="submit" className="w-full" disabled={isSendingOtp || isVerifyingOtp}>
+                            {isOtpSent 
+                                ? (isVerifyingOtp ? "Verifying..." : "Verify OTP") 
+                                : (isSendingOtp ? "Sending OTP..." : "Send OTP")
+                            }
+                        </Button>
+                        {isOtpSent && (
+                            <Button variant="link" size="sm" className="w-full" onClick={() => setIsOtpSent(false)}>
+                                Back to phone number
+                            </Button>
+                        )}
+                    </form>
+                 </Form>
+            </TabsContent>
+        </Tabs>
+
+        <div id="recaptcha-container"></div>
 
         <div className="mt-4 text-center text-sm">
           Don&apos;t have an account?{" "}
@@ -229,3 +347,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
