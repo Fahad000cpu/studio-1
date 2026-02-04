@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import React, { useEffect, useState } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, fetchSignInMethodsForEmail, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import React, { useEffect, useState, useRef } from "react";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
 import { doc, getDoc } from 'firebase/firestore';
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -68,7 +69,7 @@ const GoogleIcon = () => (
 // Augment the window interface
 declare global {
   interface Window {
-    recaptchaVerifier?: RecaptchaVerifier;
+    // We keep confirmationResult on window to survive re-renders between sending and verifying OTP
     confirmationResult?: ConfirmationResult;
   }
 }
@@ -77,10 +78,13 @@ export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
   
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -100,16 +104,22 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!auth) return;
-    // This effect should only run once to set up the verifier
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-        'callback': (response: any) => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber.
-          console.log("reCAPTCHA verified");
-        }
-      });
+
+    if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible',
+            'callback': () => {
+                // This callback is for when reCAPTCHA is solved.
+            }
+        });
     }
+
+    return () => {
+        if (recaptchaVerifierRef.current) {
+            recaptchaVerifierRef.current.clear();
+            recaptchaVerifierRef.current = null;
+        }
+    };
   }, [auth]);
 
   const handlePostLogin = async (user: User) => {
@@ -120,6 +130,7 @@ export default function LoginPage() {
         if (!userDoc.exists()) {
            console.warn("User profile not found on login for UID:", user.uid);
         }
+        router.push('/discover');
     } catch (error) {
         console.error("Post-login actions failed:", error);
     }
@@ -169,7 +180,8 @@ export default function LoginPage() {
   };
   
   const handleSendOtp = async (values: z.infer<typeof phoneFormSchema>) => {
-    if (!window.recaptchaVerifier) {
+    const verifier = recaptchaVerifierRef.current;
+    if (!verifier) {
         console.error("reCAPTCHA verifier not initialized.");
         toast({ variant: "destructive", title: "Error", description: "Could not initialize reCAPTCHA. Please refresh." });
         return;
@@ -177,20 +189,14 @@ export default function LoginPage() {
     
     setIsSendingOtp(true);
     try {
-        // Ensure phone number has a + prefix
         const phoneNumber = values.phone.startsWith('+') ? values.phone : `+${values.phone}`;
-        const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier);
+        const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
         window.confirmationResult = confirmationResult;
         setIsOtpSent(true);
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
         console.error("Error sending OTP:", error);
-        toast({ variant: "destructive", title: "Failed to Send OTP", description: error.message || "Could not send OTP. Please check the phone number." });
-        // In case of error, reset reCAPTCHA
-        window.recaptchaVerifier.render().then(widgetId => {
-            // @ts-ignore
-            grecaptcha.reset(widgetId);
-        });
+        toast({ variant: "destructive", title: "Failed to Send OTP", description: error.message || "Could not send OTP. Please check the phone number and try again." });
     } finally {
         setIsSendingOtp(false);
     }
@@ -347,5 +353,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    
