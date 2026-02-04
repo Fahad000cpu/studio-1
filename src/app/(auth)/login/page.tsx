@@ -109,33 +109,18 @@ export default function LoginPage() {
 
     return () => {
         if (recaptchaVerifierRef.current) {
-            recaptchaVerifierRef.current.clear();
-            recaptchaVerifierRef.current = null;
+            // It's safer to not call .clear() here on every re-render,
+            // as it can cause the "client element has been removed" error
+            // if a re-render happens during the sign-in process.
+            // The verifier should persist for the component's lifetime.
         }
     };
-  }, [auth]);
-
-  const handlePostLogin = async (user: User) => {
-    // This is now handled by the (auth) layout which redirects on user state change.
-    // We can keep this for any additional logic after login if needed, like analytics.
-    // For now, it just ensures the user profile exists, which is good practice.
-    try {
-        const userRef = doc(firestore, "users", user.uid);
-        const userDoc = await getDoc(userRef);
-
-        if (!userDoc.exists()) {
-           console.warn("User profile not found on login for UID:", user.uid);
-        }
-    } catch (error) {
-        console.error("Post-login actions failed:", error);
-    }
-  }
-
+  }, []);
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const creds = await signInWithEmailAndPassword(auth, values.email, values.password);
-      // Let the layout handle the redirect
+      await signInWithEmailAndPassword(auth, values.email, values.password);
+      // The (auth) layout will handle the redirect on user state change.
     } catch (error: any) {
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
             toast({
@@ -160,7 +145,7 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
         await signInWithPopup(auth, provider);
-        // Let the layout handle the redirect
+        // The (auth) layout will handle the redirect on user state change.
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
@@ -184,6 +169,7 @@ export default function LoginPage() {
     
     setIsSendingOtp(true);
     try {
+        // Ensure phone number has country code
         const phoneNumber = values.phone.startsWith('+') ? values.phone : `+${values.phone}`;
         const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
         confirmationResultRef.current = confirmationResult;
@@ -207,7 +193,7 @@ export default function LoginPage() {
      setIsVerifyingOtp(true);
      try {
         await confirmationResult.confirm(values.otp);
-        // Let the layout handle the redirect
+        // The (auth) layout will handle the redirect on user state change.
      } catch (error: any) {
         console.error("Error verifying OTP:", error);
         toast({ variant: "destructive", title: "Invalid OTP", description: "The code you entered is incorrect. Please try again." });
@@ -349,3 +335,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
