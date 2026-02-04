@@ -1,14 +1,14 @@
 
 'use client';
 
-import { getMessaging, getToken, isSupported, onTokenRefresh } from 'firebase/messaging';
 import { getApp } from 'firebase/app';
+import * as messaging from 'firebase/messaging';
 import { Firestore, doc, arrayUnion } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from './non-blocking-updates';
 import { toast } from '@/hooks/use-toast';
 
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
-  const messagingSupported = await isSupported();
+  const messagingSupported = await messaging.isSupported();
   if (!messagingSupported) {
     toast({
       variant: "destructive",
@@ -20,7 +20,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
   
   try {
     const app = getApp();
-    const messaging = getMessaging(app);
+    const messagingInstance = messaging.getMessaging(app);
     
     const permission = await Notification.requestPermission();
 
@@ -36,7 +36,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
         return null;
       }
 
-      const currentToken = await getToken(messaging, { vapidKey });
+      const currentToken = await messaging.getToken(messagingInstance, { vapidKey });
       
       if (currentToken) {
         const userDocRef = doc(firestore, 'users', userId);
@@ -78,21 +78,28 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
  * @param userId - The ID of the current user.
  * @returns An unsubscribe function to clean up the listener.
  */
-export const onTokenRefreshListener = (firestore: Firestore, userId: string) => {
-  const app = getApp();
-  const messaging = getMessaging(app);
-  
-  const unsubscribe = onTokenRefresh(messaging, (newToken) => {
-    console.log('FCM token refreshed:', newToken);
-    toast({
-      title: 'Notifications Updated',
-      description: 'Your device token has been refreshed.',
-    });
-    const userDocRef = doc(firestore, 'users', userId);
-    updateDocumentNonBlocking(userDocRef, {
-      fcmTokens: arrayUnion(newToken),
-    });
-  });
+export const onTokenRefreshListener = async (firestore: Firestore, userId: string): Promise<() => void> => {
+    try {
+        const supported = await messaging.isSupported();
+        if (supported) {
+            const app = getApp();
+            const messagingInstance = messaging.getMessaging(app);
+            
+            return messaging.onTokenRefresh(messagingInstance, (newToken) => {
+                console.log('FCM token refreshed:', newToken);
+                toast({
+                title: 'Notifications Updated',
+                description: 'Your device token has been refreshed.',
+                });
+                const userDocRef = doc(firestore, 'users', userId);
+                updateDocumentNonBlocking(userDocRef, {
+                fcmTokens: arrayUnion(newToken),
+                });
+            });
+        }
+    } catch (error) {
+        console.error("Failed to setup FCM token refresh listener:", error);
+    }
 
-  return unsubscribe;
+    return () => {}; // return a no-op unsubscribe function
 };

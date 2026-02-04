@@ -42,11 +42,8 @@ export default function MainLayout({
 
     const setupListener = async () => {
       try {
-        const { isSupported } = await import('firebase/messaging');
-        const supported = await isSupported();
-
-        if (user && firestore && supported) {
-          unsubscribe = onTokenRefreshListener(firestore, user.uid);
+        if (user && firestore) {
+          unsubscribe = await onTokenRefreshListener(firestore, user.uid);
         }
       } catch (error) {
         console.error("Failed to setup FCM token refresh listener:", error);
