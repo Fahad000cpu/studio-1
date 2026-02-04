@@ -68,7 +68,7 @@ export function useNotificationStatus() {
         
         const permGranted = notificationPermission === 'granted';
         
-        const tokenPresent = !!(userProfile?.fcmTokens && userProfile.fcmTokens.length > 0);
+        const tokenPresent = !!(userProfile?.fcmTokens?.some(token => token && token.length > 0));
 
         setStatus({
             isSupported: true,

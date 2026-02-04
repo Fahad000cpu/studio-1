@@ -196,17 +196,22 @@ export default function AdminPage() {
                           <TableCell className="font-medium">{u.name}</TableCell>
                           <TableCell>{u.email}</TableCell>
                           <TableCell>
-                            {u.fcmTokens && u.fcmTokens.length > 0 ? (
-                              <div className="flex flex-col gap-1">
-                                {[...new Set(u.fcmTokens)].map((token, i) => (
-                                  <Badge key={i} variant="secondary" className="font-mono text-xs max-w-xs truncate">
-                                    {token}
-                                  </Badge>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground text-xs">No tokens</span>
-                            )}
+                            {(() => {
+                              const validTokens = u.fcmTokens?.filter(Boolean) ?? [];
+                              const uniqueValidTokens = [...new Set(validTokens)];
+                              if (uniqueValidTokens.length > 0) {
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    {uniqueValidTokens.map((token, i) => (
+                                      <Badge key={i} variant="secondary" className="font-mono text-xs max-w-xs truncate">
+                                        {token}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                );
+                              }
+                              return <span className="text-muted-foreground text-xs">No tokens</span>;
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}
