@@ -1,6 +1,6 @@
-import { defaultCache, precacheAndRoute } from "@serwist/next/worker";
+import { cleanupOutdatedCaches, precacheAndRoute } from "@serwist/precaching";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { cleanupOutdatedCaches } from "serwist";
+import { defaultCache } from "@serwist/next/worker";
 
 declare global {
   interface SerwistWorkerGlobalScope extends SerwistGlobalConfig {
