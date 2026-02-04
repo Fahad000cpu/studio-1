@@ -4,18 +4,19 @@
 import { useState, useEffect } from "react";
 import { useUser, useAuth, useFirestore, requestPermission, updateDocumentNonBlocking } from "@/firebase";
 import { updateProfile } from "firebase/auth";
-import { doc, GeoPoint, updateDoc } from "firebase/firestore";
+import { doc, GeoPoint } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { BellRing, MapPin, Camera, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 export default function SettingsPage() {
   const { user } = useUser();
@@ -25,8 +26,7 @@ export default function SettingsPage() {
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
@@ -40,19 +40,15 @@ export default function SettingsPage() {
       setName(user.displayName || "");
       setBio(user.bio || "Loves hiking and photography.");
     }
-    // Check initial notification permission status only on client
+    
     if (typeof window !== 'undefined' && 'Notification' in window) {
       const currentPermission = Notification.permission;
-      setPushEnabled(currentPermission === 'granted');
-      setPermissionDenied(currentPermission === 'denied');
+      setNotificationPermission(currentPermission);
 
-      // Add a listener for permission changes
       if (navigator.permissions) {
         navigator.permissions.query({name: 'notifications'}).then((permissionStatus) => {
           permissionStatus.onchange = () => {
-            const newPermission = permissionStatus.state;
-            setPushEnabled(newPermission === 'granted');
-            setPermissionDenied(newPermission === 'denied');
+            setNotificationPermission(permissionStatus.state);
           };
         });
       }
@@ -130,43 +126,19 @@ export default function SettingsPage() {
   };
 
 
-  const handlePushToggle = async (checked: boolean) => {
-    if (!user || typeof window === 'undefined' || !('Notification' in window)) {
-      return;
-    }
+  const handleEnableNotifications = async () => {
+    if (!user || notificationPermission !== 'prompt') return;
 
-    if (checked) {
-      const token = await requestPermission(firestore, user.uid);
-      if (token) {
-        setPushEnabled(true);
-        setPermissionDenied(false);
+    const token = await requestPermission(firestore, user.uid);
+    // The requestPermission function itself will show toasts on failure or denial.
+    // We just need to update the state based on the outcome.
+    setNotificationPermission(Notification.permission); 
+
+    if (token) {
         toast({
-          title: "Notifications Enabled",
-          description: "You will now receive broadcast notifications from the admin.",
+            title: "Notifications Enabled!",
+            description: "You'll now receive broadcast messages from the admin.",
         });
-      } else {
-        const currentPermission = Notification.permission;
-        setPermissionDenied(currentPermission === 'denied');
-        if (currentPermission === 'denied') {
-            toast({
-              variant: "destructive",
-              title: "Permission Denied",
-              description: "You need to grant permission in your browser settings to enable notifications.",
-            });
-        } else if (currentPermission === 'prompt') {
-           // User dismissed the prompt, do nothing to the UI
-        } else {
-           toast({
-              variant: "destructive",
-              title: "Token Error",
-              description: "Could not get a notification token. Please try again.",
-            });
-        }
-      }
-    } else {
-      // This part is for disabling. We just update the UI state.
-      // True disabling would require removing the token from Firestore.
-      setPushEnabled(false);
     }
   };
   
@@ -190,7 +162,6 @@ export default function SettingsPage() {
         await updateProfile(auth.currentUser, { photoURL: downloadURL });
 
         const userDocRef = doc(firestore, 'users', user.uid);
-        // Use non-blocking update
         updateDocumentNonBlocking(userDocRef, { profilePictureUrl: downloadURL });
 
         toast({
@@ -323,21 +294,33 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label>Broadcast Notifications</Label>
-                <p className="text-sm text-muted-foreground">
-                  Receive broadcast messages from the admin via FCM.
-                </p>
-                 {permissionDenied && (
-                  <p className="text-xs text-destructive mt-1">
-                    Notifications are blocked. Please enable them in your browser settings.
-                  </p>
-                )}
-              </div>
-              <Switch checked={pushEnabled} onCheckedChange={handlePushToggle} disabled={permissionDenied} aria-readonly={isSaving} />
-            </div>
-            <div className="flex items-center justify-between">
+             {notificationPermission !== 'granted' ? (
+                <Alert variant={notificationPermission === 'denied' ? 'destructive' : 'default'}>
+                    <BellRing className="h-4 w-4" />
+                    <AlertTitle>
+                        {notificationPermission === 'denied'
+                            ? 'Push Notifications Blocked'
+                            : 'Enable Push Notifications'}
+                    </AlertTitle>
+                    <AlertDescription>
+                        {notificationPermission === 'denied'
+                            ? 'You have blocked notifications for this site. To receive updates, you must enable them in your browser settings.'
+                            : 'Receive broadcast messages from the admin.'}
+                        {notificationPermission === 'prompt' && (
+                            <Button onClick={handleEnableNotifications} className="mt-4">
+                                <Bell className="mr-2 h-4 w-4" />
+                                Allow Notifications
+                            </Button>
+                        )}
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                 <div className="flex items-center space-x-2 text-green-600">
+                    <BellRing className="h-5 w-5" />
+                    <p className="font-medium">Broadcast notifications are enabled.</p>
+                </div>
+            )}
+            <div className="flex items-center justify-between pt-4 border-t">
               <div>
                 <Label>PushAll Notifications</Label>
                 <p className="text-sm text-muted-foreground">
@@ -363,3 +346,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

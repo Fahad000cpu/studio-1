@@ -5,11 +5,16 @@ import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { getApp } from 'firebase/app';
 import { Firestore, doc, arrayUnion } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from './non-blocking-updates';
+import { toast } from '@/hooks/use-toast';
 
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
   const messagingSupported = await isSupported();
   if (!messagingSupported) {
-    console.log('Firebase Messaging is not supported in this browser.');
+    toast({
+      variant: "destructive",
+      title: "Not Supported",
+      description: "Push notifications are not supported in this browser.",
+    });
     return null;
   }
   
@@ -17,34 +22,44 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     const app = getApp();
     const messaging = getMessaging(app);
     
-    console.log('Requesting permission...');
     const permission = await Notification.requestPermission();
 
     if (permission === 'granted') {
-      console.log('Notification permission granted.');
-      
       const currentToken = await getToken(messaging, {
         vapidKey: 'BM_xqZMh6RwDGXDr5L3AwT_A-T6qXRnAKpAy-EZGndn7TgrAIbUiUxUvbCJrnMeCb2FzC9hLic6-SjpsBpFNl3o'
       });
       
       if (currentToken) {
-        console.log('FCM Token:', currentToken);
-        // Send this token to your server to store it
         const userDocRef = doc(firestore, 'users', userId);
         updateDocumentNonBlocking(userDocRef, {
             fcmTokens: arrayUnion(currentToken)
         });
         return currentToken;
       } else {
-        console.log('No registration token available. Request permission to generate one.');
+         toast({
+            variant: "destructive",
+            title: "Token Error",
+            description: "Could not get a notification token. Please try again.",
+          });
         return null;
       }
     } else {
-      console.log('Unable to get permission to notify.');
+       toast({
+          variant: "destructive",
+          title: "Permission Denied",
+          description: "You need to grant permission in your browser settings to enable notifications.",
+        });
       return null;
     }
   } catch (error) {
     console.error('An error occurred while getting the token:', error);
+     toast({
+        variant: "destructive",
+        title: "An Error Occurred",
+        description: "Could not enable notifications. Please check the console for details.",
+      });
     return null;
   }
 };
+
+    
