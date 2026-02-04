@@ -5,22 +5,15 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
+// Initialize Firebase and export the instances.
+// This code runs once on the client when the module is first loaded, ensuring a true singleton.
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth: Auth = getAuth(app);
+const firestore: Firestore = getFirestore(app);
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  
-  // Use the standard getAuth() which is idempotent and handles persistence.
-  const auth = getAuth(app);
+// A separate initialization function is no longer needed as we export the initialized instances directly.
+export { app, auth, firestore };
 
-  const firestore = getFirestore(app);
-  
-  return {
-    firebaseApp: app,
-    auth,
-    firestore,
-  };
-}
 
 export * from './provider';
 export * from './client-provider';
