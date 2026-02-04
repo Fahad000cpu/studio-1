@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -44,28 +43,28 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   const { user } = useUser();
   const { toast } = useToast();
   const firestore = useFirestore();
-  const [allSuggestedUsers, setAllSuggestedUsers] = React.useState<UserProfile[]>([]);
+  const [sortedUsers, setSortedUsers] = React.useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: usersCollection, isLoading: usersCollectionLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   React.useEffect(() => {
-    const fetchAndSortUsers = async (latitude?: number, longitude?: number) => {
+    const fetchAndSortUsers = (latitude?: number, longitude?: number) => {
       setIsLoading(true);
-      if (usersCollectionLoading) return;
+      if (usersCollectionLoading || !usersCollection) {
+          if (!usersCollectionLoading) {
+              setIsLoading(false);
+              setSortedUsers([]);
+          }
+          return;
+      };
 
       try {
-        if (!usersCollection) {
-          setAllSuggestedUsers([]);
-          setIsLoading(false);
-          return;
-        }
-
         const otherUsers = usersCollection.filter((u) => u.id !== user?.uid);
 
         // Sort users directly on the client
-        const sortedUsers = otherUsers.sort((a, b) => {
+        const sorted = otherUsers.sort((a, b) => {
             if (latitude && longitude) {
                 const locationA = a.coordinates;
                 const locationB = b.coordinates;
@@ -78,13 +77,16 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
                 if (locationA) return -1; // A has location, B does not
                 if (locationB) return 1;  // B has location, A does not
             }
-            return (a.name || "").localeCompare(b.name || ""); // Fallback sort by name
+             // Fallback sort by name (or email)
+            const nameA = a.name || a.email || '';
+            const nameB = b.name || b.email || '';
+            return nameA.localeCompare(nameB);
         });
         
-        setAllSuggestedUsers(sortedUsers);
+        setSortedUsers(sorted);
 
       } catch (error) {
-        console.error("Failed to fetch or sort users:", error);
+        console.error("Failed to sort users:", error);
         toast({
           variant: "destructive",
           title: "Error",
@@ -99,31 +101,14 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
+                    fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
                 },
                 (error: GeolocationPositionError) => {
-                if (error.code === error.PERMISSION_DENIED) {
-                    toast({
-                    title: 'Location Access Denied',
-                    description: 'Showing default user suggestions sorted alphabetically.',
-                    });
-                } else {
-                    console.error('Geolocation error:', error.message);
-                    toast({
-                    variant: 'destructive',
-                    title: 'Location Error',
-                    description: 'Could not retrieve location. Showing default suggestions.',
-                    });
-                }
-                fetchAndSortUsers();
+                    fetchAndSortUsers(); // Sort alphabetically on geo error
                 }
             );
         } else {
-            toast({
-                title: "Geolocation not supported",
-                description: "Showing default user suggestions sorted alphabetically.",
-            });
-            fetchAndSortUsers();
+            fetchAndSortUsers(); // Sort alphabetically if geo is not supported
         }
     } else if (!usersCollectionLoading) {
         setIsLoading(false);
@@ -131,17 +116,17 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   }, [user, firestore, toast, usersCollection, usersCollectionLoading]);
 
   const filteredUsers = React.useMemo(() => {
-    if (!allSuggestedUsers) return [];
-    if (!searchTerm) return allSuggestedUsers;
+    if (!sortedUsers) return [];
+    if (!searchTerm) return sortedUsers;
     
-    return allSuggestedUsers.filter(u => {
+    return sortedUsers.filter(u => {
       const searchTermLower = searchTerm.toLowerCase();
       // Ensure name and email are treated as strings even if null/undefined
       const nameMatch = (u.name || '').toLowerCase().includes(searchTermLower);
       const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
       return nameMatch || emailMatch;
     });
-  }, [allSuggestedUsers, searchTerm]);
+  }, [sortedUsers, searchTerm]);
 
 
   const handleStartChat = () => {
@@ -190,7 +175,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
                     alt={userProfile.name || ''}
                     data-ai-hint="person portrait"
                     />
-                    <AvatarFallback>{userProfile.name?.charAt(0) || userProfile.email?.charAt(0)}</AvatarFallback>
+                    <AvatarFallback>{(userProfile.name || userProfile.email || '?').charAt(0)}</AvatarFallback>
                 </Avatar>
              </div>
           </div>

@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { useUser, useAuth, useFirestore, requestPermission, updateDocumentNonBlocking } from "@/firebase";
@@ -24,8 +23,10 @@ const StatusCheckItem = ({ label, checked }: { label: string; checked: boolean |
     <div className={cn("flex items-center gap-3", checked === false ? "text-destructive" : "text-muted-foreground")}>
         {checked === true ? (
             <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-        ) : (
+        ) : checked === false ? (
             <XCircle className="h-5 w-5 shrink-0" />
+        ) : (
+            <Loader2 className="h-5 w-5 animate-spin shrink-0" />
         )}
         <span className="text-sm">{label}</span>
     </div>
@@ -290,34 +291,26 @@ export default function SettingsPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                {isStatusLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Checking notification status...</span>
-                    </div>
-                ) : !isSupported ? (
-                    <div className="flex items-center gap-2 text-destructive">
-                        <XCircle className="h-5 w-5" />
-                        <p className="font-medium">Push notifications are not supported in this browser.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        <StatusCheckItem
-                            label="Browser permission granted"
-                            checked={permissionGranted}
-                        />
-                        <StatusCheckItem
-                            label="Service worker active"
-                            checked={serviceWorkerActive}
-                        />
-                        <StatusCheckItem
-                            label="Notification token saved to profile"
-                            checked={tokenInFirestore}
-                        />
-                    </div>
-                )}
+                <div className="space-y-3 p-4 border rounded-md bg-muted/50">
+                    <StatusCheckItem
+                        label="Browser supports push notifications"
+                        checked={isStatusLoading ? null : isSupported}
+                    />
+                     <StatusCheckItem
+                        label="Browser permission granted"
+                        checked={isStatusLoading ? null : permissionGranted}
+                    />
+                    <StatusCheckItem
+                        label="Service worker is active"
+                        checked={isStatusLoading ? null : serviceWorkerActive}
+                    />
+                    <StatusCheckItem
+                        label="Notification token is saved to your profile"
+                        checked={isStatusLoading ? null : tokenInFirestore}
+                    />
+                </div>
 
-                <div className="pt-4 border-t">
+                <div className="pt-4">
                     { !isStatusLoading && isSupported && (
                         <>
                             {permission === 'prompt' && (
@@ -327,19 +320,20 @@ export default function SettingsPage() {
                                 </Button>
                             )}
                              {permission === 'denied' && (
-                                <p className="text-sm text-destructive">
-                                    You have blocked notifications. Please enable them in your browser settings to receive updates.
-                                </p>
+                                <div className="flex items-start gap-2.5 text-sm text-destructive p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                    <p>You have blocked notifications. Please enable them in your browser settings to receive updates.</p>
+                                </div>
                             )}
                              {permissionGranted && !tokenInFirestore && (
-                                <div className="flex items-start gap-2.5 text-muted-foreground text-sm">
+                                <div className="flex items-start gap-2.5 text-muted-foreground text-sm p-3 bg-amber-500/10 border border-amber-500/20 rounded-md">
                                     <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                     <p>Permission is granted, but we couldn't save your notification token. Please try again.</p>
                                     <Button onClick={handleEnableNotifications} size="sm" variant="outline" className="ml-auto">Retry</Button>
                                 </div>
                             )}
                              {permissionGranted && tokenInFirestore && serviceWorkerActive &&(
-                               <div className="flex items-center gap-2 text-green-600">
+                               <div className="flex items-center gap-2 text-green-600 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
                                   <CheckCircle2 className="h-5 w-5" />
                                   <p className="font-medium">You are all set to receive notifications!</p>
                                </div>

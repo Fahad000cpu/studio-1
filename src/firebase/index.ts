@@ -2,14 +2,19 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { Auth, getAuth } from 'firebase/auth';
+import { Auth, getAuth, browserLocalPersistence, initializeAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
   const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-  const auth = getAuth(app);
+  
+  // Use initializeAuth for IndexedDB persistence, which is more reliable.
+  const auth = initializeAuth(app, {
+    persistence: browserLocalPersistence,
+  });
+
   const firestore = getFirestore(app);
   
   return {

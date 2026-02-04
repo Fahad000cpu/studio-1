@@ -12,8 +12,8 @@ export default function DiscoverPage() {
   return (
     <div className="container mx-auto">
       <div className="my-6 flex flex-col md:flex-row gap-4">
-        <NotificationPermissionAlert className="flex-grow" />
         <InstallPwaButton className="flex-grow md:flex-grow-0" />
+        <NotificationPermissionAlert className="flex-grow" />
       </div>
       <div className="mb-8 bg-card/80 p-6 rounded-lg shadow-lg backdrop-blur-sm space-y-4">
         <div>

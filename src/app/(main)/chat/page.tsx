@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef } from 'react';
@@ -90,57 +89,57 @@ export default function ChatPage() {
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      if (allUsersLoading || !allUsers || !user) return;
-      setUsersLoading(true);
-      try {
-        const otherUsers = allUsers.filter((u) => u.id !== user.uid);
-        
-        let sortedUsers: UserProfile[] = [];
+    const fetchAndSortUsers = (latitude?: number, longitude?: number) => {
+        if (allUsersLoading || !allUsers || !user) return;
+        setUsersLoading(true);
 
+        try {
+            const otherUsers = allUsers.filter((u) => u.id !== user.uid);
+            
+            const sortedUsers = otherUsers.sort((a, b) => {
+                if (latitude && longitude) {
+                    const locationA = a.coordinates;
+                    const locationB = b.coordinates;
+                    if (locationA && locationB) {
+                        const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);
+                        const distanceB = getDistance(latitude, longitude, locationB.latitude, locationB.longitude);
+                        return distanceA - distanceB;
+                    }
+                    if (locationA) return -1;
+                    if (locationB) return 1;
+                }
+                // Fallback sort by name (or email)
+                const nameA = a.name || a.email || '';
+                const nameB = b.name || b.email || '';
+                return nameA.localeCompare(nameB);
+            });
+            setContacts(sortedUsers);
+        } catch (error) {
+            console.error("Failed to process users:", error);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not load user contacts for chat.",
+            });
+        } finally {
+            setUsersLoading(false);
+        }
+    };
+
+    if (user) {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    const { latitude, longitude } = position.coords;
-                    sortedUsers = otherUsers.sort((a, b) => {
-                        const locationA = a.coordinates;
-                        const locationB = b.coordinates;
-
-                        if (locationA && locationB) {
-                            const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);
-                            const distanceB = getDistance(latitude, longitude, locationB.latitude, locationB.longitude);
-                            return distanceA - distanceB;
-                        }
-                        if (locationA) return -1;
-                        if (locationB) return 1;
-                        return (a.name || "").localeCompare(b.name || "");
-                    });
-                    setContacts(sortedUsers);
-                }, 
+                    fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
+                },
                 () => {
-                    // On failure, sort alphabetically
-                    sortedUsers = otherUsers.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
-                    setContacts(sortedUsers);
+                    fetchAndSortUsers(); // Sort alphabetically on geo error
                 }
             );
         } else {
-            // If geolocation is not available, sort alphabetically
-            sortedUsers = otherUsers.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
-            setContacts(sortedUsers);
+            fetchAndSortUsers(); // Sort alphabetically if geo is not supported
         }
-
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not load user contacts for chat.",
-        });
-      } finally {
-        setUsersLoading(false);
-      }
-    };
-    fetchUsers();
+    }
   }, [user, toast, allUsers, allUsersLoading]);
 
     const filteredContacts = useMemo(() => {
@@ -368,7 +367,21 @@ export default function ChatPage() {
         );
       case 'text':
       default:
-        return <p>{msg.text}</p>;
+        // Match URLs in the text and wrap them in anchor tags
+        const parts = msg.text.split(urlRegex);
+        return (
+          <p>
+            {parts.map((part, i) =>
+              urlRegex.test(part) ? (
+                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">
+                  {part}
+                </a>
+              ) : (
+                part
+              )
+            )}
+          </p>
+        );
     }
   };
 
@@ -416,10 +429,10 @@ export default function ChatPage() {
                   <AvatarImage
                     src={contact.profilePictureUrl || `https://picsum.photos/seed/${contact.id}/200`}
                   />
-                  <AvatarFallback>{contact.name?.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{(contact.name || contact.email || '?').charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-grow overflow-hidden">
-                  <p className="font-semibold truncate">{contact.name}</p>
+                  <p className="font-semibold truncate">{contact.name || contact.email}</p>
                   <p className="text-sm text-muted-foreground truncate">
                     {lastMessageInfo.text}
                   </p>
@@ -453,11 +466,11 @@ export default function ChatPage() {
           <AvatarImage
              src={selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`}
           />
-          <AvatarFallback>{selectedChat.name?.charAt(0)}</AvatarFallback>
+          <AvatarFallback>{(selectedChat.name || selectedChat.email || '?').charAt(0)}</AvatarFallback>
         </Avatar>
         <div className="ml-4">
           <p className="font-semibold text-lg font-headline">
-            {selectedChat.name}
+            {selectedChat.name || selectedChat.email}
           </p>
           <p className="text-sm text-muted-foreground">Online</p>
         </div>
@@ -471,8 +484,8 @@ export default function ChatPage() {
                 ? user?.photoURL || `https://picsum.photos/seed/${user?.uid}/200`
                 : selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`;
             const avatarFallback = msg.own
-                ? user?.displayName?.charAt(0)
-                : selectedChat.name?.charAt(0);
+                ? (user?.displayName || '?').charAt(0)
+                : (selectedChat.name || '?').charAt(0);
             return (
             <div
               key={msg.id || index}
@@ -515,7 +528,7 @@ export default function ChatPage() {
              <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50">
                <Avatar className="w-8 h-8">
                  <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200`} />
-                 <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
+                 <AvatarFallback>{(user?.displayName || '?').charAt(0)}</AvatarFallback>
                </Avatar>
                <div className="flex flex-col">
                  <div className="rounded-lg p-3 text-sm bg-primary text-primary-foreground rounded-br-none">

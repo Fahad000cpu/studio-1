@@ -1,7 +1,7 @@
-
 'use client';
 
-import { useFirebase, requestPermission } from '@/firebase';
+import { useFirebase } from '@/firebase';
+import { requestPermission } from '@/firebase/messaging';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -19,6 +19,7 @@ export function NotificationPermissionAlert({ className }: { className?: string 
       tokenInFirestore, 
       isLoading,
       permission,
+      serviceWorkerActive,
   } = useNotificationStatus();
 
   const handleEnableNotifications = async () => {
@@ -43,7 +44,7 @@ export function NotificationPermissionAlert({ className }: { className?: string 
   }
 
   // Don't show if not supported or if everything is perfectly set up
-  if (!isSupported || (permissionGranted && tokenInFirestore)) {
+  if (!isSupported || (permissionGranted && tokenInFirestore && serviceWorkerActive)) {
     return null;
   }
 
@@ -56,11 +57,11 @@ export function NotificationPermissionAlert({ className }: { className?: string 
     title = 'Push Notifications Blocked';
     description = 'To receive important updates, you must enable notifications in your browser settings.';
     showButton = false;
-  } else if (permissionGranted && !tokenInFirestore) {
+  } else if (permissionGranted && (!tokenInFirestore || !serviceWorkerActive)) {
     title = 'Action Required';
-    description = "We couldn't save your notification token. Please click to try again.";
+    description = "Your notification setup is incomplete. Click to finalize.";
     showButton = true;
-    buttonText = "Retry";
+    buttonText = "Retry Setup";
   }
 
   return (
