@@ -139,45 +139,9 @@ export default function ChatPage() {
   }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    if (!messagesData) {
-        return { text: 'Click to start chatting!', time: '' };
-    }
-
-    const currentChatId = getChatId(user!.uid, contactId);
-
-    const relevantMessages = messages.filter(msg => {
-        const msgChatId = getChatId(msg.senderId, msg.recipientId || contactId);
-        return msgChatId === currentChatId;
-    });
-
-    const lastMsg = relevantMessages.length > 0 ? relevantMessages[relevantMessages.length - 1] : null;
-
-    if (lastMsg) {
-      let text = 'Click to start chatting!';
-      switch (lastMsg.messageType) {
-        case 'image':
-          text = 'Photo';
-          break;
-        case 'video':
-          text = 'Video';
-          break;
-        case 'audio':
-          text = 'Audio message';
-          break;
-        case 'link':
-            text = 'Link';
-            break;
-        case 'text':
-        default:
-          text = lastMsg.text;
-          break;
-      }
-      return {
-        text: text,
-        time: getTimeString(lastMsg.timestamp)
-      };
-    }
-    
+    // This is a placeholder. A real implementation would require fetching 
+    // the last message for each contact, which can be complex and inefficient 
+    // without denormalizing data. For now, we return a generic message.
     return { text: 'Click to start chatting!', time: '' };
   };
 
