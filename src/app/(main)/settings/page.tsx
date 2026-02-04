@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,7 +14,8 @@ import { BellRing, MapPin, Camera, Bell } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useNotificationPermission } from "@/hooks/use-notification-permission";
+import { NotificationPermissionAlert } from "@/components/notification-permission-alert";
 
 
 export default function SettingsPage() {
@@ -26,32 +26,19 @@ export default function SettingsPage() {
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   
   const [avatarKey, setAvatarKey] = useState(Date.now());
+  const { permission: notificationPermission } = useNotificationPermission();
 
 
   useEffect(() => {
     if (user) {
       setName(user.displayName || "");
       setBio(user.bio || "Loves hiking and photography.");
-    }
-    
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      const currentPermission = Notification.permission;
-      setNotificationPermission(currentPermission);
-
-      if (navigator.permissions) {
-        navigator.permissions.query({name: 'notifications'}).then((permissionStatus) => {
-          permissionStatus.onchange = () => {
-            setNotificationPermission(permissionStatus.state);
-          };
-        });
-      }
     }
   }, [user]);
 
@@ -125,23 +112,6 @@ export default function SettingsPage() {
     }
   };
 
-
-  const handleEnableNotifications = async () => {
-    if (!user || notificationPermission !== 'prompt') return;
-
-    const token = await requestPermission(firestore, user.uid);
-    // The requestPermission function itself will show toasts on failure or denial.
-    // We just need to update the state based on the outcome.
-    setNotificationPermission(Notification.permission); 
-
-    if (token) {
-        toast({
-            title: "Notifications Enabled!",
-            description: "You'll now receive broadcast messages from the admin.",
-        });
-    }
-  };
-  
     const getInitials = (name?: string | null) => {
     if (!name) return "";
     const nameParts = name.split(" ");
@@ -294,28 +264,9 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-             {notificationPermission !== 'granted' ? (
-                <Alert variant={notificationPermission === 'denied' ? 'destructive' : 'default'}>
-                    <BellRing className="h-4 w-4" />
-                    <AlertTitle>
-                        {notificationPermission === 'denied'
-                            ? 'Push Notifications Blocked'
-                            : 'Enable Push Notifications'}
-                    </AlertTitle>
-                    <AlertDescription>
-                        {notificationPermission === 'denied'
-                            ? 'You have blocked notifications for this site. To receive updates, you must enable them in your browser settings.'
-                            : 'Receive broadcast messages from the admin.'}
-                        {notificationPermission === 'prompt' && (
-                            <Button onClick={handleEnableNotifications} className="mt-4">
-                                <Bell className="mr-2 h-4 w-4" />
-                                Allow Notifications
-                            </Button>
-                        )}
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                 <div className="flex items-center space-x-2 text-green-600">
+            <NotificationPermissionAlert />
+            {notificationPermission === 'granted' && (
+                <div className="flex items-center space-x-2 text-green-600">
                     <BellRing className="h-5 w-5" />
                     <p className="font-medium">Broadcast notifications are enabled.</p>
                 </div>
@@ -346,5 +297,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
