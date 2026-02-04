@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, onTokenRefreshListener } from "@/firebase";
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -27,6 +27,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const router = useRouter();
 
   useEffect(() => {
@@ -34,6 +35,31 @@ export default function MainLayout({
       router.push("/login");
     }
   }, [user, isUserLoading, router]);
+
+  useEffect(() => {
+    let unsubscribe: () => void = () => {};
+
+    const setupListener = async () => {
+      try {
+        const { isSupported } = await import('firebase/messaging');
+        const supported = await isSupported();
+
+        if (user && firestore && supported) {
+          unsubscribe = onTokenRefreshListener(firestore, user.uid);
+        }
+      } catch (error) {
+        console.error("Failed to setup FCM token refresh listener:", error);
+      }
+    };
+
+    setupListener();
+    
+    // Cleanup the listener when the component unmounts or the user/firestore changes
+    return () => {
+      unsubscribe();
+    };
+  }, [user, firestore]);
+
 
   if (isUserLoading || !user) {
     return (
