@@ -2,14 +2,33 @@
 'use client';
 
 import { getApp } from 'firebase/app';
-import { getMessaging, getToken, onTokenRefresh, isSupported } from 'firebase/messaging';
-import { Firestore, doc, arrayUnion } from 'firebase/firestore';
+import type { Firestore } from 'firebase/firestore';
+import { doc, arrayUnion } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from './non-blocking-updates';
 import { toast } from '@/hooks/use-toast';
 
+// Helper function to dynamically import and get messaging functions
+const getMessagingFns = async () => {
+  // These checks ensure this code only runs in a browser environment
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return null;
+  }
+  try {
+    const { getMessaging, getToken, onTokenRefresh, isSupported } = await import('firebase/messaging');
+    const supported = await isSupported();
+    if (!supported) return null;
+    return { getMessaging, getToken, onTokenRefresh, isSupported };
+  } catch (error) {
+    console.error("Failed to import firebase/messaging", error);
+    return null;
+  }
+};
+
+
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
-  const messagingSupported = await isSupported();
-  if (!messagingSupported) {
+  const messagingFns = await getMessagingFns();
+
+  if (!messagingFns) {
     toast({
       variant: "destructive",
       title: "Not Supported",
@@ -18,6 +37,8 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     return null;
   }
   
+  const { getMessaging, getToken } = messagingFns;
+
   try {
     const app = getApp();
     const messagingInstance = getMessaging(app);
@@ -42,6 +63,10 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
         const userDocRef = doc(firestore, 'users', userId);
         updateDocumentNonBlocking(userDocRef, {
             fcmTokens: arrayUnion(currentToken)
+        });
+        toast({
+          title: "Notifications Enabled!",
+          description: "You're all set to receive push notifications."
         });
         return currentToken;
       } else {
@@ -79,24 +104,29 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
  * @returns An unsubscribe function to clean up the listener.
  */
 export const onTokenRefreshListener = async (firestore: Firestore, userId: string): Promise<() => void> => {
+    const messagingFns = await getMessagingFns();
+
+    if (!messagingFns) {
+      return () => {}; // Return a no-op function if not supported
+    }
+
+    const { getMessaging, onTokenRefresh } = messagingFns;
+    
     try {
-        const supported = await isSupported();
-        if (supported) {
-            const app = getApp();
-            const messagingInstance = getMessaging(app);
-            
-            return onTokenRefresh(messagingInstance, (newToken) => {
-                console.log('FCM token refreshed:', newToken);
-                toast({
-                title: 'Notifications Updated',
-                description: 'Your device token has been refreshed.',
-                });
-                const userDocRef = doc(firestore, 'users', userId);
-                updateDocumentNonBlocking(userDocRef, {
-                fcmTokens: arrayUnion(newToken),
-                });
+        const app = getApp();
+        const messagingInstance = getMessaging(app);
+        
+        return onTokenRefresh(messagingInstance, (newToken) => {
+            console.log('FCM token refreshed:', newToken);
+            toast({
+            title: 'Notifications Updated',
+            description: 'Your device token has been refreshed.',
             });
-        }
+            const userDocRef = doc(firestore, 'users', userId);
+            updateDocumentNonBlocking(userDocRef, {
+            fcmTokens: arrayUnion(newToken),
+            });
+        });
     } catch (error) {
         console.error("Failed to setup FCM token refresh listener:", error);
     }
