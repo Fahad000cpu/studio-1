@@ -56,17 +56,20 @@ const sendFcmTool = ai.defineTool(
         if (!tokens || tokens.length === 0) {
             throw new Error('No FCM tokens provided. Cannot send notification.');
         }
+        
+        const webpushDataPayload = {
+            title,
+            body,
+            ...(icon && { icon }),
+            ...(image && { image }),
+        };
 
         const message: admin.messaging.MulticastMessage = {
             tokens,
-            // The `data` payload is received by the service worker for custom handling
+            // The `data` payload is received by the service worker for custom handling.
+            // It MUST be a string.
             webpush: {
-                data: {
-                    title,
-                    body,
-                    ...(icon && { icon }),
-                    ...(image && { image }),
-                },
+                data: JSON.stringify(webpushDataPayload),
             },
             // The `notification` payload is a fallback for mobile devices or when the
             // browser/FCM handles the notification automatically (e.g., app in background).

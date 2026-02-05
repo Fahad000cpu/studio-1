@@ -25,35 +25,36 @@ self.addEventListener("activate", () => {
 
 // Your custom service worker logic goes here.
 self.addEventListener("push", (event) => {
-  // Default notification options
-  let notification = {
+  const eventData = event as PushEvent;
+  
+  let notificationData = {
     title: "New Notification",
     body: "You have a new message.",
     icon: "/logo.svg",
-    image: undefined,
+    image: undefined as string | undefined,
   };
 
-  // Try to parse the data from the push event
-  if (event.data) {
+  if (eventData.data) {
     try {
-      const pushData = event.data.json();
-      // Overwrite defaults with any data from the push
-      notification = { ...notification, ...pushData };
+      const parsedData = eventData.data.json();
+      // Ensure parsedData is an object before spreading
+      if (typeof parsedData === 'object' && parsedData !== null) {
+        notificationData = { ...notificationData, ...parsedData };
+      }
     } catch (e) {
-      console.error("Push event for non-JSON payload or parsing failed:", e);
+      console.error("Push event data could not be parsed as JSON:", e);
     }
   }
 
-  const title = notification.title;
   const options = {
-    body: notification.body,
-    icon: notification.icon,
-    image: notification.image,
+    body: notificationData.body,
+    icon: notificationData.icon,
+    image: notificationData.image,
   };
 
-  // Use waitUntil to ensure the service worker doesn't terminate
-  // before the notification is displayed.
-  event.waitUntil(self.registration.showNotification(title, options));
+  const promiseChain = self.registration.showNotification(notificationData.title, options);
+
+  event.waitUntil(promiseChain);
 });
 
 
