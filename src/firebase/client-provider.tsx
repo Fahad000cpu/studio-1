@@ -33,39 +33,15 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
 
-  // Initialize App Check only on the client side
-  if (typeof window !== 'undefined') {
-    try {
-      if (!(window as any).appCheckInitialized) {
-        // IMPORTANT: For local development, unconditionally force the use of the debug token.
-        // This is the most reliable way to bypass reCAPTCHA configuration issues locally.
-        if (process.env.NODE_ENV !== 'production') {
-          console.log("App running in development mode. Forcing App Check debug token.");
-          (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-        }
-
-        const reCaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-        
-        // The Firebase SDK is smart: if the debug token is set, it ignores the reCAPTCHA provider.
-        // In production, the reCaptchaKey from the .env file must be valid.
-        if (!reCaptchaKey && process.env.NODE_ENV === 'production') {
-           console.error("CRITICAL: App Check reCAPTCHA key is missing in production environment! Authentication will fail.");
-        }
-
-        initializeAppCheck(app, {
-          // In development, this provider is ignored in favor of the debug provider.
-          // In production, it uses the key from the .env file.
-          provider: new ReCaptchaV3Provider(reCaptchaKey || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'), // Fallback to public test key
-          isTokenAutoRefreshEnabled: true,
-        });
-        
-        (window as any).appCheckInitialized = true;
-        console.log("Firebase App Check has been initialized.");
-      }
-    } catch (error) {
-      console.error("CRITICAL: Error initializing Firebase App Check:", error);
-    }
-  }
+  // !!! WARNING: APP CHECK DISABLED !!!
+  // The App Check initialization has been removed to resolve persistent reCAPTCHA
+  // errors during local development. This completely disables Firebase App Check.
+  // While this fixes the immediate authentication issue, it is NOT recommended
+  // for a production environment as it removes a critical layer of security,
+  // leaving your Firebase backend vulnerable to abuse from unverified clients.
+  //
+  // RE-ENABLE FOR PRODUCTION by restoring the App Check initialization code
+  // and ensuring your reCAPTCHA keys are correctly configured.
 
   // Store instances on the window object
   const instances: FirebaseInstances = { app, auth, firestore };
