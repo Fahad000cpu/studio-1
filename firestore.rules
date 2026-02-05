@@ -167,7 +167,7 @@ service cloud.firestore {
       * @path /roles_admin/{userId}
       */
     match /roles_admin/{userId} {
-       allow get: if isOwner(userId) || isAdmin();
+       allow get: if request.auth.uid == userId; // A user can only check their own admin status.
        allow list: if isAdmin();
        allow create, delete: if isAdmin();
        allow update: if false; // Role documents are either created or deleted, not updated.
