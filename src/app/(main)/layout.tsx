@@ -51,19 +51,19 @@ export default function MainLayout({
       
       try {
         // Dynamically import the messaging library only on the client
-        const { getMessaging, onTokenRefresh, isSupported } = await import('firebase/messaging');
+        const messagingModule = await import('firebase/messaging');
 
-        const supported = await isSupported();
+        const supported = await messagingModule.isSupported();
         if (!supported) {
           // Don't log an error, as this is a normal case for some browsers (e.g., Safari)
           console.log("Firebase Messaging is not supported in this browser.");
           return;
         }
 
-        const messaging = getMessaging();
+        const messaging = messagingModule.getMessaging();
         
         // This is the listener for token refresh
-        unsubscribe = onTokenRefresh(messaging, (newToken) => {
+        unsubscribe = messagingModule.onTokenRefresh(messaging, (newToken) => {
           console.log('FCM token refreshed:', newToken);
           toast({
             title: 'Notifications Updated',
