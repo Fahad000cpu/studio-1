@@ -24,25 +24,38 @@ self.addEventListener("activate", () => {
 });
 
 // Your custom service worker logic goes here.
-// For example, listen to "push" events, and show a notification.
 self.addEventListener("push", (event) => {
+  // Default notification options
+  let notification = {
+    title: "New Notification",
+    body: "You have a new message.",
+    icon: "/logo.svg",
+    image: undefined,
+  };
+
+  // Try to parse the data from the push event
   if (event.data) {
     try {
-      const data = event.data.json();
-      if (data) {
-        const { title, body, icon, image } = data;
-        const options = {
-          body,
-          icon,
-          image,
-        };
-        self.registration.showNotification(title, options);
-      }
+      const pushData = event.data.json();
+      // Overwrite defaults with any data from the push
+      notification = { ...notification, ...pushData };
     } catch (e) {
-      console.error("Push event for non-JSON payload", e);
+      console.error("Push event for non-JSON payload or parsing failed:", e);
     }
   }
+
+  const title = notification.title;
+  const options = {
+    body: notification.body,
+    icon: notification.icon,
+    image: notification.image,
+  };
+
+  // Use waitUntil to ensure the service worker doesn't terminate
+  // before the notification is displayed.
+  event.waitUntil(self.registration.showNotification(title, options));
 });
+
 
 // @serwist/next's default cache handler.
 // You can override this logic, or just let it do its thing.
