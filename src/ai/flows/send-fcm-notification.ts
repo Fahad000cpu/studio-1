@@ -59,16 +59,23 @@ const sendFcmTool = ai.defineTool(
 
         const message: admin.messaging.MulticastMessage = {
             tokens,
+            // The `data` payload is received by the service worker for custom handling
+            webpush: {
+                data: {
+                    title,
+                    body,
+                    ...(icon && { icon }),
+                    ...(image && { image }),
+                },
+            },
+            // The `notification` payload is a fallback for mobile devices or when the
+            // browser/FCM handles the notification automatically (e.g., app in background).
             notification: {
                 title,
                 body,
+                ...(icon && { icon }),
+                ...(image && { image }),
             },
-            webpush: {
-                notification: {
-                    icon: icon,
-                    image: image,
-                }
-            }
         };
 
         try {

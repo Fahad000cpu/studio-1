@@ -1,3 +1,4 @@
+
 import { cleanupOutdatedCaches, precacheAndRoute } from "@serwist/precaching";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { defaultCache } from "@serwist/next/worker";
@@ -25,14 +26,21 @@ self.addEventListener("activate", () => {
 // Your custom service worker logic goes here.
 // For example, listen to "push" events, and show a notification.
 self.addEventListener("push", (event) => {
-  const data = event.data?.json();
-  if (data) {
-    const { title, body, icon, image } = data;
-    self.registration.showNotification(title, {
-      body,
-      icon,
-      image,
-    });
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      if (data) {
+        const { title, body, icon, image } = data;
+        const options = {
+          body,
+          icon,
+          image,
+        };
+        self.registration.showNotification(title, options);
+      }
+    } catch (e) {
+      console.error("Push event for non-JSON payload", e);
+    }
   }
 });
 
