@@ -36,18 +36,24 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   // Initialize App Check only on the client side
   if (typeof window !== 'undefined') {
     try {
-      if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY === 'YOUR_RECAPTCHA_V3_SITE_KEY') {
-        console.warn("reCAPTCHA Site Key is not set for App Check. Phone auth and other services may fail. Please add it to your .env file.");
-      } else {
-        // App Check can only be initialized once
-        // We'll add a flag to window to prevent re-initialization just in case.
-        if (!(window as any).appCheckInitialized) {
-            initializeAppCheck(app, {
-                provider: new ReCaptchaV3Provider(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY),
-                isTokenAutoRefreshEnabled: true
-            });
-            (window as any).appCheckInitialized = true;
+      // Prevent re-initialization
+      if (!(window as any).appCheckInitialized) {
+        const reCaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+
+        // For local development, if the key is missing, use the debug token.
+        // This avoids needing a reCAPTCHA setup for local dev.
+        if (!reCaptchaKey || reCaptchaKey === 'YOUR_RECAPTCHA_V3_SITE_KEY') {
+          console.warn("reCAPTCHA Site Key not found. Using App Check debug token for local development. For production, set NEXT_PUBLIC_RECAPTCHA_SITE_KEY in your .env file.");
+          (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
         }
+
+        initializeAppCheck(app, {
+          // Use ReCaptchaV3Provider if key is available, otherwise the debug provider will be used automatically
+          provider: new ReCaptchaV3Provider(reCaptchaKey || 'dummy-site-key'),
+          isTokenAutoRefreshEnabled: true,
+        });
+        
+        (window as any).appCheckInitialized = true;
       }
     } catch (error) {
       console.error("Error initializing Firebase App Check:", error);

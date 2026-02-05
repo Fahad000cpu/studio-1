@@ -50,32 +50,31 @@ export default function MainLayout({
       }
       
       try {
-        // Dynamically import the messaging library only on the client
-        const messagingModule = await import('firebase/messaging');
-
-        const supported = await messagingModule.isSupported();
-        if (!supported) {
-          // Don't log an error, as this is a normal case for some browsers (e.g., Safari)
-          console.log("Firebase Messaging is not supported in this browser.");
-          return;
-        }
-
-        const messaging = messagingModule.getMessaging();
-        
-        // This is the listener for token refresh
-        unsubscribe = messagingModule.onTokenRefresh(messaging, (newToken) => {
-          console.log('FCM token refreshed:', newToken);
-          toast({
-            title: 'Notifications Updated',
-            description: 'Your device token has been refreshed.',
-          });
-          const userDocRef = doc(firestore, 'users', user.uid);
-          // Use non-blocking update to save the new token
-          updateDocumentNonBlocking(userDocRef, {
-            fcmTokens: arrayUnion(newToken),
-          });
-        });
-
+        // NOTE: The onTokenRefresh listener logic has been temporarily disabled.
+        // This is a workaround for a persistent Next.js build issue where the
+        // onTokenRefresh function fails to import correctly, causing a runtime
+        // crash. The core functionality of requesting and saving the initial
+        // notification token remains active in other parts of the app.
+        // This listener is for handling token refreshes that happen in the background.
+        // ---
+        // const messagingModule = await import('firebase/messaging');
+        // const supported = await messagingModule.isSupported();
+        // if (!supported) {
+        //   console.log("Firebase Messaging is not supported in this browser.");
+        //   return;
+        // }
+        // const messaging = messagingModule.getMessaging();
+        // unsubscribe = messagingModule.onTokenRefresh(messaging, (newToken) => {
+        //   console.log('FCM token refreshed:', newToken);
+        //   toast({
+        //     title: 'Notifications Updated',
+        //     description: 'Your device token has been refreshed.',
+        //   });
+        //   const userDocRef = doc(firestore, 'users', user.uid);
+        //   updateDocumentNonBlocking(userDocRef, {
+        //     fcmTokens: arrayUnion(newToken),
+        //   });
+        // });
       } catch (error) {
         console.error("Error setting up FCM token refresh listener:", error);
       }
