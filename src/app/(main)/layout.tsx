@@ -59,8 +59,6 @@ export default function MainLayout({
                     }
                 });
 
-                // NOTE: onTokenRefresh listener is disabled due to build issues.
-
                 return () => {
                     unsubscribeOnMessage();
                 };

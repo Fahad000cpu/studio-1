@@ -1,16 +1,24 @@
 {
   "name": "ConnectSphere",
   "short_name": "ConnectSphere",
-  "description": "A modern chat application.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#18181b",
-  "theme_color": "#8A2BE2",
+  "description": "A modern chat application with PWA and push notification support.",
   "icons": [
     {
-      "src": "logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/logo.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "theme_color": "#8A2BE2",
+  "background_color": "#F5F5F5",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait"
 }
