@@ -14,12 +14,17 @@ const getMessagingFns = async () => {
     return null;
   }
   try {
+    // Dynamically import the module
     const { getMessaging, getToken, onTokenRefresh, isSupported } = await import('firebase/messaging');
     const supported = await isSupported();
-    if (!supported) return null;
-    return { getMessaging, getToken, onTokenRefresh, isSupported };
+    if (!supported) {
+        console.log("Firebase Messaging is not supported in this browser.");
+        return null;
+    }
+    // Return the functions if supported
+    return { getMessaging, getToken, onTokenRefresh };
   } catch (error) {
-    console.error("Failed to import firebase/messaging", error);
+    console.error("Failed to import or initialize firebase/messaging:", error);
     return null;
   }
 };
@@ -31,8 +36,8 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
   if (!messagingFns) {
     toast({
       variant: "destructive",
-      title: "Not Supported",
-      description: "Push notifications are not supported in this browser.",
+      title: "Notifications Not Available",
+      description: "Push notifications are not supported or could not be initialized in this browser.",
     });
     return null;
   }
