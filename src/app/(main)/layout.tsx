@@ -135,12 +135,6 @@ export default function MainLayout({
               <div className="w-full flex-1">
                 {/* Can add breadcrumbs or search here */}
               </div>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="https://pushall.ru/?fs=5965" target="_blank">
-                  <Bell />
-                  <span className="sr-only">Subscribe to PushAll</span>
-                </Link>
-              </Button>
               <ThemeToggle />
               <UserNav />
             </header>
