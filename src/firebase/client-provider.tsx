@@ -37,26 +37,33 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   if (typeof window !== 'undefined') {
     try {
       if (!(window as any).appCheckInitialized) {
-        // For local development, unconditionally use the debug token.
-        // This bypasses reCAPTCHA and its related issues during development.
+        // IMPORTANT: For local development, unconditionally force the use of the debug token.
+        // This is the most reliable way to bypass reCAPTCHA configuration issues locally.
         if (process.env.NODE_ENV !== 'production') {
-          console.log("Development environment detected. Using App Check debug token.");
+          console.log("App running in development mode. Forcing App Check debug token.");
           (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
         }
 
         const reCaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+        
+        // The Firebase SDK is smart: if the debug token is set, it ignores the reCAPTCHA provider.
+        // In production, the reCaptchaKey from the .env file must be valid.
+        if (!reCaptchaKey && process.env.NODE_ENV === 'production') {
+           console.error("CRITICAL: App Check reCAPTCHA key is missing in production environment! Authentication will fail.");
+        }
 
-        // Initialize App Check. The debug token will be used if set.
-        // If in production, it will require the reCaptchaKey.
         initializeAppCheck(app, {
-          provider: new ReCaptchaV3Provider(reCaptchaKey || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'), // Provide a fallback test key
+          // In development, this provider is ignored in favor of the debug provider.
+          // In production, it uses the key from the .env file.
+          provider: new ReCaptchaV3Provider(reCaptchaKey || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'), // Fallback to public test key
           isTokenAutoRefreshEnabled: true,
         });
         
         (window as any).appCheckInitialized = true;
+        console.log("Firebase App Check has been initialized.");
       }
     } catch (error) {
-      console.error("Error initializing Firebase App Check:", error);
+      console.error("CRITICAL: Error initializing Firebase App Check:", error);
     }
   }
 
