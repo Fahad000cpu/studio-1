@@ -15,7 +15,7 @@ import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
   try {
     const supported = await isSupported();
-    if (!supported) {
+    if (!supported || !navigator.serviceWorker) {
       toast({
         variant: "destructive",
         title: "Notifications Not Supported",
@@ -33,6 +33,18 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       });
       return null;
     }
+    
+    // Get the service worker registration.
+    // The service worker is registered by Serwist at the root scope.
+    const swRegistration = await navigator.serviceWorker.getRegistration();
+    if (!swRegistration) {
+        toast({
+            variant: "destructive",
+            title: "Service Worker Error",
+            description: "The notification service worker is not active. Please refresh the page and try again.",
+        });
+        return null;
+    }
 
     const app = getApp();
     const messagingInstance = getMessaging(app);
@@ -48,7 +60,8 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       return null;
     }
 
-    const currentToken = await getToken(messagingInstance, { vapidKey });
+    // Pass the registration to getToken to use the custom service worker.
+    const currentToken = await getToken(messagingInstance, { vapidKey, serviceWorkerRegistration: swRegistration });
     if (currentToken) {
       const userDocRef = doc(firestore, 'users', userId);
       updateDocumentNonBlocking(userDocRef, {
@@ -69,11 +82,22 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     }
   } catch (error) {
     console.error('An error occurred while requesting notification permission:', error);
-    toast({
-      variant: "destructive",
-      title: "An Error Occurred",
-      description: "Could not enable notifications. Please check the console for details.",
-    });
+    // Check if error is a FirebaseError and has a specific code
+    const firebaseError = error as { code?: string; message?: string };
+    if (firebaseError.code === 'messaging/failed-service-worker-registration') {
+        toast({
+            variant: "destructive",
+            title: "Notification Setup Failed",
+            description: "Could not set up notifications. Please ensure you are on a secure (HTTPS) connection and try refreshing.",
+            duration: 10000,
+        });
+    } else {
+        toast({
+          variant: "destructive",
+          title: "An Error Occurred",
+          description: firebaseError.message || "Could not enable notifications. Please check the console for details.",
+        });
+    }
     return null;
   }
 };
