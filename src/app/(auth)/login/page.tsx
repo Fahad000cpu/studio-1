@@ -142,7 +142,7 @@ export default function LoginPage() {
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push("/discover");
+      window.location.replace("/discover");
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
@@ -174,7 +174,7 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
         await signInWithPopup(auth, provider);
-        router.push("/discover");
+        window.location.replace("/discover");
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
@@ -245,7 +245,7 @@ export default function LoginPage() {
      setIsVerifyingOtp(true);
      try {
         await confirmationResult.confirm(values.otp);
-        router.push("/discover");
+        window.location.replace("/discover");
      } catch (error: any) {
         console.error("Error verifying OTP:", error);
         toast({ variant: "destructive", title: "Invalid OTP", description: "The code you entered is incorrect. Please try again." });
@@ -387,5 +387,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    
