@@ -76,6 +76,7 @@ export default function LoginPage() {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isRecaptchaInitialized, setIsRecaptchaInitialized] = useState(false);
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
@@ -96,14 +97,8 @@ export default function LoginPage() {
     },
   });
 
- useEffect(() => {
-    // Only initialize reCAPTCHA when the phone tab is active
-    if (activeTab !== 'phone' || !auth) {
-      return;
-    }
-
-    // Avoid re-initializing if it already exists
-    if (recaptchaVerifierRef.current) {
+  useEffect(() => {
+    if (!auth || activeTab !== 'phone' || isRecaptchaInitialized) {
       return;
     }
 
@@ -111,6 +106,11 @@ export default function LoginPage() {
     if (!recaptchaContainer) {
       console.error("reCAPTCHA container not found");
       return;
+    }
+    
+    // This check prevents re-creating the verifier if the container already has the widget.
+    if (recaptchaContainer.innerHTML !== '') {
+        return;
     }
     
     try {
@@ -121,18 +121,23 @@ export default function LoginPage() {
         },
       });
       recaptchaVerifierRef.current = verifier;
+      setIsRecaptchaInitialized(true);
+      
     } catch (e) {
       console.error("Error creating RecaptchaVerifier", e);
     }
+  }, [auth, activeTab, isRecaptchaInitialized]);
 
-    // Cleanup function: clears the verifier when the tab is switched or component unmounts
+  // This effect handles the cleanup when the component is unmounted.
+  useEffect(() => {
     return () => {
-      if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-        recaptchaVerifierRef.current = null;
-      }
-    };
-  }, [auth, activeTab]);
+        if (recaptchaVerifierRef.current) {
+            recaptchaVerifierRef.current.clear();
+            recaptchaVerifierRef.current = null;
+        }
+    }
+  }, []);
+
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -179,11 +184,10 @@ export default function LoginPage() {
   const handleSendOtp = async (values: z.infer<typeof phoneFormSchema>) => {
     const verifier = recaptchaVerifierRef.current;
     if (!verifier) {
-        console.error("reCAPTCHA verifier not initialized. Please refresh the page.");
         toast({ 
             variant: "destructive", 
             title: "Error", 
-            description: "Security verification failed to initialize. Please switch tabs or refresh and try again." 
+            description: "Security verification failed. Please try switching tabs or refreshing the page." 
         });
         return;
     }
@@ -198,19 +202,18 @@ export default function LoginPage() {
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
         console.error("Error sending OTP:", error);
-        if (error.code === 'auth/internal-error') {
+        if (error.code === 'auth/operation-not-allowed') {
+            toast({
+                variant: "destructive",
+                title: "Action Required: Enable Phone Sign-In",
+                description: "Please go to the Firebase Console, navigate to 'Authentication' > 'Sign-in method', and enable the 'Phone' provider for your project.",
+                duration: 20000,
+            });
+        } else if (error.code === 'auth/internal-error') {
             toast({
                 variant: "destructive",
                 title: "Configuration Error",
-                description: "An internal error occurred. This can happen if the Identity Platform API is not enabled in your Google Cloud project, or if App Check is misconfigured. Please check your Firebase project settings.",
-                duration: 20000,
-            });
-        } else if (error.code === 'auth/operation-not-allowed') {
-            const currentDomain = window.location.hostname;
-            toast({
-                variant: "destructive",
-                title: "Action Required: Configuration Error",
-                description: `Phone sign-in is not allowed. Please check two things: 1) The domain "${currentDomain}" is in the 'Authorised domains' list in Firebase Auth settings. 2) App Check is correctly set up and your app is registered with reCAPTCHA v3.`,
+                description: "An internal error occurred. This can happen if the 'Identity Platform API' is not enabled in your Google Cloud project. Please check your project settings.",
                 duration: 20000,
             });
         } else {
@@ -377,3 +380,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
