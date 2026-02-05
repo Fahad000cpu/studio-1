@@ -68,4 +68,5 @@ const nextConfig: NextConfig = {
 export default withSerwist({
   swSrc: "src/sw.ts",
   swDest: "public/sw.js",
+  disable: false,
 })(nextConfig);
