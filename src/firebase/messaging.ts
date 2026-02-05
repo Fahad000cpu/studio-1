@@ -13,9 +13,10 @@ import { toast } from '@/hooks/use-toast';
  */
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
   try {
-    const messaging = await import('firebase/messaging');
+    // Dynamically import and destructure messaging functions
+    const { isSupported, getToken, getMessaging } = await import('firebase/messaging');
     
-    const supported = await messaging.isSupported();
+    const supported = await isSupported();
     if (!supported) {
       toast({
         variant: "destructive",
@@ -36,7 +37,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     }
 
     const app = getApp();
-    const messagingInstance = messaging.getMessaging(app);
+    const messagingInstance = getMessaging(app);
     
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
     if (!vapidKey) {
@@ -49,7 +50,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       return null;
     }
 
-    const currentToken = await messaging.getToken(messagingInstance, { vapidKey });
+    const currentToken = await getToken(messagingInstance, { vapidKey });
     if (currentToken) {
       const userDocRef = doc(firestore, 'users', userId);
       updateDocumentNonBlocking(userDocRef, {
@@ -86,23 +87,19 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
  */
 export const onTokenRefreshListener = async (firestore: Firestore, userId: string): Promise<() => void> => {
   try {
-    const messaging = await import('firebase/messaging');
+    // Dynamically import and destructure messaging functions
+    const { isSupported, onTokenRefresh, getMessaging } = await import('firebase/messaging');
 
-    const supported = await messaging.isSupported();
+    const supported = await isSupported();
     if (!supported) {
       console.log('Firebase Messaging is not supported in this browser.');
       return () => {};
     }
 
-    if (typeof messaging.onTokenRefresh !== 'function') {
-      console.error('onTokenRefresh is not a function after dynamic import. This indicates a build issue.');
-      return () => {};
-    }
-
     const app = getApp();
-    const messagingInstance = messaging.getMessaging(app);
+    const messagingInstance = getMessaging(app);
     
-    const unsubscribe = messaging.onTokenRefresh(messagingInstance, (newToken) => {
+    const unsubscribe = onTokenRefresh(messagingInstance, (newToken) => {
         console.log('FCM token refreshed:', newToken);
         toast({
         title: 'Notifications Updated',
@@ -118,6 +115,9 @@ export const onTokenRefreshListener = async (firestore: Firestore, userId: strin
 
   } catch (error) {
     console.error("Failed to setup FCM token refresh listener:", error);
+    if (error instanceof TypeError && error.message.includes('is not a function')) {
+        console.error('This is likely a build issue with Next.js and Firebase. The dynamically imported module for `firebase/messaging` seems to be incomplete.');
+    }
     return () => {};
   }
 };
