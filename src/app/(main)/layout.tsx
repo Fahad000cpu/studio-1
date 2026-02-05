@@ -3,7 +3,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser, useFirestore, onTokenRefreshListener } from "@/firebase";
+import { useUser, useFirestore, updateDocumentNonBlocking } from "@/firebase";
+import { doc, arrayUnion } from 'firebase/firestore';
+import { toast } from "@/hooks/use-toast";
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -38,25 +40,54 @@ export default function MainLayout({
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    let unsubscribe: () => void = () => {};
+    // This will hold the unsubscribe function from the onTokenRefresh listener
+    let unsubscribe = () => {};
 
-    const setupListener = async () => {
+    const setupFcmTokenListener = async () => {
+      // Ensure this only runs on the client and when the user is logged in
+      if (typeof window === 'undefined' || !user || !firestore) {
+        return;
+      }
+      
       try {
-        if (user && firestore) {
-          unsubscribe = await onTokenRefreshListener(firestore, user.uid);
+        // Dynamically import the messaging library only on the client
+        const { getMessaging, onTokenRefresh, isSupported } = await import('firebase/messaging');
+
+        const supported = await isSupported();
+        if (!supported) {
+          // Don't log an error, as this is a normal case for some browsers (e.g., Safari)
+          console.log("Firebase Messaging is not supported in this browser.");
+          return;
         }
+
+        const messaging = getMessaging();
+        
+        // This is the listener for token refresh
+        unsubscribe = onTokenRefresh(messaging, (newToken) => {
+          console.log('FCM token refreshed:', newToken);
+          toast({
+            title: 'Notifications Updated',
+            description: 'Your device token has been refreshed.',
+          });
+          const userDocRef = doc(firestore, 'users', user.uid);
+          // Use non-blocking update to save the new token
+          updateDocumentNonBlocking(userDocRef, {
+            fcmTokens: arrayUnion(newToken),
+          });
+        });
+
       } catch (error) {
-        console.error("Failed to setup FCM token refresh listener:", error);
+        console.error("Error setting up FCM token refresh listener:", error);
       }
     };
 
-    setupListener();
+    setupFcmTokenListener();
     
-    // Cleanup the listener when the component unmounts or the user/firestore changes
+    // Cleanup the listener when the component unmounts
     return () => {
       unsubscribe();
     };
-  }, [user, firestore]);
+  }, [user, firestore]); // Rerun if user or firestore instance changes
 
 
   // While checking auth state, or if we have confirmed there is no user (and are about to redirect), show a loader.
