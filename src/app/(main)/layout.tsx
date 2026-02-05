@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Flame, Bell } from "lucide-react";
 import Link from "next/link";
+import { getMessaging, onMessage, isSupported } from 'firebase/messaging';
 
 export default function MainLayout({
   children,
@@ -31,6 +32,7 @@ export default function MainLayout({
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     // If auth state is confirmed and there is NO user, redirect them to the login page.
@@ -40,53 +42,32 @@ export default function MainLayout({
   }, [user, isUserLoading, router]);
 
   useEffect(() => {
-    // This will hold the unsubscribe function from the onTokenRefresh listener
-    let unsubscribe = () => {};
+    // This effect sets up Firebase messaging listeners for foreground messages.
+    if (typeof window !== 'undefined' && user) {
+        isSupported().then(supported => {
+            if (supported) {
+                const messaging = getMessaging();
 
-    const setupFcmTokenListener = async () => {
-      // Ensure this only runs on the client and when the user is logged in
-      if (typeof window === 'undefined' || !user || !firestore) {
-        return;
-      }
-      
-      try {
-        // NOTE: The onTokenRefresh listener logic has been temporarily disabled.
-        // This is a workaround for a persistent Next.js build issue where the
-        // onTokenRefresh function fails to import correctly, causing a runtime
-        // crash. The core functionality of requesting and saving the initial
-        // notification token remains active in other parts of the app.
-        // This listener is for handling token refreshes that happen in the background.
-        // ---
-        // const messagingModule = await import('firebase/messaging');
-        // const supported = await messagingModule.isSupported();
-        // if (!supported) {
-        //   console.log("Firebase Messaging is not supported in this browser.");
-        //   return;
-        // }
-        // const messaging = messagingModule.getMessaging();
-        // unsubscribe = messagingModule.onTokenRefresh(messaging, (newToken) => {
-        //   console.log('FCM token refreshed:', newToken);
-        //   toast({
-        //     title: 'Notifications Updated',
-        //     description: 'Your device token has been refreshed.',
-        //   });
-        //   const userDocRef = doc(firestore, 'users', user.uid);
-        //   updateDocumentNonBlocking(userDocRef, {
-        //     fcmTokens: arrayUnion(newToken),
-        //   });
-        // });
-      } catch (error) {
-        console.error("Error setting up FCM token refresh listener:", error);
-      }
-    };
+                // Handle messages that arrive while the app is in the foreground
+                const unsubscribeOnMessage = onMessage(messaging, (payload) => {
+                    console.log('Foreground message received.', payload);
+                    if (payload.notification) {
+                        toast({
+                            title: payload.notification.title,
+                            description: payload.notification.body,
+                        });
+                    }
+                });
 
-    setupFcmTokenListener();
-    
-    // Cleanup the listener when the component unmounts
-    return () => {
-      unsubscribe();
-    };
-  }, [user, firestore]); // Rerun if user or firestore instance changes
+                // NOTE: onTokenRefresh listener is disabled due to build issues.
+
+                return () => {
+                    unsubscribeOnMessage();
+                };
+            }
+        });
+    }
+  }, [user, firestore, toast]);
 
 
   // While checking auth state, or if we have confirmed there is no user (and are about to redirect), show a loader.

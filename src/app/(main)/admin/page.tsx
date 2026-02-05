@@ -75,8 +75,8 @@ export default function AdminPage() {
         tokens: uniqueTokens,
         title: notificationTitle,
         body: notificationBody,
-        icon: '/favicon.ico',
-        image: '/logo.png',
+        icon: '/logo.svg',
+        image: '/logo.svg',
       });
 
       toast({
