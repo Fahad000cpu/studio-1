@@ -144,7 +144,14 @@ export default function LoginPage() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       router.push("/discover");
     } catch (error: any) {
-        if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        if (error.code === 'auth/operation-not-allowed') {
+            toast({
+                variant: "destructive",
+                title: "Login Method Disabled",
+                description: "Email/Password sign-in is not enabled for this project. An admin must enable it in the Firebase Console.",
+                duration: 10000,
+            });
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
             toast({
                 variant: "destructive",
                 title: "Login Failed",
@@ -205,8 +212,8 @@ export default function LoginPage() {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
                 variant: "destructive",
-                title: "Action Required: Enable Phone Sign-In",
-                description: "Please go to the Firebase Console, navigate to 'Authentication' > 'Sign-in method', and enable the 'Phone' provider for your project.",
+                title: "Phone Sign-In Disabled",
+                description: "Phone authentication is not enabled for this project. An administrator must enable it in the Firebase Console's 'Sign-in method' tab.",
                 duration: 20000,
             });
         } else if (error.code === 'auth/internal-error') {
