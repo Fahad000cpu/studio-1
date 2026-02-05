@@ -36,27 +36,20 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   // Initialize App Check only on the client side
   if (typeof window !== 'undefined') {
     try {
-      // Prevent re-initialization
       if (!(window as any).appCheckInitialized) {
-        // This is the official reCAPTCHA v3 test key for localhost.
-        // It's safe to use and will not trigger validation errors in dev.
-        const RECAPTCHA_TEST_KEY = '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+        // For local development, unconditionally use the debug token.
+        // This bypasses reCAPTCHA and its related issues during development.
+        if (process.env.NODE_ENV !== 'production') {
+          console.log("Development environment detected. Using App Check debug token.");
+          (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+        }
 
         const reCaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
 
-        // In a non-production environment, automatically use the debug token
-        // if no real key is provided. This is the standard for local development.
-        if (process.env.NODE_ENV !== 'production') {
-           if (!reCaptchaKey) {
-             console.warn("reCAPTCHA Site Key not found. Using App Check debug token for local development.");
-             (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-           }
-        }
-
+        // Initialize App Check. The debug token will be used if set.
+        // If in production, it will require the reCaptchaKey.
         initializeAppCheck(app, {
-          // Use the user's key if available, otherwise fall back to the valid test key.
-          // This prevents initialization errors during development.
-          provider: new ReCaptchaV3Provider(reCaptchaKey || RECAPTCHA_TEST_KEY),
+          provider: new ReCaptchaV3Provider(reCaptchaKey || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI'), // Provide a fallback test key
           isTokenAutoRefreshEnabled: true,
         });
         
