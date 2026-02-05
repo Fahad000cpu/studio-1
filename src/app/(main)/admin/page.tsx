@@ -14,7 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Copy } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
@@ -95,6 +95,14 @@ export default function AdminPage() {
     } finally {
       setIsSending(false);
     }
+  };
+  
+  const handleCopyToken = (token: string) => {
+    navigator.clipboard.writeText(token);
+    toast({
+        title: "Token Copied",
+        description: "The FCM token has been copied to your clipboard.",
+    });
   };
 
 
@@ -201,11 +209,16 @@ export default function AdminPage() {
                               const uniqueValidTokens = [...new Set(validTokens)];
                               if (uniqueValidTokens.length > 0) {
                                 return (
-                                  <div className="flex flex-col gap-1">
+                                  <div className="flex flex-col gap-2">
                                     {uniqueValidTokens.map((token, i) => (
-                                      <Badge key={i} variant="secondary" className="font-mono text-xs max-w-xs truncate">
-                                        {token}
-                                      </Badge>
+                                      <div key={i} className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="font-mono text-xs max-w-xs truncate">
+                                            {token}
+                                        </Badge>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyToken(token)}>
+                                            <Copy className="h-3 w-3" />
+                                        </Button>
+                                      </div>
                                     ))}
                                   </div>
                                 );
