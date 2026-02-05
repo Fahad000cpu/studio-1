@@ -167,7 +167,8 @@ service cloud.firestore {
       * @path /roles_admin/{userId}
       */
     match /roles_admin/{userId} {
-       allow get, list: if isAdmin();
+       allow get: if isOwner(userId) || isAdmin();
+       allow list: if isAdmin();
        allow create, delete: if isAdmin();
        allow update: if false; // Role documents are either created or deleted, not updated.
     }
