@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo } from "firebase/auth";
 import { doc, GeoPoint, getDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +64,7 @@ export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -127,7 +129,7 @@ export default function SignupPage() {
       if (user) {
         await updateProfile(user, { displayName: values.name });
         await handlePostSignup(user, values.name, values.email, user.phoneNumber, user.photoURL);
-        // The redirect is now handled by the (auth) layout based on auth state.
+        router.push("/discover");
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -157,6 +159,7 @@ export default function SignupPage() {
         if (additionalInfo?.isNewUser) {
            await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
         }
+        router.push("/discover");
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;

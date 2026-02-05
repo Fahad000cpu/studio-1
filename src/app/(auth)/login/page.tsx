@@ -174,7 +174,7 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
         await signInWithPopup(auth, provider);
-        // The (auth) layout will handle the redirect on user state change.
+        router.push("/discover");
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
