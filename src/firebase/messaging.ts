@@ -2,13 +2,13 @@
 'use client';
 
 import { getApp } from 'firebase/app';
-import * as messaging from 'firebase/messaging';
+import { getMessaging, getToken, onTokenRefresh, isSupported } from 'firebase/messaging';
 import { Firestore, doc, arrayUnion } from 'firebase/firestore';
 import { updateDocumentNonBlocking } from './non-blocking-updates';
 import { toast } from '@/hooks/use-toast';
 
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
-  const messagingSupported = await messaging.isSupported();
+  const messagingSupported = await isSupported();
   if (!messagingSupported) {
     toast({
       variant: "destructive",
@@ -20,7 +20,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
   
   try {
     const app = getApp();
-    const messagingInstance = messaging.getMessaging(app);
+    const messagingInstance = getMessaging(app);
     
     const permission = await Notification.requestPermission();
 
@@ -36,7 +36,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
         return null;
       }
 
-      const currentToken = await messaging.getToken(messagingInstance, { vapidKey });
+      const currentToken = await getToken(messagingInstance, { vapidKey });
       
       if (currentToken) {
         const userDocRef = doc(firestore, 'users', userId);
@@ -80,12 +80,12 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
  */
 export const onTokenRefreshListener = async (firestore: Firestore, userId: string): Promise<() => void> => {
     try {
-        const supported = await messaging.isSupported();
+        const supported = await isSupported();
         if (supported) {
             const app = getApp();
-            const messagingInstance = messaging.getMessaging(app);
+            const messagingInstance = getMessaging(app);
             
-            return messaging.onTokenRefresh(messagingInstance, (newToken) => {
+            return onTokenRefresh(messagingInstance, (newToken) => {
                 console.log('FCM token refreshed:', newToken);
                 toast({
                 title: 'Notifications Updated',
