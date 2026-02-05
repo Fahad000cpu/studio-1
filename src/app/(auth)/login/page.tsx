@@ -151,11 +151,11 @@ export default function LoginPage() {
                 description: "Email/Password sign-in is not enabled for this project. An admin must enable it in the Firebase Console.",
                 duration: 10000,
             });
-        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
             toast({
                 variant: "destructive",
                 title: "Login Failed",
-                description: "Invalid email or password. If you signed up using another method, please use that to log in.",
+                description: "Invalid email or password. Please check your credentials and try again.",
             });
         }
         else {
@@ -179,11 +179,21 @@ export default function LoginPage() {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
         }
+        if (error.code === 'auth/account-exists-with-different-credential') {
+            toast({
+                variant: "destructive",
+                title: "Account Exists",
+                description: "An account with this email already exists using a different sign-in method. Please log in with your original method.",
+                duration: 10000,
+            });
+            return;
+        }
         console.error("Google Sign-In Error:", error);
         toast({
             variant: "destructive",
             title: "Google Sign-In Failed",
-            description: error.message || "Could not sign in with Google. Please try again.",
+            description: error.message || "Could not sign in with Google. Please ensure your domain is authorized in the Firebase console and try again.",
+            duration: 10000,
         });
     }
   };
@@ -387,3 +397,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
