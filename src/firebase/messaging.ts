@@ -13,9 +13,9 @@ import { toast } from '@/hooks/use-toast';
  */
 export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
   try {
-    const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
+    const messaging = await import('firebase/messaging');
     
-    const supported = await isSupported();
+    const supported = await messaging.isSupported();
     if (!supported) {
       toast({
         variant: "destructive",
@@ -36,7 +36,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     }
 
     const app = getApp();
-    const messagingInstance = getMessaging(app);
+    const messagingInstance = messaging.getMessaging(app);
     
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
     if (!vapidKey) {
@@ -49,7 +49,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       return null;
     }
 
-    const currentToken = await getToken(messagingInstance, { vapidKey });
+    const currentToken = await messaging.getToken(messagingInstance, { vapidKey });
     if (currentToken) {
       const userDocRef = doc(firestore, 'users', userId);
       updateDocumentNonBlocking(userDocRef, {
@@ -86,35 +86,38 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
  */
 export const onTokenRefreshListener = async (firestore: Firestore, userId: string): Promise<() => void> => {
   try {
-    const { getMessaging, onTokenRefresh, isSupported } = await import('firebase/messaging');
-    
-    const supported = await isSupported();
+    const messaging = await import('firebase/messaging');
+
+    const supported = await messaging.isSupported();
     if (!supported) {
-      // Return a no-op function if not supported
+      console.log('Firebase Messaging is not supported in this browser.');
+      return () => {};
+    }
+
+    if (typeof messaging.onTokenRefresh !== 'function') {
+      console.error('onTokenRefresh is not a function after dynamic import. This indicates a build issue.');
       return () => {};
     }
 
     const app = getApp();
-    const messagingInstance = getMessaging(app);
+    const messagingInstance = messaging.getMessaging(app);
     
-    const unsubscribe = onTokenRefresh(messagingInstance, (newToken) => {
-      console.log('FCM token refreshed:', newToken);
-      toast({
+    const unsubscribe = messaging.onTokenRefresh(messagingInstance, (newToken) => {
+        console.log('FCM token refreshed:', newToken);
+        toast({
         title: 'Notifications Updated',
         description: 'Your device token has been refreshed.',
-      });
-      const userDocRef = doc(firestore, 'users', userId);
-      updateDocumentNonBlocking(userDocRef, {
+        });
+        const userDocRef = doc(firestore, 'users', userId);
+        updateDocumentNonBlocking(userDocRef, {
         fcmTokens: arrayUnion(newToken),
-      });
+        });
     });
     
     return unsubscribe;
 
   } catch (error) {
     console.error("Failed to setup FCM token refresh listener:", error);
-    // Return a no-op function on error
     return () => {};
   }
 };
-    
