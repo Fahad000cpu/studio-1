@@ -65,7 +65,7 @@ export default function AdminPage() {
       if (uniqueTokens.length === 0) {
           toast({
             variant: "destructive",
-            title: "No FCM Tokens",
+            title: "No Push Tokens Found",
             description: "No users have registered for push notifications.",
           });
           setIsSending(false);
@@ -82,8 +82,8 @@ export default function AdminPage() {
       });
 
       toast({
-        title: 'Notification Sent',
-        description: 'The notification has been sent to all registered users.',
+        title: 'Push Notification Sent',
+        description: 'The notification has been broadcast to all users with valid tokens.',
       });
       setNotificationTitle('');
       setNotificationBody('');
@@ -94,7 +94,7 @@ export default function AdminPage() {
       toast({
         variant: 'destructive',
         title: 'Send Failed',
-        description: 'An error occurred while sending the notification.',
+        description: 'An error occurred while sending the push notification.',
       });
     } finally {
       setIsSending(false);
@@ -117,7 +117,7 @@ export default function AdminPage() {
           Admin Controls
         </h1>
         <p className="text-muted-foreground">
-          Use this page to manage application settings and users.
+          Manage application settings, users, and messaging.
         </p>
       </div>
       <div className="space-y-8">
@@ -148,19 +148,19 @@ export default function AdminPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Smartphone className="h-5 w-5"/>
-                        How to use In-App Messaging
+                        In-App Messaging (Pop-ups & Banners)
                     </CardTitle>
                     <CardDescription>
-                        Send targeted, contextual messages to users who are actively using your app.
+                       Send messages to **active users** inside the app. These are managed from the Firebase Console, not from here.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Alert>
                         <Info className="h-4 w-4" />
-                        <AlertTitle>Managed from Firebase Console</AlertTitle>
+                        <AlertTitle>How It Works</AlertTitle>
                         <AlertDescription>
-                            <p>In-App messages (like pop-ups or banners) are created and managed entirely in the Firebase Console under the **In-App Messaging** section. You don't send them from here.</p>
-                            <p className="mt-2">To test a message on your own device before sending it to everyone, you need your device's **Installation ID**. Open your browser's developer console (F12) to find it.</p>
+                            <p>In-App messages do not use the FCM tokens listed on this page. They are handled automatically by Firebase.</p>
+                            <p className="mt-2 font-semibold">To test a message on your device before sending it to everyone, you need your device's unique **Installation ID**. Open your browser's developer console (F12) to find it.</p>
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -170,10 +170,10 @@ export default function AdminPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BellRing className="h-5 w-5"/>
-                  Send Broadcast Push Notification
+                  Broadcast Push Notifications
                 </CardTitle>
                 <CardDescription>
-                  Send a push notification to all users who have enabled them. This appears even when the app is closed.
+                  Send notifications that appear on a user's device, **even when the app is closed**. This uses the FCM Push Tokens listed below.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -211,14 +211,14 @@ export default function AdminPage() {
                 </div>
                 <Button onClick={handleSendNotification} disabled={isSending}>
                   <Send className="mr-2 h-4 w-4" />
-                  {isSending ? 'Sending...' : 'Send Notification'}
+                  {isSending ? 'Sending...' : 'Send Push Notification'}
                 </Button>
               </CardContent>
             </Card>
             
             <Alert>
               <Info className="h-4 w-4" />
-              <AlertTitle>How FCM Tokens Work</AlertTitle>
+              <AlertTitle>How Push Tokens Work</AlertTitle>
               <AlertDescription>
                 FCM tokens for Push Notifications will only appear below after users have gone to the <strong>Settings</strong> page and enabled them.
               </AlertDescription>
@@ -227,7 +227,7 @@ export default function AdminPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>User FCM Tokens</CardTitle>
+                <CardTitle>User Push Notification Tokens (FCM)</CardTitle>
                 <CardDescription>
                   List of users and their registered Firebase Cloud Messaging (FCM) tokens for Push Notifications.
                 </CardDescription>
