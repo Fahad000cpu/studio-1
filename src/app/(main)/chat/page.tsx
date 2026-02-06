@@ -16,6 +16,7 @@ import {
   query,
   where,
   orderBy,
+  arrayUnion,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -28,12 +29,20 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   useUser,
   useFirestore,
   addDocumentNonBlocking,
   useCollection,
   useMemoFirebase,
   deleteDocumentNonBlocking,
+  updateDocumentNonBlocking,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -44,7 +53,12 @@ import {
   ArrowLeft,
   ImageIcon,
   Square,
+  MoreVertical,
+  Trash,
   Trash2,
+  Undo2,
+  Check,
+  CheckCheck,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -65,13 +79,11 @@ const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null) => 
   const date = timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
   
   if (isToday(date)) {
-    // e.g., "2:30 PM"
     return format(date, 'p'); 
   }
   if (isYesterday(date)) {
     return 'Yesterday';
   }
-  // e.g., "24/05/2024"
   return format(date, 'dd/MM/yyyy');
 };
 
@@ -93,7 +105,6 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Fetch chat metadata, sorted by last message time
   const chatMetadataCollection = useMemoFirebase(
     () => (user ? query(
         collection(firestore, 'chat_metadata'),
@@ -104,11 +115,9 @@ export default function ChatPage() {
   );
   const { data: chatMetadatas, isLoading: metadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection);
 
-  // 2. Fetch all users to get their details (name, avatar)
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
-  // 3. Create a map of users for quick lookups
   const usersMap = useMemo(() => {
     if (!allUsers) return new Map<string, UserProfile>();
     return new Map(allUsers.map(u => [u.id, u]));
@@ -125,7 +134,6 @@ export default function ChatPage() {
 
   const isLoading = metadataLoading || allUsersLoading;
 
-  // Handles both initial chat from URL and default selection on desktop
   useEffect(() => {
     if (isLoading || selectedChatId || !usersMap.size) return;
 
@@ -185,26 +193,32 @@ export default function ChatPage() {
   const { data: messagesData } = useCollection<Message>(messagesCollection, messageCollectionOptions);
 
   const messages: Message[] = useMemo(() => {
-    if (!messagesData) return [];
-    return messagesData.map(msg => ({
-      ...msg,
-      own: msg.senderId === user?.uid,
-    }));
+    if (!messagesData || !user?.uid) return [];
+    return messagesData
+        .map(msg => ({
+            ...msg,
+            own: msg.senderId === user?.uid,
+        }))
+        .filter(msg => !msg.deletedFor?.includes(user.uid!));
   }, [messagesData, user?.uid]);
 
+  const currentChatMetadata = useMemo(() => {
+    if (!chatId || !chatMetadatas) return null;
+    return chatMetadatas.find(m => m.id === chatId) ?? null;
+  }, [chatId, chatMetadatas]);
 
-  // Reset unread count when a chat is opened
   useEffect(() => {
     if (!user || !selectedChatId) return;
     const currentChatId = getChatId(user.uid, selectedChatId);
     const metadataRef = doc(firestore, 'chat_metadata', currentChatId);
 
     updateDoc(metadataRef, {
-        [`unreadCount.${user.uid}`]: 0
+        [`unreadCount.${user.uid}`]: 0,
+        [`lastRead.${user.uid}`]: serverTimestamp(),
     }).catch(() => {
         // Silently ignore if doc doesn't exist. It will be created on first message.
     });
-  }, [selectedChatId, user, firestore]);
+  }, [selectedChatId, user, firestore, messages]); // re-run if messages change
 
 
   useEffect(() => {
@@ -241,6 +255,7 @@ export default function ChatPage() {
           lastMessageTimestamp: serverTimestamp(),
           participants: [user.uid, recipientId],
           unreadCount: { [recipientId]: 1, [user.uid]: 0 },
+          lastRead: { [user.uid]: serverTimestamp() },
         };
         await setDoc(metadataRef, createPayload);
       } else {
@@ -258,7 +273,6 @@ export default function ChatPage() {
 
     const isLink = urlRegex.test(messageText.trim());
     
-    // 1. Add the message to the database
     addDocumentNonBlocking(messagesCollection, {
       text: messageText,
       senderId: user.uid,
@@ -269,15 +283,9 @@ export default function ChatPage() {
       chatId: chatId,
     });
 
-    // 2. Update chat metadata for sorting and unread count
     await updateChatMetadata(messageText);
 
-    // 3. Directly trigger the notification
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
-    
-    console.log('[ConnectSphere Chat] Attempting to send notification.');
-    console.log(`[ConnectSphere Chat] Recipient: ${selectedChat.name}, Found tokens:`, recipientTokens);
-
     if (recipientTokens.length > 0) {
       sendFcmNotification({
         tokens: recipientTokens,
@@ -286,10 +294,8 @@ export default function ChatPage() {
         url: `/chat?chatWith=${user.uid}`,
         icon: user.photoURL || undefined,
       }).catch(err => console.error("[ConnectSphere Chat] Failed to send text message notification:", err));
-    } else {
-        console.log("[ConnectSphere Chat] No valid FCM tokens found for recipient. Skipping notification.");
     }
-};
+  };
 
   const handleAttachmentClick = () => {
     fileInputRef.current?.click();
@@ -303,7 +309,6 @@ export default function ChatPage() {
     try {
       const downloadURL = await uploadToCloudinary(file);
 
-      // 1. Add the media message to the database
       addDocumentNonBlocking(messagesCollection, {
         text: '',
         senderId: user.uid,
@@ -314,19 +319,13 @@ export default function ChatPage() {
         chatId: chatId,
       });
 
-      // 2. Determine notification body and update metadata
       let body = 'Sent a file';
       if (type === 'image') body = '📷 Photo';
       if (type === 'video') body = '🎥 Video';
       if (type === 'audio') body = '🎤 Voice Message';
       await updateChatMetadata(body);
       
-      // 3. Directly trigger the notification for the media message
       const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
-      
-      console.log('[ConnectSphere Chat] Attempting to send media notification.');
-      console.log(`[ConnectSphere Chat] Recipient: ${selectedChat.name}, Found tokens:`, recipientTokens);
-
       if (recipientTokens.length > 0) {
         sendFcmNotification({
           tokens: recipientTokens,
@@ -335,8 +334,6 @@ export default function ChatPage() {
           url: `/chat?chatWith=${user.uid}`,
           icon: user.photoURL || undefined,
         }).catch(err => console.error("[ConnectSphere Chat] Failed to send media message notification:", err));
-      } else {
-         console.log("[ConnectSphere Chat] No valid FCM tokens found for recipient to send media notification.");
       }
 
     } catch (error) {
@@ -348,7 +345,6 @@ export default function ChatPage() {
       });
     } finally {
       setIsUploading(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -417,10 +413,32 @@ export default function ChatPage() {
     }
   };
   
-    const handleDeleteMessage = (messageId: string) => {
+  const handleDeleteForMe = (messageId: string) => {
+    if (!chatId || !user) return;
+    const messageRef = doc(firestore, 'chats', chatId, 'messages', messageId);
+    updateDocumentNonBlocking(messageRef, {
+        deletedFor: arrayUnion(user.uid)
+    });
+  };
+
+  const handleDeleteForEveryone = (messageId: string) => {
     if (!chatId) return;
     const messageRef = doc(firestore, 'chats', chatId, 'messages', messageId);
     deleteDocumentNonBlocking(messageRef);
+  };
+  
+  const handleMarkAsUnread = async (chatId: string) => {
+    if (!user) return;
+    const metadataRef = doc(firestore, 'chat_metadata', chatId);
+    try {
+        await updateDoc(metadataRef, {
+            [`unreadCount.${user.uid}`]: 1,
+        });
+        toast({ title: "Chat marked as unread." });
+    } catch (error) {
+        console.error("Failed to mark as unread:", error);
+        toast({ variant: "destructive", title: "Error", description: "Could not mark chat as unread."});
+    }
   };
 
 
@@ -501,20 +519,20 @@ export default function ChatPage() {
     
             const contact = usersMap.get(otherUserId);
             if (!contact) {
-              // This can happen if a user is deleted but chat metadata remains.
-              // We'll just skip rendering them.
               return null;
             }
 
             const unreadCount = metadata.unreadCount?.[user.uid] || 0;
             const lastMessageText = metadata.lastMessageText || 'Click to start chatting!';
             const lastMessageTime = getMessageTimestamp(metadata.lastMessageTimestamp);
+            const chatIdForUnread = getChatId(user.uid, contact.id);
+
 
             return (
               <div
                 key={contact.id}
                 className={cn(
-                  'flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
+                  'group relative flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
                   selectedChatId === contact.id && 'bg-accent/80'
                 )}
                 onClick={() => handleSelectChat(contact)}
@@ -542,6 +560,21 @@ export default function ChatPage() {
                         </Badge>
                     )}
                 </div>
+                 <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMarkAsUnread(chatIdForUnread); }}>
+                                <Undo2 className="mr-2 h-4 w-4" />
+                                <span>Mark as Unread</span>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
               </div>
             );
         })
@@ -550,7 +583,7 @@ export default function ChatPage() {
     </div>
   );
 
-  const ChatWindow = selectedChat && (
+  const ChatWindow = selectedChat && user && (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
       <div className="flex items-center p-3 border-b">
@@ -580,26 +613,59 @@ export default function ChatPage() {
 
       {/* Messages */}
       <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
           {messages.map((msg, index) => {
              const avatarSrc = msg.own
-                ? user?.photoURL || `https://picsum.photos/seed/${user?.uid}/200`
+                ? user.photoURL || `https://picsum.photos/seed/${user?.uid}/200`
                 : selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`;
             const avatarFallback = msg.own
-                ? (user?.displayName || '?').charAt(0)
+                ? (user.displayName || '?').charAt(0)
                 : (selectedChat.name || '?').charAt(0);
+            
+            const recipientLastRead = currentChatMetadata?.lastRead?.[selectedChat.id];
+            const msgTimestamp = msg.timestamp instanceof Timestamp ? msg.timestamp : null;
+            const isRead = !!(recipientLastRead && msgTimestamp && msgTimestamp.toMillis() <= recipientLastRead.toMillis());
+
             return (
               <div
                 key={msg.id || index}
                 className={cn(
-                  'flex items-start max-w-[75%] gap-2 group',
+                  'group flex items-end max-w-[75%] gap-2 py-2',
                   msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto'
                 )}
               >
-                <Avatar className="w-8 h-8">
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={msg.own ? "end" : "start"}>
+                        <DropdownMenuItem onClick={() => handleDeleteForMe(msg.id)}>
+                            <Trash className="mr-2 h-4 w-4" />
+                            <span>Delete for me</span>
+                        </DropdownMenuItem>
+                        {msg.own && (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg.id)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete for everyone</span>
+                                </DropdownMenuItem>
+                            </>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <Avatar className="w-8 h-8 self-start">
                   <AvatarImage src={avatarSrc} />
                   <AvatarFallback>{avatarFallback}</AvatarFallback>
                 </Avatar>
+
                 <div
                   className={cn(
                     'flex flex-col gap-1',
@@ -609,12 +675,8 @@ export default function ChatPage() {
                   <div
                     className={cn(
                       'rounded-lg',
-                      msg.messageType !== 'audio' &&
-                        msg.messageType !== 'video' &&
-                        'p-3',
-                      (msg.messageType === 'audio' ||
-                        msg.messageType === 'video') &&
-                        'p-2',
+                       msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3',
+                       (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2',
                       msg.own
                         ? 'bg-primary text-primary-foreground rounded-br-none'
                         : 'bg-muted rounded-bl-none'
@@ -622,22 +684,17 @@ export default function ChatPage() {
                   >
                     {renderMessageContent(msg)}
                   </div>
-                  <span className="text-xs text-muted-foreground px-1">
-                    {getMessageTimestamp(msg.timestamp)}
-                  </span>
-                </div>
-                {msg.own && (
-                  <div className="self-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleDeleteMessage(msg.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                    <span>{getMessageTimestamp(msg.timestamp)}</span>
+                    {msg.own && (
+                      isRead ? (
+                          <CheckCheck className="h-4 w-4 text-blue-500" />
+                      ) : (
+                          <Check className="h-4 w-4" />
+                      )
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}

@@ -19,11 +19,14 @@ export type Message = {
   messageType: 'text' | 'image' | 'video' | 'file' | 'audio' | 'link';
   mediaUrl?: string | null;
   chatId?: string;
+  deletedFor?: string[];
 };
 
 export type ChatMetadata = {
+  id: string;
   participants: string[];
   lastMessageText?: string;
   lastMessageTimestamp?: Timestamp;
   unreadCount?: { [key: string]: number };
+  lastRead?: { [key: string]: Timestamp };
 };
