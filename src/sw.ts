@@ -11,54 +11,53 @@ declare global {
 
 declare const self: SerwistWorkerGlobalScope;
 
+// --- Serwist Setup ---
 cleanupOutdatedCaches();
-
 precacheAndRoute(self.__SW_MANIFEST || []);
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", () => self.clients.claim());
 
-self.addEventListener("install", () => {
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", () => {
-  self.clients.claim();
-});
-
-// Your custom service worker logic goes here.
+// --- Custom Push Notification Handler ---
 self.addEventListener("push", (event) => {
-  const promiseChain = (async () => {
-    // Default notification options
-    let notificationTitle = "ConnectSphere";
-    const notificationOptions: NotificationOptions = {
+  // Define the async function that will handle the push event logic.
+  const handlePush = async () => {
+    // Set default title and options for the notification.
+    let title = "ConnectSphere";
+    let options: NotificationOptions = {
       body: "You have a new message.",
       icon: "/logo.svg",
       badge: "/logo.svg",
       vibrate: [200, 100, 200],
     };
 
+    // Check if the push event has any data.
     if (event.data) {
       try {
+        // Try to parse the data as JSON.
         const payload = event.data.json();
-        notificationTitle = payload.title || notificationTitle;
-        notificationOptions.body = payload.body || notificationOptions.body;
-        notificationOptions.icon = payload.icon || notificationOptions.icon;
-        if (payload.image) {
-          notificationOptions.image = payload.image;
-        }
+        // Overwrite the defaults with data from the payload.
+        title = payload.title || title;
+        options = {
+          ...options,
+          body: payload.body || options.body,
+          icon: payload.icon || options.icon,
+          image: payload.image, // This can be undefined, which is fine.
+        };
       } catch (e) {
-        console.error("Push event data parsing error, treating as text.", e);
-        notificationOptions.body = event.data.text();
+        // If parsing as JSON fails, assume the data is plain text.
+        console.error("Push event data was not valid JSON. Falling back to text.", e);
+        options.body = event.data.text();
       }
     }
-    
-    // Show the notification.
-    await self.registration.showNotification(notificationTitle, notificationOptions);
-  })();
-  
-  event.waitUntil(promiseChain);
+
+    // Display the notification to the user.
+    await self.registration.showNotification(title, options);
+  };
+
+  // Tell the browser to wait until our async function has finished executing.
+  event.waitUntil(handlePush());
 });
 
-
-// @serwist/next's default cache handler.
-// You can override this logic, or just let it do its thing.
-// To learn more, see https://serwist.pages.dev/docs/next/worker-exports
+// --- Serwist Default Cache Handler ---
+// This handles caching for Next.js routes and assets.
 defaultCache();
