@@ -1,26 +1,17 @@
 
 'use server';
-/**
- * @fileOverview A server action for sending FCM notifications. This has been made more robust
- * to handle initialization errors and to identify invalid tokens for self-healing.
- */
 
 import * as admin from 'firebase-admin';
 import type { SendFcmNotificationInput, SendFcmNotificationOutput } from '@/types/fcm';
 
-// Helper function to initialize Firebase Admin SDK idempotently
-function initializeFirebaseAdmin() {
-  if (admin.apps.length === 0) {
-    try {
-      // In a managed environment like App Hosting or Cloud Functions,
-      // initializeApp() with no arguments automatically uses Application Default Credentials.
-      admin.initializeApp();
-      console.log("Firebase Admin SDK initialized successfully.");
-    } catch (e) {
-      console.error('Firebase Admin SDK initialization error:', e);
-      // This is a critical failure, so we throw to stop execution.
-      throw new Error("Could not initialize Firebase Admin SDK. Notifications will not be sent.");
-    }
+// --- Simplified, top-level initialization ---
+// This code runs once when the module is loaded on the server.
+if (admin.apps.length === 0) {
+  try {
+    admin.initializeApp();
+    console.log("Firebase Admin SDK initialized for the first time.");
+  } catch (error: any) {
+    console.error("CRITICAL: Failed to initialize Firebase Admin SDK on load.", error.message);
   }
 }
 
@@ -28,45 +19,34 @@ export async function sendFcmNotification(
     input: SendFcmNotificationInput
   ): Promise<SendFcmNotificationOutput> {
     
-    try {
-      initializeFirebaseAdmin();
-    } catch(e) {
-      console.error(e);
-      return { successCount: 0, failureCount: input.tokens?.length || 0, invalidTokens: [] };
+    // --- Guard clause: Check if SDK is properly initialized ---
+    if (admin.apps.length === 0) {
+        const errorMessage = "Firebase Admin SDK is not initialized. Cannot send notification.";
+        console.error(errorMessage);
+        // Throw an error that the client-side catch block will handle.
+        throw new Error(errorMessage);
     }
     
-    // After attempting initialization, check again if it's ready. If not, exit.
-    if (admin.apps.length === 0) {
-        console.error("Firebase Admin SDK is not available. Cannot send notification.");
-        return { successCount: 0, failureCount: input.tokens?.length || 0, invalidTokens: [] };
-    }
-
     const { tokens, title, body, icon, url } = input;
-
     const validTokens = Array.isArray(tokens) ? tokens.filter(t => typeof t === 'string' && t.length > 0) : [];
 
     if (validTokens.length === 0) {
+        console.log("No valid FCM tokens provided. Skipping notification.");
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        // The `notification` payload is displayed automatically by the browser/OS
-        // when the app is in the background.
         notification: {
             title: title || "New Message",
             body: body || "You have a new message",
-            imageUrl: icon, // Use 'imageUrl' for the icon in the notification payload
+            imageUrl: icon,
         },
-        // The `data` payload is sent to the service worker so it knows
-        // which URL to open when the notification is clicked.
         data: {
           url: url || '/',
         },
-        // Webpush-specific config for further customization.
         webpush: {
             fcmOptions: {
-                // This link is a fallback for browsers that support it directly.
                 link: url || '/',
             },
             headers: {
@@ -75,36 +55,37 @@ export async function sendFcmNotification(
         },
     };
 
+    console.log(`Sending FCM message to ${validTokens.length} token(s).`);
+
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
+        console.log(`FCM sendEachForMulticast response: Successes: ${response.successCount}, Failures: ${response.failureCount}`);
+        
         const invalidTokens: string[] = [];
-
         if (response.failureCount > 0) {
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
                     const error = resp.error;
-                    console.error(`Token failed: ${validTokens[idx]}, Error: ${error?.code} - ${error?.message}`);
-                    
-                    // Identify tokens that are no longer registered.
+                    const failedToken = validTokens[idx];
+                    console.error(`Token failed: ${failedToken}, Error: ${error?.code} - ${error?.message}`);
                     if (
                         error?.code === 'messaging/registration-token-not-registered' ||
                         error?.code === 'messaging/invalid-registration-token'
                     ) {
-                        invalidTokens.push(validTokens[idx]);
+                        invalidTokens.push(failedToken);
                     }
                 }
             });
-            console.error('List of failed tokens:', invalidTokens);
         }
 
         return {
             successCount: response.successCount,
             failureCount: response.failureCount,
-            invalidTokens: invalidTokens, // Return invalid tokens for self-healing
+            invalidTokens: invalidTokens,
         };
-    } catch (error) {
-        console.error('Critical error calling admin.messaging().sendEachForMulticast():', error);
-        // This catch block handles errors during the API call itself (e.g., network issues)
-        return { successCount: 0, failureCount: validTokens.length, invalidTokens: [] };
+    } catch (error: any) {
+        console.error('CRITICAL: Error calling admin.messaging().sendEachForMulticast():', error.message);
+        // Re-throw the error so the client-side `catch` block can display a toast.
+        throw new Error(`Failed to send notification via FCM: ${error.message}`);
     }
 }
