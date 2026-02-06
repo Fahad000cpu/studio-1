@@ -54,12 +54,6 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
           logger.log("Message is missing sender or recipient ID. Exiting function.", { senderId, recipientId });
           return;
       }
-
-      // Do not send notification if the user is sending a message to themselves.
-      if (senderId === recipientId) {
-          logger.log("Sender and recipient are the same. No notification will be sent.");
-          return;
-      }
   
       // 1. Get recipient's tokens
       const recipientDoc = await db.collection("users").doc(recipientId).get();
