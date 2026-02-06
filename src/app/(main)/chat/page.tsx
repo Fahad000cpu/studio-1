@@ -44,6 +44,7 @@ import type { ChatContact, Message } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -214,18 +215,31 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
 
-    const isLink = urlRegex.test(newMessage.trim());
+    const messageText = newMessage;
+    const isLink = urlRegex.test(messageText.trim());
 
     addDocumentNonBlocking(messagesCollection, {
-      text: newMessage,
+      text: messageText,
       senderId: user.uid,
       recipientId: selectedChat.id,
       timestamp: serverTimestamp(),
       messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
     });
-
     setNewMessage('');
+    
+    // Send FCM notification to the recipient
+    const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
+    if (recipientTokens && recipientTokens.length > 0) {
+      sendFcmNotification({
+        tokens: recipientTokens,
+        title: `New message from ${user.displayName || 'Someone'}`,
+        body: messageText,
+        icon: user.photoURL || undefined,
+      }).catch(error => {
+          console.error("Failed to send chat notification:", error);
+      });
+    }
   };
 
   const handleAttachmentClick = () => {
