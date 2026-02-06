@@ -40,6 +40,7 @@ const messaging = admin.messaging();
 export const sendChatNotificationOnNewMessage = onDocumentCreated(
     "chats/{chatId}/messages/{messageId}",
     async (event) => {
+      logger.log("Function triggered for new message:", event.params);
       const snapshot = event.data;
       if (!snapshot) {
         logger.log("No data associated with the event. Exiting function.");
@@ -56,6 +57,7 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
       }
   
       // 1. Get recipient's tokens
+      logger.log(`Fetching recipient user document for ID: ${recipientId}`);
       const recipientDoc = await db.collection("users").doc(recipientId).get();
       if (!recipientDoc.exists) {
           logger.log(`Recipient user document not found for ID: ${recipientId}. Exiting function.`);
@@ -69,6 +71,7 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
           logger.log(`Recipient ${recipientId} has no valid FCM tokens. Exiting function.`);
           return;
       }
+      logger.log(`Found ${tokens.length} token(s) for recipient ${recipientId}.`);
   
       // 2. Get sender's name and photo
       const senderDoc = await db.collection("users").doc(senderId).get();
@@ -95,7 +98,6 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
           notification: { // Fallback for other platforms
               title: `${senderName} sent a message`,
               body: notificationBody,
-              imageUrl: senderPhoto, // Basic image for mobile
           },
           webpush: { // Specific for Web Push
               notification: {
@@ -131,6 +133,7 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
                     const error = resp.error;
+                    logger.warn(`Failed to send to token: ${tokens[idx]}`, error);
                     if (error && (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token')) {
                         invalidTokens.push(tokens[idx]);
                     }
@@ -150,9 +153,3 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
       }
     }
 );
-
-
-// export const helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
