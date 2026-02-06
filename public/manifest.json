@@ -1,15 +1,24 @@
+
 {
-  "name": "ConnectSphere",
-  "short_name": "ConnectSphere",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#F5F5F5",
-  "theme_color": "#8A2BE2",
-  "icons": [
-    {
-      "src": "logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
-    }
-  ]
+    "name": "ConnectSphere",
+    "short_name": "ConnectSphere",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#240747",
+    "theme_color": "#8A2BE2",
+    "description": "A modern chat application built with Next.js and Firebase.",
+    "icons": [
+        {
+            "src": "/logo.svg",
+            "sizes": "192x192",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        },
+        {
+            "src": "/logo.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml",
+            "purpose": "maskable"
+        }
+    ]
 }

@@ -1,67 +1,79 @@
-// These scripts are downloaded from the CDN and run in the browser.
+
+// This service worker is essential for receiving push notifications when the app is in the background.
+
+// Import the Firebase scripts that are needed in the service worker
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
-// This config is exposed to the browser, so it's safe.
+// Initialize the Firebase app in the service worker with your project's configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyB8ADt_BHfhhcIwDax82s13GVYJAefjA0g",
-  authDomain: "studio-6505166944-ae18f.firebaseapp.com",
-  projectId: "studio-6505166944-ae18f",
-  storageBucket: "studio-6505166944-ae18f.appspot.com",
-  messagingSenderId: "954303139735",
-  appId: "1:954303139735:web:1cb50131d512627c9d3ed2",
-  measurementId: "G-1TC3B2RSWT"
+  "projectId": "studio-6505166944-ae18f",
+  "appId": "1:954303139735:web:1cb50131d512627c9d3ed2",
+  "storageBucket": "studio-6505166944-ae18f.appspot.com",
+  "apiKey": "AIzaSyB8ADt_BHfhhcIwDax82s13GVYJAefjA0g",
+  "authDomain": "studio-6505166944-ae18f.firebaseapp.com",
+  "measurementId": "G-1TC3B2RSWT",
+  "messagingSenderId": "954303139735"
 };
 
 firebase.initializeApp(firebaseConfig);
 
+// Retrieve an instance of Firebase Messaging so that it can handle background messages.
 const messaging = firebase.messaging();
 
-// This handler is for messages received when the app is in the background.
-messaging.onBackgroundMessage(function(payload) {
-  console.log('SW: Received background message ', payload);
+/**
+ * onBackgroundMessage is the handler for messages received when the app is in the background.
+ * It's responsible for showing the notification to the user.
+ */
+messaging.onBackgroundMessage((payload) => {
+  console.log('[sw.js] Received background message ', payload);
 
-  // From the payload, we can get the notification data.
-  const notificationTitle = payload.notification.title;
+  // Extract the title and options from the incoming payload.
+  const notificationTitle = payload.notification?.title || 'New Message';
   const notificationOptions = {
-    body: payload.notification.body,
-    icon: payload.notification.icon,
-    badge: payload.notification.badge,
-    tag: payload.notification.tag,
-    renotify: payload.notification.renotify,
+    body: payload.notification?.body || 'You have a new message.',
+    icon: payload.notification?.icon || '/logo.svg',
+    badge: '/logo.svg',
+    tag: payload.notification?.tag,
+    renotify: true,
+    // Store the URL to open in the notification's data property.
     data: {
-      url: payload.data.url // Pass the URL to the data property for click handling
+        url: payload.data?.url || '/'
     }
   };
 
-  // The service worker shows the notification.
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+  // Show the notification.
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// This handler is for when the user clicks on the notification.
+/**
+ * This event listener handles the user clicking on the notification.
+ */
 self.addEventListener('notificationclick', function(event) {
-  // The notification is closed when clicked.
-  event.notification.close();
+    console.log('[sw.js] Notification click Received.', event.notification);
 
-  // Get the URL from the notification's data property.
-  const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
+    // Close the notification.
+    event.notification.close();
+    
+    // Get the URL to open from the notification's data.
+    const urlToOpen = event.notification.data.url;
 
-  // This function finds an existing window/tab or opens a new one.
-  event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then(function(clientList) {
-      // If a window with the same URL is already open, focus it.
-      for (const client of clientList) {
-        if (new URL(client.url).pathname === new URL(urlToOpen).pathname && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // Otherwise, open a new window.
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+    // This looks for an open window with the same URL and focuses it.
+    // If it's not found, it opens a new window.
+    event.waitUntil(
+        clients.matchAll({
+            type: "window",
+            includeUncontrolled: true
+        }).then(function(clientList) {
+            for (var i = 0; i < clientList.length; i++) {
+                var client = clientList[i];
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
 });

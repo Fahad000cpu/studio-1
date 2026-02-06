@@ -58,9 +58,11 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
           return;
       }
 
-      if (senderId === recipientId) {
-        logger.info("Sender and recipient are the same. This is a self-chat. Proceeding for testing purposes.");
-      }
+      // For testing, we allow self-chats. In production, you might uncomment this.
+      // if (senderId === recipientId) {
+      //   logger.info("[EXIT] Sender and recipient are the same. No notification will be sent.");
+      //   return;
+      // }
   
       // 1. Get recipient's tokens
       let tokens: string[] = [];
@@ -128,6 +130,7 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
           notification: {
               title: `${senderName} sent a message`,
               body: notificationBody,
+              icon: senderPhoto, // Standard icon for mobile
           },
           webpush: {
               notification: {
