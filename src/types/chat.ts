@@ -18,6 +18,12 @@ export type Message = {
   status?: 'sending' | 'sent' | 'failed';
   messageType: 'text' | 'image' | 'video' | 'file' | 'audio' | 'link';
   mediaUrl?: string | null;
+  chatId?: string;
 };
 
-    
+export type ChatMetadata = {
+  participants: string[];
+  lastMessageText?: string;
+  lastMessageTimestamp?: Timestamp;
+  unreadCount?: { [key: string]: number };
+};

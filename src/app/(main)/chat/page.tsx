@@ -10,6 +10,12 @@ import {
   deleteDoc,
   doc,
   GeoPoint,
+  updateDoc,
+  increment,
+  setDoc,
+  query,
+  where,
+  orderBy,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -43,34 +49,18 @@ import {
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
-import type { Message } from '@/types/chat';
+import type { Message, ChatMetadata } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
+import { Badge } from '@/components/ui/badge';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
 }
 
-// Haversine distance formula to calculate distance between two points on Earth
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    if (lat1 === lat2 && lon1 === lon2) {
-        return 0;
-    }
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distance in km
-    return distance;
-}
-
-const getMessageTimestamp = (timestamp: Timestamp | Date | undefined) => {
+const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null) => {
   if (!timestamp) return '';
   const date = timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
   
@@ -97,108 +87,85 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const searchParams = useSearchParams();
 
-  const [contacts, setContacts] = useState<UserProfile[]>([]);
-  const [usersLoading, setUsersLoading] = useState(true);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 1. Fetch chat metadata, sorted by last message time
+  const chatMetadataCollection = useMemoFirebase(
+    () => (user ? query(
+        collection(firestore, 'chat_metadata'),
+        where('participants', 'array-contains', user.uid),
+        orderBy('lastMessageTimestamp', 'desc')
+    ) : null),
+    [firestore, user]
+  );
+  const { data: chatMetadatas, isLoading: metadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection);
+
+  // 2. Fetch all users to get their details (name, avatar)
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
+  // 3. Create a map of users for quick lookups
+  const usersMap = useMemo(() => {
+    if (!allUsers) return new Map<string, UserProfile>();
+    return new Map(allUsers.map(u => [u.id, u]));
+  }, [allUsers]);
+
   const selectedChat = useMemo(() => {
-    if (!selectedChatId || !allUsers) return null;
-    return allUsers.find(u => u.id === selectedChatId) ?? null;
-  }, [selectedChatId, allUsers]);
+    if (!selectedChatId || !usersMap) return null;
+    return usersMap.get(selectedChatId) ?? null;
+  }, [selectedChatId, usersMap]);
   
   const handleSelectChat = useCallback((contact: UserProfile) => {
     setSelectedChatId(contact.id);
   }, []);
 
-  useEffect(() => {
-    const fetchAndSortUsers = (latitude?: number, longitude?: number) => {
-        if (allUsersLoading || !allUsers || !user) return;
-        setUsersLoading(true);
-
-        try {
-            const otherUsers = allUsers.filter((u) => u.id !== user.uid);
-            
-            const sortedUsers = otherUsers.sort((a, b) => {
-                if (latitude && longitude) {
-                    const locationA = a.coordinates;
-                    const locationB = b.coordinates;
-                    if (locationA && locationB) {
-                        const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);
-                        const distanceB = getDistance(latitude, longitude, locationB.latitude, locationB.longitude);
-                        return distanceA - distanceB;
-                    }
-                    if (locationA) return -1;
-                    if (locationB) return 1;
-                }
-                const nameA = a.name || a.email || '';
-                const nameB = b.name || b.email || '';
-                return nameA.localeCompare(nameB);
-            });
-            setContacts(sortedUsers);
-        } catch (error) {
-            console.error("Failed to process users:", error);
-            toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not load user contacts for chat.",
-            });
-        } finally {
-            setUsersLoading(false);
-        }
-    };
-
-    if (user) {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
-                },
-                () => {
-                    fetchAndSortUsers();
-                }
-            );
-        } else {
-            fetchAndSortUsers();
-        }
-    }
-  }, [user, toast, allUsers, allUsersLoading]);
+  const isLoading = metadataLoading || allUsersLoading;
 
   // Handles both initial chat from URL and default selection on desktop
   useEffect(() => {
-    if (contacts.length === 0 || selectedChatId) return;
+    if (isLoading || selectedChatId || !usersMap.size) return;
 
     const chatWithId = searchParams.get('chatWith');
     if (chatWithId) {
-        const userToChatWith = contacts.find(u => u.id === chatWithId);
+        const userToChatWith = usersMap.get(chatWithId);
         if (userToChatWith) {
             handleSelectChat(userToChatWith);
             return;
         }
     }
     
-    if (!isMobile) {
-        const firstContact = contacts.find(c => c.id !== user?.uid);
+    if (!isMobile && chatMetadatas && chatMetadatas.length > 0 && user) {
+        const firstChat = chatMetadatas[0];
+        const otherUserId = firstChat.participants.find(p => p !== user.uid);
+        const firstContact = otherUserId ? usersMap.get(otherUserId) : null;
         if (firstContact) {
             handleSelectChat(firstContact);
         }
     }
-  }, [contacts, selectedChatId, searchParams, isMobile, user, handleSelectChat]);
+  }, [chatMetadatas, usersMap, selectedChatId, searchParams, isMobile, user, handleSelectChat, isLoading]);
 
+  const filteredChats = useMemo(() => {
+    if (!chatMetadatas || !user) return [];
+    
+    return chatMetadatas.filter(metadata => {
+        const otherUserId = metadata.participants.find(p => p !== user.uid);
+        if (!otherUserId) return false;
+        
+        const contact = usersMap.get(otherUserId);
+        if (!contact) return false;
 
-    const filteredContacts = useMemo(() => {
-    if (!contacts) return [];
-    return contacts.filter(contact =>
-      (contact.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-      (contact.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [contacts, searchTerm]);
+        if (!searchTerm) return true;
+
+        const searchTermLower = searchTerm.toLowerCase();
+        const nameMatch = (contact.name || '').toLowerCase().includes(searchTermLower);
+        const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
+        return nameMatch || emailMatch;
+    });
+  }, [chatMetadatas, user, searchTerm, usersMap]);
 
 
   const chatId = useMemo(() => {
@@ -225,9 +192,19 @@ export default function ChatPage() {
     }));
   }, [messagesData, user?.uid]);
 
-  const getLastMessage = (contactId: string): { text: string; time: string } => {
-    return { text: 'Click to start chatting!', time: '' };
-  };
+
+  // Reset unread count when a chat is opened
+  useEffect(() => {
+    if (!user || !selectedChatId) return;
+    const currentChatId = getChatId(user.uid, selectedChatId);
+    const metadataRef = doc(firestore, 'chat_metadata', currentChatId);
+
+    updateDoc(metadataRef, {
+        [`unreadCount.${user.uid}`]: 0
+    }).catch(() => {
+        // Silently ignore if doc doesn't exist. It will be created on first message.
+    });
+  }, [selectedChatId, user, firestore]);
 
 
   useEffect(() => {
@@ -242,6 +219,36 @@ export default function ChatPage() {
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
+  const updateChatMetadata = async (text: string) => {
+    if (!user || !selectedChat || !chatId) return;
+
+    const metadataRef = doc(firestore, 'chat_metadata', chatId);
+    const recipientId = selectedChat.id;
+
+    const updatePayload = {
+      lastMessageText: text,
+      lastMessageTimestamp: serverTimestamp(),
+      participants: [user.uid, recipientId],
+      [`unreadCount.${recipientId}`]: increment(1),
+    };
+
+    try {
+      await updateDoc(metadataRef, updatePayload);
+    } catch (error: any) {
+      if (error.code === 'not-found') {
+        const createPayload = {
+          lastMessageText: text,
+          lastMessageTimestamp: serverTimestamp(),
+          participants: [user.uid, recipientId],
+          unreadCount: { [recipientId]: 1, [user.uid]: 0 },
+        };
+        await setDoc(metadataRef, createPayload);
+      } else {
+        console.error("Failed to update chat metadata:", error);
+      }
+    }
+  };
+
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection || !chatId) return;
@@ -262,7 +269,10 @@ export default function ChatPage() {
       chatId: chatId,
     });
 
-    // 2. Directly trigger the notification
+    // 2. Update chat metadata for sorting and unread count
+    await updateChatMetadata(messageText);
+
+    // 3. Directly trigger the notification
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
     
     console.log('[ConnectSphere Chat] Attempting to send notification.');
@@ -304,12 +314,15 @@ export default function ChatPage() {
         chatId: chatId,
       });
 
-      // 2. Directly trigger the notification for the media message
-      const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
+      // 2. Determine notification body and update metadata
       let body = 'Sent a file';
       if (type === 'image') body = '📷 Photo';
       if (type === 'video') body = '🎥 Video';
       if (type === 'audio') body = '🎤 Voice Message';
+      await updateChatMetadata(body);
+      
+      // 3. Directly trigger the notification for the media message
+      const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
       
       console.log('[ConnectSphere Chat] Attempting to send media notification.');
       console.log(`[ConnectSphere Chat] Recipient: ${selectedChat.name}, Found tokens:`, recipientTokens);
@@ -364,7 +377,7 @@ export default function ChatPage() {
     }
     
     if (fileType) {
-        uploadMedia(file, fileType);
+        await uploadMedia(file, fileType);
     }
   };
 
@@ -379,9 +392,9 @@ export default function ChatPage() {
         audioChunksRef.current.push(event.data);
       };
 
-      mediaRecorderRef.current.onstop = () => {
+      mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        uploadMedia(audioBlob, 'audio');
+        await uploadMedia(audioBlob, 'audio');
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -468,7 +481,7 @@ export default function ChatPage() {
       </div>
       <Separator />
       <ScrollArea className="flex-grow">
-        {usersLoading ? (
+        {isLoading ? (
           <div className="p-4 space-y-4">
             {[...Array(5)].map((_, i) => (
               <div key={`skeleton-${i}`} className="flex items-center gap-4">
@@ -481,8 +494,22 @@ export default function ChatPage() {
             ))}
           </div>
         ) : (
-          filteredContacts?.map((contact) => {
-             const lastMessageInfo = getLastMessage(contact.id);
+          filteredChats?.map((metadata) => {
+            if (!user) return null;
+            const otherUserId = metadata.participants.find(p => p !== user.uid);
+            if (!otherUserId) return null;
+    
+            const contact = usersMap.get(otherUserId);
+            if (!contact) {
+              // This can happen if a user is deleted but chat metadata remains.
+              // We'll just skip rendering them.
+              return null;
+            }
+
+            const unreadCount = metadata.unreadCount?.[user.uid] || 0;
+            const lastMessageText = metadata.lastMessageText || 'Click to start chatting!';
+            const lastMessageTime = getMessageTimestamp(metadata.lastMessageTimestamp);
+
             return (
               <div
                 key={contact.id}
@@ -500,12 +527,20 @@ export default function ChatPage() {
                 </Avatar>
                 <div className="flex-grow overflow-hidden">
                   <p className="font-semibold truncate">{contact.name || contact.email}</p>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {lastMessageInfo.text}
+                  <p className={cn(
+                      "text-sm truncate",
+                      unreadCount > 0 ? "text-foreground font-semibold" : "text-muted-foreground"
+                    )}>
+                    {lastMessageText}
                   </p>
                 </div>
-                <div className="text-xs text-muted-foreground whitespace-nowrap">
-                    {lastMessageInfo.time}
+                <div className="text-xs text-muted-foreground whitespace-nowrap flex flex-col items-end gap-1.5 self-start">
+                    <span className={cn(unreadCount > 0 && "text-accent-foreground font-bold")}>{lastMessageTime}</span>
+                    {unreadCount > 0 && (
+                        <Badge className="h-5 min-w-[1.25rem] p-1 flex items-center justify-center rounded-full bg-accent text-accent-foreground">
+                          {unreadCount}
+                        </Badge>
+                    )}
                 </div>
               </div>
             );
