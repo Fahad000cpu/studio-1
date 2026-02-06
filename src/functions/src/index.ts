@@ -92,14 +92,16 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
       // 4. Construct the notification payload
       const payload: admin.messaging.MulticastMessage = {
           tokens,
-          notification: {
+          notification: { // Fallback for other platforms
               title: `${senderName} sent a message`,
               body: notificationBody,
+              imageUrl: senderPhoto, // Basic image for mobile
           },
-          webpush: {
+          webpush: { // Specific for Web Push
               notification: {
-                  icon: senderPhoto,
+                  title: `${senderName} sent a message`,
                   body: notificationBody.length > 100 ? notificationBody.substring(0, 97) + '...' : notificationBody,
+                  icon: senderPhoto,
                   badge: '/logo.svg',
                   tag: `chat_${event.params.chatId}`,
                   renotify: true,
@@ -108,7 +110,7 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
                   link: `/chat?chatWith=${senderId}`,
               },
           },
-          data: {
+          data: { // Custom data for click actions
               url: `/chat?chatWith=${senderId}`,
               senderId: senderId,
           }
