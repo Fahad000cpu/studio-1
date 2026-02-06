@@ -2,87 +2,76 @@
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
-try {
-  // IMPORTANT: Replace this with your actual Firebase config object.
-  const firebaseConfig = {
-    apiKey: "AIzaSyB8ADt_BHfhhcIwDax82s13GVYJAefjA0g",
-    authDomain: "studio-6505166944-ae18f.firebaseapp.com",
-    projectId: "studio-6505166944-ae18f",
-    storageBucket: "studio-6505166944-ae18f.appspot.com",
-    messagingSenderId: "954303139735",
-    appId: "1:954303139735:web:1cb50131d512627c9d3ed2",
-    measurementId: "G-1TC3B2RSWT"
+// IMPORTANT: This config is copied from `src/firebase/config.ts`
+firebase.initializeApp({
+    "projectId": "studio-6505166944-ae18f",
+    "appId": "1:954303139735:web:1cb50131d512627c9d3ed2",
+    "storageBucket": "studio-6505166944-ae18f.appspot.com",
+    "apiKey": "AIzaSyB8ADt_BHfhhcIwDax82s13GVYJAefjA0g",
+    "authDomain": "studio-6505166944-ae18f.firebaseapp.com",
+    "measurementId": "G-1TC3B2RSWT",
+    "messagingSenderId": "954303139735"
+});
+
+const messaging = firebase.messaging();
+
+// This listener handles messages received when the app is in the background.
+// It's responsible for displaying the notification.
+messaging.onBackgroundMessage((payload) => {
+  console.log('[sw.js] Background message received: ', payload);
+  
+  // The actual notification content comes from the 'data' payload.
+  const notificationTitle = payload.data.title;
+  const notificationOptions = {
+    body: payload.data.body,
+    icon: payload.data.icon,
+    // We pass the URL to the notification's data property so we can
+    // use it in the 'notificationclick' event listener.
+    data: {
+        url: payload.data.url 
+    }
   };
 
-  firebase.initializeApp(firebaseConfig);
-
-  const messaging = firebase.messaging();
-
-  // Handle Background Messages
-  // This is triggered when a message is received while the app is in the background or closed.
-  messaging.onBackgroundMessage((payload) => {
-    console.log('[sw.js] Background message received: ', payload);
-    
-    // The payload.notification object is used directly by the browser to display the notification.
-    // However, if you want to customize it or handle it yourself, you can do so here.
-    // For most cases, the browser handles this automatically if the 'notification' key is present in the FCM payload.
-    // We show it manually for consistency and control.
-    const notificationTitle = payload.notification?.title || 'New Message';
-    const notificationOptions = {
-      body: payload.notification?.body || 'You have new content!',
-      icon: payload.notification?.icon || '/logo.svg',
-      badge: '/logo.svg',
-      data: payload.data // Pass along data for click events
-    };
-
+  // Ensure we have a title before trying to show a notification.
+  if (notificationTitle) {
     self.registration.showNotification(notificationTitle, notificationOptions);
-  });
+  } else {
+    console.warn('[sw.js] Received background message without a title, not showing notification.');
+  }
+});
 
-} catch (error) {
-    console.error("Error initializing Firebase in Service Worker:", error);
-}
-
-
-// Handle Notification Clicks
+// This listener handles the user clicking on the notification.
 self.addEventListener('notificationclick', (event) => {
   console.log('[sw.js] Notification click Received.', event.notification);
+
+  // Close the notification.
   event.notification.close();
-  
-  let openUrl = '/'; // Default URL to open
-  try {
-    // The data is a stringified JSON object, so we need to parse it.
-    if (event.notification.data) {
-      const data = JSON.parse(event.notification.data);
-      if (data && data.url) {
-        openUrl = data.url;
-      }
-    }
-  } catch (e) {
-    console.error('Error parsing notification data:', e);
-  }
-  
-  // This looks for an existing window and focuses it.
+
+  const targetUrl = event.notification.data?.url || '/';
+
+  // This looks for an existing window/tab with the same URL and focuses it.
+  // If not found, it opens a new one.
   event.waitUntil(
     clients.matchAll({
-      type: "window",
+      type: 'window',
       includeUncontrolled: true,
     }).then((clientList) => {
-      // Check if there's a window already open with the target URL
+      // Check if there's a client running the app already.
       for (const client of clientList) {
-        // Use URL constructor to ignore hashes and search params
-        if (new URL(client.url).pathname === openUrl && 'focus' in client) {
+        // If a client is found, focus it.
+        if (client.url.includes(self.origin) && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window is found, open a new one.
+      // If no existing window is found, open a new one.
       if (clients.openWindow) {
-        return clients.openWindow(openUrl);
+        return clients.openWindow(targetUrl);
       }
     })
   );
 });
 
-// This is required for the service worker to be installable as a PWA, even if it does nothing.
-self.addEventListener('fetch', (event) => {
-  // This basic fetch handler is needed for PWA installability.
+// This is required for PWA installability. A basic fetch handler is enough.
+self.addEventListener('fetch', function(event) {
+    // You can add more complex caching logic here if needed.
 });

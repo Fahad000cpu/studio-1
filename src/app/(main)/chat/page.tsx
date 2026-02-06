@@ -9,6 +9,7 @@ import {
   doc,
   GeoPoint,
 } from 'firebase/firestore';
+import { format, isToday, isYesterday } from 'date-fns';
 import {
   Avatar,
   AvatarFallback,
@@ -66,6 +67,21 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
     const distance = R * c; // Distance in km
     return distance;
 }
+
+const getMessageTimestamp = (timestamp: Timestamp | Date | undefined) => {
+  if (!timestamp) return '';
+  const date = timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
+  
+  if (isToday(date)) {
+    // e.g., "2:30 PM"
+    return format(date, 'p'); 
+  }
+  if (isYesterday(date)) {
+    return 'Yesterday';
+  }
+  // e.g., "24/05/2024"
+  return format(date, 'dd/MM/yyyy');
+};
 
 
 export default function ChatPage() {
@@ -341,14 +357,6 @@ export default function ChatPage() {
       setIsRecording(false);
     }
   };
-
-
-  const getTimeString = (timestamp: Timestamp | Date | undefined) => {
-    if (!timestamp) return '';
-    const date =
-      timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
   
     const handleDeleteMessage = (messageId: string) => {
     if (!chatId) return;
@@ -535,7 +543,7 @@ export default function ChatPage() {
                     {renderMessageContent(msg)}
                   </div>
                   <span className="text-xs text-muted-foreground px-1">
-                    {getTimeString(msg.timestamp)}
+                    {getMessageTimestamp(msg.timestamp)}
                   </span>
                 </div>
                 {msg.own && (

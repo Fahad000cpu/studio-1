@@ -1,16 +1,10 @@
-
 'use server';
 /**
- * @fileOverview A Genkit flow for sending FCM notifications.
- *
- * - sendFcmNotification - Sends a push notification to a list of FCM tokens.
- * - SendFcmNotificationInput - Input schema for the flow.
- * - SendFcmNotificationOutput - Output schema for the flow.
+ * @fileOverview A server action for sending FCM notifications.
  */
 
-import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
 import * as admin from 'firebase-admin';
+import type { SendFcmNotificationInput, SendFcmNotificationOutput } from '@/types/fcm';
 
 // Initialize Firebase Admin SDK if not already initialized
 if (admin.apps.length === 0) {
@@ -23,90 +17,49 @@ if (admin.apps.length === 0) {
   }
 }
 
-export const SendFcmNotificationInputSchema = z.object({
-  tokens: z.array(z.string()).describe('A list of FCM registration tokens.'),
-  title: z.string().describe('The title of the notification.'),
-  body: z.string().describe('The body content of the notification.'),
-  icon: z.string().optional().describe('URL to an icon for the notification.'),
-  image: z.string().optional().describe('URL to an image for the notification.'),
-});
-export type SendFcmNotificationInput = z.infer<typeof SendFcmNotificationInputSchema>;
-
-export const SendFcmNotificationOutputSchema = z.object({
-  successCount: z.number().describe('Number of successfully sent messages.'),
-  failureCount: z.number().describe('Number of failed messages.'),
-});
-export type SendFcmNotificationOutput = z.infer<typeof SendFcmNotificationOutputSchema>;
-
-
-const sendFcmTool = ai.defineTool(
-    {
-      name: 'sendFcmTool',
-      description: 'Sends a Firebase Cloud Messaging (FCM) notification to a list of device tokens.',
-      inputSchema: SendFcmNotificationInputSchema,
-      outputSchema: SendFcmNotificationOutputSchema,
-    },
-    async (input) => {
-        if (admin.apps.length === 0) {
-            throw new Error('Firebase Admin SDK not initialized.');
-        }
-
-        const { tokens, title, body, icon, image } = input;
-
-        if (!tokens || tokens.length === 0) {
-            throw new Error('No FCM tokens provided. Cannot send notification.');
-        }
-        
-        const message: admin.messaging.MulticastMessage = {
-            tokens,
-            notification: {
-                title,
-                body,
-            },
-            webpush: {
-                notification: {
-                    ...(icon && { icon }),
-                    ...(image && { image }),
-                },
-                data: JSON.stringify({
-                    url: '/chat', // URL to open on click
-                }),
-            },
-        };
-
-        try {
-            const response = await admin.messaging().sendEachForMulticast(message);
-            console.log('Successfully sent message:', response);
-            return {
-                successCount: response.successCount,
-                failureCount: response.failureCount,
-            };
-        } catch (error) {
-            console.error('Error sending message:', error);
-            // We need to determine how many failed based on the tokens list length.
-            return { successCount: 0, failureCount: tokens.length };
-        }
-    }
-);
-
-
-const sendFcmNotificationFlow = ai.defineFlow(
-  {
-    name: 'sendFcmNotificationFlow',
-    inputSchema: SendFcmNotificationInputSchema,
-    outputSchema: SendFcmNotificationOutputSchema,
-  },
-  async (input) => {
-    // This flow directly uses the tool.
-    // In a more complex scenario, you could add more logic here,
-    // like fetching tokens from a DB before calling the tool.
-    return await sendFcmTool(input);
-  }
-);
-
-
 export async function sendFcmNotification(
     input: SendFcmNotificationInput
   ): Promise<SendFcmNotificationOutput> {
-    return sendFcmNotificationFlow(input);
+    if (admin.apps.length === 0) {
+        console.error("Firebase Admin SDK not initialized. Cannot send notification.");
+        // To prevent client-side crashes, return a valid output shape
+        return { successCount: 0, failureCount: input.tokens.length || 0 };
+    }
+
+    const { tokens, title, body, icon } = input;
+
+    if (!tokens || tokens.length === 0) {
+        console.log("No FCM tokens provided. Skipping notification.");
+        return { successCount: 0, failureCount: 0 };
+    }
+    
+    // We send a data-only payload to give our service worker full control
+    // over the notification display. This prevents duplicate notifications
+    // that can occur when FCM auto-displays a `notification` payload.
+    const message: admin.messaging.MulticastMessage = {
+        tokens,
+        data: {
+            title,
+            body,
+            icon: icon || '/logo.svg',
+            url: '/chat',
+        },
+        webpush: {
+            headers: {
+                Urgency: 'high',
+            },
+        },
+    };
+
+    try {
+        const response = await admin.messaging().sendEachForMulticast(message);
+        console.log(`FCM send report: ${response.successCount} success, ${response.failureCount} failure.`);
+        return {
+            successCount: response.successCount,
+            failureCount: response.failureCount,
+        };
+    } catch (error) {
+        console.error('Error sending FCM message:', error);
+        return { successCount: 0, failureCount: tokens.length };
+    }
 }
