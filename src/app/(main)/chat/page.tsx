@@ -9,8 +9,6 @@ import {
   deleteDoc,
   doc,
   GeoPoint,
-  arrayRemove,
-  arrayUnion,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -29,7 +27,6 @@ import {
   useCollection,
   useMemoFirebase,
   deleteDocumentNonBlocking,
-  updateDocumentNonBlocking,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -49,8 +46,6 @@ import type { Message } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
-import type { SendFcmNotificationInput } from '@/types/fcm';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -110,7 +105,6 @@ export default function ChatPage() {
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
-  // This is the reactive fix. `selectedChat` is now always derived from the latest `allUsers` data.
   const selectedChat = useMemo(() => {
     if (!selectedChatId || !allUsers) return null;
     return allUsers.find(u => u.id === selectedChatId) ?? null;
@@ -231,52 +225,9 @@ export default function ChatPage() {
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
-  const sendChatNotification = async (body: string, image?: string) => {
-    // This function now uses the `selectedChat` object which is reactively updated,
-    // ensuring it always has the latest data, including `fcmTokens`.
-    if (!selectedChat || !user) return;
-    
-    const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
-
-    // As requested, this no longer shows a disruptive error to the user.
-    // It will silently fail if no tokens are found, but log a warning for developers.
-    if (!recipientTokens || recipientTokens.length === 0) {
-      console.warn(`Chat notification not sent to ${selectedChat.name || selectedChat.id}: No valid FCM tokens found.`);
-      return;
-    }
-
-    try {
-      const result = await sendFcmNotification({
-        tokens: [...new Set(recipientTokens)],
-        title: user.displayName || 'New Message',
-        body: body,
-        icon: user.photoURL || '/logo.svg',
-        url: `/chat?chatWith=${user.uid}`,
-        image: image,
-      });
-  
-      if (result.invalidTokens && result.invalidTokens.length > 0) {
-        const recipientUserRef = doc(firestore, 'users', selectedChat.id);
-        updateDocumentNonBlocking(recipientUserRef, {
-          fcmTokens: arrayRemove(...result.invalidTokens),
-        });
-      }
-    } catch (error: any) {
-      console.error('Failed to send chat notification:', error);
-      if (error.message && !error.message.includes('registration-token-not-registered')) {
-        toast({
-          variant: 'destructive',
-          title: 'Notification Send Error',
-          description: `Could not send notification: ${error.message}`,
-        });
-      }
-    }
-  };
-
-
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
+    if (!newMessage.trim() || !selectedChat || !user || !messagesCollection || !chatId) return;
 
     const messageText = newMessage;
     setNewMessage('');
@@ -289,10 +240,8 @@ export default function ChatPage() {
       timestamp: serverTimestamp(),
       messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
+      chatId: chatId,
     });
-    
-    // This will now use the latest user data to check for tokens.
-    await sendChatNotification(messageText);
 };
 
   const handleAttachmentClick = () => {
@@ -314,15 +263,8 @@ export default function ChatPage() {
         timestamp: serverTimestamp(),
         messageType: type,
         mediaUrl: downloadURL,
+        chatId: chatId,
       });
-
-      let notificationBody = 'Sent a file';
-      if (type === 'image') notificationBody = '📷 Photo';
-      if (type === 'video') notificationBody = '🎥 Video';
-      if (type === 'audio') notificationBody = '🎤 Voice Message';
-
-      await sendChatNotification(notificationBody, type === 'image' ? downloadURL : undefined);
-
 
     } catch (error) {
       console.error("File upload failed:", error);
