@@ -14,7 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info, Copy, Link } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
@@ -34,6 +34,7 @@ export default function AdminPage() {
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
   const [notificationUrl, setNotificationUrl] = useState('');
+  const [notificationImage, setNotificationImage] = useState('');
   const [isSending, setIsSending] = useState(false);
   
   const isLoading = isAdminLoading || usersLoading;
@@ -58,7 +59,6 @@ export default function AdminPage() {
 
     setIsSending(true);
     try {
-      // Flatten all tokens from all users into a single array, filtering out undefined/null tokens
       const allTokens = users.flatMap(u => u.fcmTokens || []).filter(Boolean);
       const uniqueTokens = [...new Set(allTokens)];
 
@@ -77,7 +77,8 @@ export default function AdminPage() {
         title: notificationTitle,
         body: notificationBody,
         icon: '/logo.svg',
-        url: notificationUrl || '/discover', // Direct users to the discover page on click
+        url: notificationUrl || '/discover',
+        image: notificationImage,
       });
 
       toast({
@@ -87,6 +88,7 @@ export default function AdminPage() {
       setNotificationTitle('');
       setNotificationBody('');
       setNotificationUrl('');
+      setNotificationImage('');
     } catch (error) {
       console.error('Failed to send notification', error);
       toast({
@@ -180,6 +182,16 @@ export default function AdminPage() {
                     className="pl-10"
                     value={notificationUrl}
                     onChange={(e) => setNotificationUrl(e.target.value)}
+                    disabled={isSending}
+                  />
+                </div>
+                 <div className="relative">
+                  <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Optional: Notification Image URL"
+                    className="pl-10"
+                    value={notificationImage}
+                    onChange={(e) => setNotificationImage(e.target.value)}
                     disabled={isSending}
                   />
                 </div>

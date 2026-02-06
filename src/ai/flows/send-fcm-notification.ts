@@ -27,7 +27,7 @@ export async function sendFcmNotification(
         throw new Error(errorMessage);
     }
     
-    const { tokens, title, body, icon, url } = input;
+    const { tokens, title, body, icon, url, image } = input;
     const validTokens = Array.isArray(tokens) ? tokens.filter(t => typeof t === 'string' && t.length > 0) : [];
 
     if (validTokens.length === 0) {
@@ -35,15 +35,19 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
-    // Switched to a data-only payload for maximum reliability with the service worker.
+    const dataPayload: { [key: string]: string } = {
+        title: title || "New Message",
+        body: body || "You have a new message",
+        icon: icon || '/logo.svg',
+        url: url || '/',
+    };
+    if (image) {
+        dataPayload.image = image;
+    }
+
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        data: {
-            title: title || "New Message",
-            body: body || "You have a new message",
-            icon: icon || '/logo.svg',
-            url: url || '/',
-        },
+        data: dataPayload,
         webpush: {
             headers: {
                 Urgency: 'high',
@@ -64,7 +68,6 @@ export async function sendFcmNotification(
                     const error = resp.error;
                     const failedToken = validTokens[idx];
                     console.error(`Token failed: ${failedToken}, Error: ${error?.code} - ${error?.message}`);
-                    // Identify tokens that are no longer registered.
                     if (
                         error?.code === 'messaging/registration-token-not-registered' ||
                         error?.code === 'messaging/invalid-registration-token'
@@ -82,7 +85,6 @@ export async function sendFcmNotification(
         };
     } catch (error: any) {
         console.error('CRITICAL: Error calling admin.messaging().sendEachForMulticast():', error.message);
-        // Re-throw the error so the client-side `catch` block can display a toast.
         throw new Error(`Failed to send notification via FCM: ${error.message}`);
     }
 }

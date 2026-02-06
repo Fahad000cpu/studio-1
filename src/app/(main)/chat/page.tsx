@@ -10,6 +10,7 @@ import {
   doc,
   GeoPoint,
   arrayRemove,
+  arrayUnion,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -44,11 +45,12 @@ import {
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
-import type { ChatContact, Message } from '@/types/chat';
+import type { Message } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
+import type { SendFcmNotificationInput } from '@/types/fcm';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -99,7 +101,7 @@ export default function ChatPage() {
 
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
-  const [selectedChat, setSelectedChat] = useState<ChatContact | null>(null);
+  const [selectedChat, setSelectedChat] = useState<UserProfile | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -128,7 +130,6 @@ export default function ChatPage() {
                     if (locationA) return -1;
                     if (locationB) return 1;
                 }
-                // Fallback sort by name (or email)
                 const nameA = a.name || a.email || '';
                 const nameB = b.name || b.email || '';
                 return nameA.localeCompare(nameB);
@@ -153,11 +154,11 @@ export default function ChatPage() {
                     fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
                 },
                 () => {
-                    fetchAndSortUsers(); // Sort alphabetically on geo error
+                    fetchAndSortUsers();
                 }
             );
         } else {
-            fetchAndSortUsers(); // Sort alphabetically if geo is not supported
+            fetchAndSortUsers();
         }
     }
   }, [user, toast, allUsers, allUsersLoading]);
@@ -185,7 +186,7 @@ export default function ChatPage() {
     orderBy: ['timestamp', 'asc']
   }), []);
 
-  const { data: messagesData, isLoading: messagesLoading } = useCollection<Message>(messagesCollection, messageCollectionOptions);
+  const { data: messagesData } = useCollection<Message>(messagesCollection, messageCollectionOptions);
 
   const messages: Message[] = useMemo(() => {
     if (!messagesData) return [];
@@ -196,9 +197,6 @@ export default function ChatPage() {
   }, [messagesData, user?.uid]);
 
   const getLastMessage = (contactId: string): { text: string; time: string } => {
-    // This is a placeholder. A real implementation would require fetching 
-    // the last message for each contact, which can be complex and inefficient 
-    // without denormalizing data. For now, we return a generic message.
     return { text: 'Click to start chatting!', time: '' };
   };
 
@@ -222,13 +220,54 @@ export default function ChatPage() {
   }, [contacts, isMobile, selectedChat, user]);
 
   const handleSelectChat = (contact: UserProfile) => {
-    setSelectedChat({
-      ...contact,
-      lastMessage: 'Click to start chatting!',
-    });
+    setSelectedChat(contact);
   };
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
+  const sendChatNotification = async (body: string, image?: string) => {
+    if (!selectedChat || !user) return;
+    
+    const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
+    if (!recipientTokens || recipientTokens.length === 0) {
+        return; // No tokens to send to
+    }
+
+    try {
+        const result = await sendFcmNotification({
+            tokens: recipientTokens,
+            title: user.displayName || 'New Message',
+            body: body,
+            icon: user.photoURL || '/logo.svg',
+            url: `/chat?chatWith=${user.uid}`,
+            image: image, // Pass image if available
+        });
+
+        if (result.failureCount > 0) {
+            toast({
+                variant: 'default',
+                title: 'Notification Status',
+                description: `Notification failed for ${result.failureCount} device(s). The recipient may need to visit the Settings page to re-enable notifications.`,
+                duration: 10000,
+            });
+        }
+
+        if (result.invalidTokens && result.invalidTokens.length > 0) {
+            const recipientUserRef = doc(firestore, "users", selectedChat.id);
+            updateDocumentNonBlocking(recipientUserRef, {
+                fcmTokens: arrayRemove(...result.invalidTokens)
+            });
+        }
+    } catch (error: any) {
+        console.error("Failed to send chat notification:", error);
+        toast({
+            variant: "destructive",
+            title: "Notification Error",
+            description: `An unexpected error occurred while sending the notification: ${error.message}`,
+        });
+    }
+  };
+
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -247,44 +286,7 @@ export default function ChatPage() {
       mediaUrl: null,
     });
     
-    // Asynchronously send FCM notification and handle self-healing
-    const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
-    if (recipientTokens && recipientTokens.length > 0) {
-        try {
-            const result = await sendFcmNotification({
-                tokens: recipientTokens,
-                title: user.displayName || 'New Message',
-                body: messageText,
-                icon: user.photoURL || '/logo.svg',
-                url: `/chat?chatWith=${user.uid}`
-            });
-            
-            if (result.failureCount > 0) {
-                toast({
-                    variant: 'default',
-                    title: 'Notification Status',
-                    description: `Notification failed for ${result.failureCount} device(s). The recipient may need to visit the Settings page to re-enable notifications.`,
-                    duration: 10000,
-                });
-            }
-
-            // Self-healing: Remove invalid tokens from the database
-            if (result.invalidTokens && result.invalidTokens.length > 0) {
-                const recipientUserRef = doc(firestore, "users", selectedChat.id);
-                updateDocumentNonBlocking(recipientUserRef, {
-                    fcmTokens: arrayRemove(...result.invalidTokens)
-                });
-            }
-
-        } catch (error: any) {
-            console.error("Failed to send chat notification:", error);
-            toast({
-                variant: "destructive",
-                title: "Notification Error",
-                description: `An unexpected error occurred while sending the notification: ${error.message}`,
-            });
-        }
-    }
+    await sendChatNotification(messageText);
 };
 
   const handleAttachmentClick = () => {
@@ -307,6 +309,14 @@ export default function ChatPage() {
         messageType: type,
         mediaUrl: downloadURL,
       });
+
+      let notificationBody = 'Sent a file';
+      if (type === 'image') notificationBody = '📷 Photo';
+      if (type === 'video') notificationBody = '🎥 Video';
+      if (type === 'audio') notificationBody = '🎤 Voice Message';
+
+      await sendChatNotification(notificationBody, type === 'image' ? downloadURL : undefined);
+
 
     } catch (error) {
       console.error("File upload failed:", error);
@@ -364,7 +374,6 @@ export default function ChatPage() {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         uploadMedia(audioBlob, 'audio');
-        // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -418,7 +427,6 @@ export default function ChatPage() {
         );
       case 'text':
       default:
-        // Match URLs in the text and wrap them in anchor tags
         const parts = msg.text.split(urlRegex);
         return (
           <p>

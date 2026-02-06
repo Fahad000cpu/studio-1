@@ -1,70 +1,63 @@
-// This file must be in the public directory
+
+// This is the service worker file.
+// It runs in the background and handles push notifications.
+
 self.addEventListener('push', (event) => {
-  console.log('[Service Worker] Push Received.');
-  if (!event.data) {
-    console.error('[Service Worker] Push event but no data');
-    return;
-  }
-
-  let payload;
+  let data;
   try {
-    // This handles payloads from our server (wrapped in `data`) 
-    // and from the FCM console (wrapped in `notification`)
-    const rawPayload = event.data.json();
-    payload = rawPayload.data || rawPayload.notification;
-
-    if (!payload || !payload.title) {
-        throw new Error('Payload format not recognized or title is missing.');
-    }
-
+    data = event.data.json();
   } catch (e) {
-    console.error('[Service Worker] Could not parse push data:', e);
-    // As a fallback, try to display the raw text if JSON parsing fails
-    const promiseChain = self.registration.showNotification('New Message', {
-      body: event.data.text(),
-      icon: '/logo.svg'
-    });
-    event.waitUntil(promiseChain);
+    console.error('Push event data is not valid JSON:', event.data.text());
+    data = {
+        title: 'New Notification',
+        body: event.data.text(),
+    };
+  }
+
+  if (!data) {
+    console.error('Push event has no data.');
     return;
   }
-  
-  const title = payload.title;
+
+  const title = data.title || 'ConnectSphere';
   const options = {
-    body: payload.body || 'You have a new message.',
-    icon: payload.icon || '/logo.svg',
-    badge: '/logo.svg', // A badge icon for Android
+    body: data.body || 'You have a new message.',
+    icon: data.icon || '/logo.svg', // Small icon
+    badge: '/logo.svg', // Small icon for notification tray on Android
+    image: data.image, // Optional large image
     data: {
-      url: payload.url || '/' // Pass the URL to the notification click handler
-    }
+      url: data.url || '/', // URL to open on click
+    },
   };
 
-  const promiseChain = self.registration.showNotification(title, options);
-  event.waitUntil(promiseChain);
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {
-  console.log('[Service Worker] Notification click Received.');
-
   event.notification.close();
-
-  const urlToOpen = event.notification.data.url || '/';
+  const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
 
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    }).then((clientList) => {
-      // Check if a window for this app is already open and on the correct URL.
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Check if a window is already open at the target URL
       for (const client of clientList) {
-         // If a window is open, focus it.
-        if ('focus' in client) {
+        if (new URL(client.url).href === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window is open, open a new one.
+      // If not, open a new window
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
     })
   );
+});
+
+// Boilerplate to ensure the new service worker activates quickly.
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
