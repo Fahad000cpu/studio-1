@@ -1,73 +1,108 @@
 
-// public/sw.js
+// This is the service worker file. It runs in the background in the browser.
 
-// This listener is for data-only push messages. It MUST be able to
-// construct and show a notification. It works whether the app tab is open, 
-// in the background, or closed.
-self.addEventListener('push', (event) => {
-    console.log('[sw.js] Push Received.');
+/**
+ * Listen for incoming push notifications.
+ */
+self.addEventListener('push', event => {
+  console.log('[Service Worker] Push Received.');
 
-    if (!event.data) {
-        console.log('[sw.js] Push event but no data');
-        return;
-    }
+  // Default values in case the payload is malformed.
+  let notificationData = {
+    title: 'New Message',
+    body: 'You have a new message.',
+    icon: '/logo.svg',
+    image: undefined,
+    url: '/',
+  };
 
-    console.log(`[sw.js] Raw push data: "${event.data.text()}"`);
-
-    let notificationData;
+  // Try to parse the payload from the push event.
+  // This is the data sent from our `send-fcm-notification` server function.
+  if (event.data) {
     try {
-        // The data sent from the Admin SDK is nested under a `data` property
-        const fcmPayload = event.data.json();
-        notificationData = fcmPayload.data;
+      const payload = event.data.json();
+      notificationData = {
+        title: payload.title || 'New Message',
+        body: payload.body || 'You have a new message.',
+        icon: payload.icon || '/logo.svg',
+        image: payload.image, // This can be undefined if no image is sent
+        url: payload.url || '/',
+      };
     } catch (e) {
-        console.error('[sw.js] Failed to parse JSON, treating as text.', e);
-        notificationData = {
-            title: 'New Message',
-            body: event.data.text(),
-            icon: '/logo.svg',
-            url: '/'
-        };
+      console.error('[Service Worker] Error parsing push data. Using defaults.', e);
     }
+  }
 
-    const title = notificationData.title || 'New Notification';
-    const options = {
-        body: notificationData.body,
-        icon: notificationData.icon,
-        image: notificationData.image, // `image` is a standard Notification API option
-        data: {
-            url: notificationData.url, // Pass custom data to the click handler
-        },
-    };
+  // Define how the notification will look.
+  const options = {
+    body: notificationData.body,
+    icon: notificationData.icon,
+    image: notificationData.image,
+    badge: '/logo.svg', // A small monochrome icon for the status bar on mobile
+    tag: 'connectsphere-notification', // This groups notifications
+    renotify: true,
+    // We store the URL to open in the 'data' attribute.
+    data: {
+      url: notificationData.url,
+    },
+  };
 
-    event.waitUntil(self.registration.showNotification(title, options));
+  // Tell the browser to show the notification.
+  // We wrap this in `waitUntil` to ensure the service worker stays alive long enough.
+  event.waitUntil(
+    self.registration.showNotification(notificationData.title, options)
+  );
 });
 
-// This listener handles what happens when a user clicks the notification.
-self.addEventListener('notificationclick', (event) => {
-    console.log('[sw.js] Notification click received.');
+/**
+ * Listen for clicks on the notification.
+ */
+self.addEventListener('notificationclick', event => {
+  console.log('[Service Worker] Notification click Received.');
 
-    event.notification.close();
+  // Close the notification pop-up.
+  event.notification.close();
 
-    const urlToOpen = event.notification.data.url || '/';
+  // Get the URL we stored in the 'data' attribute.
+  const urlToOpen = event.notification.data.url || '/';
 
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-            // Check if a window/tab of our app is already open.
-            for (const client of clientList) {
-                if (new URL(client.url).origin === self.location.origin) {
-                    // If so, focus it and navigate to the correct URL.
-                    if (client.navigate) {
-                        client.navigate(urlToOpen);
-                    }
-                    if (client.focus) {
-                        return client.focus();
-                    }
-                }
-            }
-            // If no window is open, open a new one.
-            if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
-            }
-        })
-    );
+  // This is smart logic:
+  // It looks for an existing tab of our app and focuses it.
+  // If no tab is open, it opens a new one to the correct URL.
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    }).then(clientList => {
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
+          // If a window is found, navigate it to the correct URL and focus it.
+          return client.navigate(urlToOpen).then(c => c.focus());
+        }
+      }
+      // If no window is found, open a new one.
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
+
+/**
+ * This event runs when the service worker is first installed.
+ */
+self.addEventListener('install', event => {
+    console.log('[Service Worker] Install');
+    // This forces the waiting service worker to become the active service worker.
+    self.skipWaiting();
+});
+
+/**
+ * This event runs when the service worker is activated.
+ */
+self.addEventListener('activate', event => {
+    console.log('[Service Worker] Activate');
+    // This allows an active service worker to take control of all clients within its scope.
+    event.waitUntil(clients.claim());
 });
