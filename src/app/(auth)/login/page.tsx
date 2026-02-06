@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React, { useEffect, useState, useRef } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from 'firebase/firestore';
 import { useRouter } from "next/navigation";
 
@@ -27,6 +27,17 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth, useFirestore } from "@/firebase";
 import { Flame, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -77,6 +88,10 @@ export default function LoginPage() {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isRecaptchaInitialized, setIsRecaptchaInitialized] = useState(false);
+
+  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
@@ -264,6 +279,39 @@ export default function LoginPage() {
      }
   }
 
+  const handlePasswordReset = async () => {
+    if (!resetEmail) {
+        toast({
+            variant: "destructive",
+            title: "Email Required",
+            description: "Please enter your email address to reset your password.",
+        });
+        return;
+    }
+    if (!auth) return;
+    setIsSendingReset(true);
+    try {
+        await sendPasswordResetEmail(auth, resetEmail);
+        toast({
+            title: "Password Reset Email Sent",
+            description: `If an account exists for ${resetEmail}, you will receive an email with instructions.`,
+        });
+        setIsResetAlertOpen(false);
+        setResetEmail('');
+    } catch (error: any) {
+        // To prevent email enumeration attacks, we show the same message for success and "user not found".
+        toast({
+            title: "Password Reset Email Sent",
+            description: `If an account exists for ${resetEmail}, you will receive an email with instructions.`,
+        });
+        setIsResetAlertOpen(false);
+        setResetEmail('');
+        console.error("Password reset error:", error);
+    } finally {
+        setIsSendingReset(false);
+    }
+  };
+
 
   return (
     <Card className="w-full max-w-md mx-4">
@@ -302,7 +350,16 @@ export default function LoginPage() {
                     name="password"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Password</FormLabel>
+                         <div className="flex items-center justify-between">
+                            <FormLabel>Password</FormLabel>
+                            <button
+                                type="button"
+                                onClick={() => setIsResetAlertOpen(true)}
+                                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                            >
+                                Forgot password?
+                            </button>
+                        </div>
                         <FormControl>
                             <Input type="password" placeholder="••••••••" {...field} />
                         </FormControl>
@@ -393,6 +450,34 @@ export default function LoginPage() {
             Sign up
           </Link>
         </div>
+
+        <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Forgot Password?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Enter your email address below and we'll send you a link to reset your password.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 py-2">
+                <Label htmlFor="reset-email">Email Address</Label>
+                <Input 
+                    id="reset-email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handlePasswordReset} disabled={isSendingReset}>
+                {isSendingReset ? "Sending..." : "Send Reset Link"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
       </CardContent>
     </Card>
   );

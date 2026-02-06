@@ -55,7 +55,19 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
         .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
         .catch((error) => console.error('Service Worker registration failed:', error));
     }
-  }, []);
+    
+    // Initialize In-App Messaging dynamically to avoid server-side rendering issues
+    if (instances.app && typeof window !== 'undefined') {
+      import('./init-in-app-messaging')
+        .then(({ initializeInAppMessaging }) => {
+          initializeInAppMessaging(instances.app);
+        })
+        .catch((err) => {
+            // This catch is for the dynamic import itself failing
+            console.error("Failed to load In-App Messaging module:", err);
+        });
+    }
+  }, [instances.app]);
 
   return (
     <FirebaseProvider
