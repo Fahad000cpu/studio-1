@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { PlusCircle, X, ImagePlus, Send, XCircle, Heart, Eye } from "lucide-react";
+import { PlusCircle, X, ImagePlus, Send, XCircle, Heart, Eye, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc, arrayUnion, arrayRemove } from "firebase/firestore";
@@ -16,6 +16,9 @@ import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
 import { Card } from "@/components/ui/card";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { getInitials } from "@/lib/utils";
 
 type StatusStory = {
   id: string;
@@ -51,11 +54,21 @@ export default function StatusPage() {
   const [isAddingStatus, setIsAddingStatus] = useState(false);
   const [statusFile, setStatusFile] = useState<File | null>(null);
   const [statusPreview, setStatusPreview] = useState<string | null>(null);
+  const [statusText, setStatusText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewersTitle, setViewersTitle] = useState("Views");
+  const [currentStoryAudience, setCurrentStoryAudience] = useState<UserProfile[]>([]);
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: usersData, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
+
+  const usersMap = useMemo(() => {
+    if (!usersData) return new Map<string, UserProfile>();
+    return new Map(usersData.map(u => [u.id, u]));
+  }, [usersData]);
 
   const [statuses, setStatuses] = useState<StatusUser[]>([]);
   const [statusesLoading, setStatusesLoading] = useState(true);
@@ -180,7 +193,6 @@ export default function StatusPage() {
     });
   }, [user, firestore]);
 
-
   const startTimer = useCallback(() => {
     if (!activeUser || !user) return;
     
@@ -192,7 +204,7 @@ export default function StatusPage() {
     }
 
     setProgress(0);
-    clearInterval(progressTimerRef.current);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     const interval = setInterval(() => {
         setProgress(p => {
             if (p >= 100) {
@@ -205,7 +217,7 @@ export default function StatusPage() {
     progressTimerRef.current = interval;
 
 
-    clearTimeout(timerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       handleNextStory();
     }, story.duration);
@@ -216,13 +228,13 @@ export default function StatusPage() {
     if (activeUser && !isStoryLoading) {
       startTimer();
     } else {
-      clearTimeout(timerRef.current);
-      clearInterval(progressTimerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     }
     
     return () => {
-      clearTimeout(timerRef.current);
-      clearInterval(progressTimerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
   }, [activeUser, activeStoryIndex, startTimer, isStoryLoading]);
   
@@ -253,7 +265,6 @@ export default function StatusPage() {
             const selectedFile = e.target.files[0];
             setStatusFile(selectedFile);
             setStatusPreview(URL.createObjectURL(selectedFile));
-            setIsAddingStatus(true);
         }
     };
 
@@ -272,6 +283,7 @@ export default function StatusPage() {
                 type: 'image',
                 views: [],
                 likes: [],
+                text: statusText,
             });
             
             toast({ title: "Status Added!", description: "Your new status is now live." });
@@ -288,6 +300,7 @@ export default function StatusPage() {
         setIsAddingStatus(false);
         setStatusFile(null);
         setStatusPreview(null);
+        setStatusText("");
         if(fileInputRef.current) {
             fileInputRef.current.value = "";
         }
@@ -302,6 +315,14 @@ export default function StatusPage() {
             updateDocumentNonBlocking(storyRef, { likes: arrayUnion(user.uid) });
         }
     };
+  
+    const handleShowAudience = (audienceIds: string[], title: "Views" | "Likes") => {
+        if (!usersMap) return;
+        const audience = audienceIds.map(id => usersMap.get(id)).filter(Boolean) as UserProfile[];
+        setCurrentStoryAudience(audience);
+        setViewersTitle(title);
+        setShowViewers(true);
+    };
 
   if (activeUser) {
       const activeStory = activeUser.stories[activeStoryIndex];
@@ -309,108 +330,162 @@ export default function StatusPage() {
       const isOwnStory = user?.uid === activeStory?.userId;
 
     return (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center" onMouseDown={closeStatus} onTouchStart={closeStatus}>
-            <div className="relative w-full max-w-sm h-full max-h-[95vh] md:max-h-[80vh] aspect-[9/16] bg-black rounded-lg overflow-hidden shadow-2xl" onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
-                {isStoryLoading && <Skeleton className="absolute inset-0 w-full h-full animate-pulse" />}
-                {activeStory && <Image
-                    src={activeStory.mediaUrl}
-                    alt={`Status from ${activeUser.name}`}
-                    fill
-                    className={cn("object-cover", isStoryLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300")}
-                    onLoad={() => setIsStoryLoading(false)}
-                    unoptimized
-                />}
-                 <div className="absolute inset-x-0 top-0 p-3 z-20 bg-gradient-to-b from-black/50 to-transparent">
-                    <div className="flex items-center gap-2 mb-2">
-                        {activeUser.stories.map((_, index) => (
-                           <Progress key={index} value={index < activeStoryIndex ? 100 : (index === activeStoryIndex ? progress : 0)} className="h-1 w-full bg-white/30" />
-                        ))}
-                    </div>
-                     <div className="flex items-center gap-3 text-white">
-                        <Avatar className="w-10 h-10 border-2 border-white/80">
-                            <AvatarImage src={activeUser.avatarUrl} />
-                            <AvatarFallback>{activeUser.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <h3 className="font-bold font-headline">{activeUser.name}</h3>
-                            <p className="text-xs text-white/80">
-                              {activeStory?.timestamp?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </p>
+        <>
+            <div className="fixed inset-0 bg-black z-50 flex items-center justify-center" onMouseDown={closeStatus} onTouchStart={closeStatus}>
+                <div className="relative w-full max-w-sm h-[95vh] md:h-[80vh] bg-neutral-900 rounded-lg overflow-hidden shadow-2xl flex items-center justify-center" onMouseDown={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()}>
+                    {isStoryLoading && <Skeleton className="absolute inset-0 w-full h-full animate-pulse" />}
+                    {activeStory && 
+                        <Image
+                            src={activeStory.mediaUrl}
+                            alt={`Status from ${activeUser.name}`}
+                            fill
+                            className={cn("object-contain", isStoryLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300")}
+                            onLoad={() => setIsStoryLoading(false)}
+                            unoptimized
+                        />
+                    }
+                    {activeStory?.text && (
+                        <div className="absolute bottom-20 left-0 right-0 p-4 z-20 text-center">
+                            <p className="inline bg-black/50 text-white text-sm p-2 rounded-md">{activeStory.text}</p>
                         </div>
-                     </div>
-                 </div>
-                 <div className="absolute top-3 right-3 z-20">
-                    <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" onClick={closeStatus}>
-                        <X className="w-6 h-6"/>
-                    </Button>
-                </div>
-                
-                 {activeStory && (
-                    <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 text-white">
-                        <div 
-                         className={cn("flex items-center gap-1.5")}
-                        >
-                            <Eye className="w-5 h-5"/>
-                            <span className="text-sm font-medium">{activeStory.views?.length || 0}</span>
+                    )}
+                    <div className="absolute inset-x-0 top-0 p-3 z-20 bg-gradient-to-b from-black/50 to-transparent">
+                        <div className="flex items-center gap-2 mb-2">
+                            {activeUser.stories.map((_, index) => (
+                            <Progress key={index} value={index < activeStoryIndex ? 100 : (index === activeStoryIndex ? progress : 0)} className="h-1 w-full bg-white/30" />
+                            ))}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                            <Heart className="w-5 h-5"/>
-                            <span className="text-sm font-medium">{activeStory.likes?.length || 0}</span>
+                        <div className="flex items-center gap-3 text-white">
+                            <Avatar className="w-10 h-10 border-2 border-white/80">
+                                <AvatarImage src={activeUser.avatarUrl} />
+                                <AvatarFallback>{activeUser.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h3 className="font-bold font-headline">{activeUser.name}</h3>
+                                <p className="text-xs text-white/80">
+                                {activeStory?.timestamp?.toDate().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                 )}
-
-                {activeStory && !isOwnStory && (
-                    <div className="absolute bottom-4 right-4 z-20">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-white h-10 w-10 hover:bg-white/10 hover:text-white"
-                            onClick={() => handleLikeToggle(activeStory.id, activeStory.likes)}
-                        >
-                            <Heart className={cn("w-6 h-6 transition-all", isLiked ? "fill-red-500 text-red-500" : "")} />
+                    <div className="absolute top-3 right-3 z-20">
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 hover:text-white" onClick={closeStatus}>
+                            <X className="w-6 h-6"/>
                         </Button>
                     </div>
-                )}
-                
-                 <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
-                 <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
+                    
+                    {activeStory && isOwnStory && (
+                        <div className="absolute bottom-4 left-4 z-20 flex items-center gap-4 text-white">
+                            <button className="flex items-center gap-1.5" onClick={() => handleShowAudience(activeStory.views, "Views")}>
+                                <Eye className="w-5 h-5"/>
+                                <span className="text-sm font-medium">{activeStory.views?.length || 0}</span>
+                            </button>
+                            <button className="flex items-center gap-1.5" onClick={() => handleShowAudience(activeStory.likes, "Likes")}>
+                                <Heart className="w-5 h-5"/>
+                                <span className="text-sm font-medium">{activeStory.likes?.length || 0}</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {activeStory && !isOwnStory && (
+                        <div className="absolute bottom-4 right-4 z-20">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-white h-10 w-10 hover:bg-white/10 hover:text-white"
+                                onClick={() => handleLikeToggle(activeStory.id, activeStory.likes)}
+                            >
+                                <Heart className={cn("w-6 h-6 transition-all", isLiked ? "fill-red-500 text-red-500" : "")} />
+                            </Button>
+                        </div>
+                    )}
+                    
+                    <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
+                    <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
+                </div>
             </div>
-        </div>
+
+            <Dialog open={showViewers} onOpenChange={setShowViewers}>
+              <DialogContent>
+                  <DialogHeader>
+                      <DialogTitle>{viewersTitle}</DialogTitle>
+                      <DialogDescription>
+                         List of users who have {viewersTitle === 'Views' ? 'viewed' : 'liked'} this status.
+                      </DialogDescription>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-[60vh]">
+                      <div className="space-y-4 pr-6">
+                      {currentStoryAudience.length > 0 ? (
+                           currentStoryAudience.map(viewer => (
+                            <div key={viewer.id} className="flex items-center gap-4">
+                                <Avatar>
+                                    <AvatarImage src={viewer.profilePictureUrl || `https://picsum.photos/seed/${viewer.id}/200`} />
+                                    <AvatarFallback>{getInitials(viewer.name)}</AvatarFallback>
+                                </Avatar>
+                                <span>{viewer.name}</span>
+                            </div>
+                           ))
+                      ) : (
+                        <p className="text-muted-foreground text-sm text-center py-8">No {viewersTitle.toLowerCase()} yet.</p>
+                      )}
+                      </div>
+                  </ScrollArea>
+              </DialogContent>
+            </Dialog>
+        </>
     );
   }
 
   return (
     <div className="container mx-auto py-6">
-       <Input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold font-headline">Status</h1>
-        {!isAddingStatus && (
-            <Button size="sm" onClick={() => fileInputRef.current?.click()}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Status
-            </Button>
-        )}
+        <Button size="sm" onClick={() => setIsAddingStatus(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Add Status
+        </Button>
       </div>
 
-    {isAddingStatus && statusPreview && (
-        <Card className="mb-6">
-            <div className="p-4 space-y-4">
-                <div className="relative aspect-[16/9] w-full rounded-md overflow-hidden">
-                    <Image src={statusPreview} alt="Status preview" fill className="object-cover"/>
+    <Dialog open={isAddingStatus} onOpenChange={handleCancelAddStatus}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Add New Status</DialogTitle>
+                <DialogDescription>
+                    Choose an image and add an optional caption to share with your friends.
+                </DialogDescription>
+            </DialogHeader>
+            
+            <Input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+
+            {statusPreview ? (
+                <div className="space-y-4">
+                    <div className="relative aspect-video w-full rounded-md overflow-hidden border">
+                        <Image src={statusPreview} alt="Status preview" fill className="object-contain"/>
+                    </div>
+                     <Input 
+                        placeholder="Add a caption..." 
+                        value={statusText}
+                        onChange={(e) => setStatusText(e.target.value)}
+                    />
                 </div>
-                <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={handleCancelAddStatus} disabled={isUploading}>
-                        <XCircle className="mr-2 h-4 w-4" />
-                        Cancel
-                    </Button>
-                    <Button onClick={handleUpload} disabled={!statusFile || isUploading}>
-                         <Send className="mr-2 h-4 w-4" />
-                        {isUploading ? "Uploading..." : "Post Status"}
-                    </Button>
-                </div>
-            </div>
-        </Card>
-    )}
+            ) : (
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg text-muted-foreground hover:bg-muted/50 transition-colors"
+                >
+                    <ImagePlus className="w-10 h-10 mb-2"/>
+                    <p>Click to select an image</p>
+                </button>
+            )}
+            
+            <DialogFooter>
+                 <Button variant="ghost" onClick={handleCancelAddStatus}>Cancel</Button>
+                 <Button onClick={handleUpload} disabled={!statusFile || isUploading}>
+                    <Send className="mr-2 h-4 w-4" />
+                    {isUploading ? "Uploading..." : "Post Status"}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
 
 
       {(statusesLoading) ? (
@@ -462,3 +537,5 @@ export default function StatusPage() {
     </div>
   );
 }
+
+    
