@@ -1,7 +1,6 @@
 import type {NextConfig} from 'next';
-import withSerwistInit from "@serwist/next";
+const withSerwist = require("@serwist/next").default;
 
-const withSerwist = withSerwistInit.default;
 
 const nextConfig: NextConfig = {
   /* config options here */

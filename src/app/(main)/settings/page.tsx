@@ -314,7 +314,7 @@ export default function SettingsPage() {
                 <div className="pt-4">
                     { isSupported && (
                         <>
-                            {permission === 'prompt' && (
+                            {permission === 'default' && (
                                 <Button onClick={handleEnableNotifications}>
                                     <Bell className="mr-2 h-4 w-4" />
                                     Enable Notifications
