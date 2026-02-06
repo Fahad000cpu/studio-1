@@ -1,10 +1,8 @@
-
 'use client';
 
 import { getApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
-import { doc, arrayUnion } from 'firebase/firestore';
-import { updateDocumentNonBlocking } from './non-blocking-updates';
+import { doc, arrayUnion, updateDoc } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 
@@ -54,14 +52,25 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
 
     if (currentToken) {
       const userDocRef = doc(firestore, 'users', userId);
-      updateDocumentNonBlocking(userDocRef, {
-        fcmTokens: arrayUnion(currentToken)
-      });
-      toast({
-        title: "Notifications Enabled!",
-        description: "You're all set to receive push notifications."
-      });
-      return currentToken;
+      // Use await and try/catch for robust error handling
+      try {
+        await updateDoc(userDocRef, {
+          fcmTokens: arrayUnion(currentToken)
+        });
+        toast({
+          title: "Notifications Enabled!",
+          description: "You're all set to receive push notifications."
+        });
+        return currentToken;
+      } catch (updateError) {
+        console.error('Failed to save FCM token to Firestore:', updateError);
+        toast({
+          variant: "destructive",
+          title: "Save Token Failed",
+          description: "Could not save your notification token to your profile. Please check Firestore security rules.",
+        });
+        return null; // Return null on failure
+      }
     } else {
       toast({
         variant: "destructive",
