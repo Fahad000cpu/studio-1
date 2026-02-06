@@ -11,23 +11,13 @@ import type { SendFcmNotificationInput, SendFcmNotificationOutput } from '@/type
 function initializeFirebaseAdmin() {
   if (admin.apps.length === 0) {
     try {
-      // Check if the required environment variable is set.
-      if (!process.env.GOOGLE_APPLICATION_CREDENTIALS && !admin.apps.length) {
-         console.warn(
-          'Firebase Admin SDK initialization skipped: GOOGLE_APPLICATION_CREDENTIALS not set and no app is initialized. ' +
-          'This is normal in a local dev environment without service account keys, but will fail in production.'
-        );
-        // In a real production environment, you might want to throw an error here.
-        // For this context, we allow it to proceed, and the `send` will fail gracefully.
-        return;
-      }
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-      });
+      // In a managed environment like App Hosting or Cloud Functions,
+      // initializeApp() with no arguments automatically uses Application Default Credentials.
+      admin.initializeApp();
       console.log("Firebase Admin SDK initialized successfully.");
     } catch (e) {
-      console.error('Firebase Admin initialization error:', e);
-      // Re-throw as a critical failure if initialization is essential for every call
+      console.error('Firebase Admin SDK initialization error:', e);
+      // This is a critical failure, so we throw to stop execution.
       throw new Error("Could not initialize Firebase Admin SDK. Notifications will not be sent.");
     }
   }
@@ -41,13 +31,13 @@ export async function sendFcmNotification(
       initializeFirebaseAdmin();
     } catch(e) {
       console.error(e);
-      return { successCount: 0, failureCount: input.tokens?.length || 0 };
+      return { successCount: 0, failureCount: input.tokens?.length || 0, invalidTokens: [] };
     }
     
     // After attempting initialization, check again if it's ready. If not, exit.
     if (admin.apps.length === 0) {
         console.error("Firebase Admin SDK is not available. Cannot send notification.");
-        return { successCount: 0, failureCount: input.tokens?.length || 0 };
+        return { successCount: 0, failureCount: input.tokens?.length || 0, invalidTokens: [] };
     }
 
     const { tokens, title, body, icon } = input;
@@ -55,7 +45,7 @@ export async function sendFcmNotification(
     const validTokens = Array.isArray(tokens) ? tokens.filter(t => typeof t === 'string' && t.length > 0) : [];
 
     if (validTokens.length === 0) {
-        return { successCount: 0, failureCount: 0 };
+        return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
     const message: admin.messaging.MulticastMessage = {
@@ -105,6 +95,6 @@ export async function sendFcmNotification(
     } catch (error) {
         console.error('Critical error calling admin.messaging().sendEachForMulticast():', error);
         // This catch block handles errors during the API call itself (e.g., network issues)
-        return { successCount: 0, failureCount: validTokens.length };
+        return { successCount: 0, failureCount: validTokens.length, invalidTokens: [] };
     }
 }

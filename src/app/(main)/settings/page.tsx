@@ -2,7 +2,8 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useUser, useAuth, useFirestore, requestPermission, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useAuth, useFirestore, updateDocumentNonBlocking } from "@/firebase";
+import { requestPermission } from '@/firebase/messaging';
 import { updateProfile } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
@@ -179,7 +180,7 @@ export default function SettingsPage() {
       return;
     }
     setIsRequestingPermission(true);
-    await requestPermission(firestore, user.uid);
+    await requestPermission(firestore, user);
     setIsRequestingPermission(false);
   };
 

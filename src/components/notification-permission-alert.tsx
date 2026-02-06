@@ -31,7 +31,7 @@ export function NotificationPermissionAlert({ className }: { className?: string 
         });
         return;
     }
-    await requestPermission(firestore, user.uid);
+    await requestPermission(firestore, user);
   };
   
   if (isLoading.auth || isLoading.profile || isLoading.serviceWorker) {

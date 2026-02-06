@@ -3,6 +3,7 @@
 import { getApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
 import { doc, arrayUnion, setDoc } from 'firebase/firestore';
+import type { User } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 
@@ -10,7 +11,7 @@ import { getMessaging, getToken, isSupported } from 'firebase/messaging';
  * Requests permission for push notifications and saves the token if granted.
  * This function should only be called from a client component on user interaction.
  */
-export const requestPermission = async (firestore: Firestore, userId: string): Promise<string | null> => {
+export const requestPermission = async (firestore: Firestore, user: User): Promise<string | null> => {
   try {
     const supported = await isSupported();
     if (!supported || !navigator.serviceWorker) {
@@ -32,7 +33,6 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       return null;
     }
     
-    // Get the service worker registration. Use .ready to ensure it's active.
     const swRegistration = await navigator.serviceWorker.ready;
     if (!swRegistration) {
         toast({
@@ -46,19 +46,21 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     const app = getApp();
     const messagingInstance = getMessaging(app);
     
-    // The VAPID key is managed by the firebase-compat library in sw.js via the config.
-    // We pass the service worker registration to ensure getToken uses it.
     const currentToken = await getToken(messagingInstance, { serviceWorkerRegistration: swRegistration });
 
     if (currentToken) {
-      const userDocRef = doc(firestore, 'users', userId);
-      // Use await and try/catch for robust error handling
+      const userDocRef = doc(firestore, 'users', user.uid);
       try {
-        // Use setDoc with merge:true to prevent race conditions.
-        // This will create the document if it doesn't exist, or merge the fcmTokens field if it does.
-        await setDoc(userDocRef, {
+        // This is a robust way to save the token.
+        // It creates the user document with essential info if it doesn't exist,
+        // or merges the fcmTokens field if it does. This prevents race conditions.
+        const userProfileData = {
+          id: user.uid,
+          email: user.email,
+          name: user.displayName,
           fcmTokens: arrayUnion(currentToken)
-        }, { merge: true });
+        };
+        await setDoc(userDocRef, userProfileData, { merge: true });
 
         toast({
           title: "Notifications Enabled!",
@@ -72,7 +74,7 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
           title: "Save Token Failed",
           description: "Could not save your notification token to your profile. Please check Firestore security rules.",
         });
-        return null; // Return null on failure
+        return null;
       }
     } else {
       toast({
