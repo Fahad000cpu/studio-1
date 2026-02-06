@@ -32,16 +32,6 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
 
-  // !!! WARNING: APP CHECK DISABLED !!!
-  // The App Check initialization has been removed to resolve persistent reCAPTCHA
-  // errors during local development. This completely disables Firebase App Check.
-  // While this fixes the immediate authentication issue, it is NOT recommended
-  // for a production environment as it removes a critical layer of security,
-  // leaving your Firebase backend vulnerable to abuse from unverified clients.
-  //
-  // RE-ENABLE FOR PRODUCTION by restoring the App Check initialization code
-  // and ensuring your reCAPTCHA keys are correctly configured.
-
   // Store instances on the window object
   const instances: FirebaseInstances = { app, auth, firestore };
   if (typeof window !== 'undefined') {
@@ -58,8 +48,8 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   }, []);
 
   useEffect(() => {
+    // This effect registers the vanilla JavaScript service worker.
     if ('serviceWorker' in navigator) {
-      // Register the new, manually created service worker.
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => console.log('Service Worker registered with scope:', registration.scope))

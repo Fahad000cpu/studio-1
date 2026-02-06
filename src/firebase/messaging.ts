@@ -34,9 +34,8 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       return null;
     }
     
-    // Get the service worker registration.
-    // The service worker is registered by Serwist at the root scope.
-    const swRegistration = await navigator.serviceWorker.getRegistration();
+    // Get the service worker registration. Use .ready to ensure it's active.
+    const swRegistration = await navigator.serviceWorker.ready;
     if (!swRegistration) {
         toast({
             variant: "destructive",
@@ -49,19 +48,10 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     const app = getApp();
     const messagingInstance = getMessaging(app);
     
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_KEY;
-    if (!vapidKey) {
-      console.error("VAPID key is not set in environment variables.");
-      toast({
-        variant: "destructive",
-        title: "Configuration Error",
-        description: "Cannot enable notifications due to a missing configuration key.",
-      });
-      return null;
-    }
+    // The VAPID key is managed by the firebase-compat library in sw.js via the config.
+    // We pass the service worker registration to ensure getToken uses it.
+    const currentToken = await getToken(messagingInstance, { serviceWorkerRegistration: swRegistration });
 
-    // Pass the registration to getToken to use the custom service worker.
-    const currentToken = await getToken(messagingInstance, { vapidKey, serviceWorkerRegistration: swRegistration });
     if (currentToken) {
       const userDocRef = doc(firestore, 'users', userId);
       updateDocumentNonBlocking(userDocRef, {
@@ -82,7 +72,6 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
     }
   } catch (error) {
     console.error('An error occurred while requesting notification permission:', error);
-    // Check if error is a FirebaseError and has a specific code
     const firebaseError = error as { code?: string; message?: string };
     if (firebaseError.code === 'messaging/failed-service-worker-registration') {
         toast({
