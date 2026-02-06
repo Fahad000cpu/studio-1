@@ -1,14 +1,13 @@
-// A robust, vanilla JS service worker for Firebase Cloud Messaging.
-// This file is not processed by TypeScript or bundlers.
+// This is a basic, "bulletproof" service worker for Firebase Cloud Messaging.
+// It's designed to be simple and reliable.
 
 // Import the Firebase scripts
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
 // Initialize Firebase
-// IMPORTANT: This config is publicly visible and contains no secrets.
-// Security is handled by Firestore Security Rules.
-firebase.initializeApp({
+// This configuration is automatically replaced by a build process.
+const firebaseConfig = {
   "projectId": "studio-6505166944-ae18f",
   "appId": "1:954303139735:web:1cb50131d512627c9d3ed2",
   "storageBucket": "studio-6505166944-ae18f.appspot.com",
@@ -16,44 +15,42 @@ firebase.initializeApp({
   "authDomain": "studio-6505166944-ae18f.firebaseapp.com",
   "measurementId": "G-1TC3B2RSWT",
   "messagingSenderId": "954303139735"
-});
+};
+
+firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
-// A basic fetch handler is required for the service worker to be recognized as a PWA install candidate.
+// This 'fetch' event listener is required for a web app to be recognized as a PWA.
+// Even an empty handler is sufficient.
 self.addEventListener('fetch', (event) => {
-  // This is a no-op, but it's required.
-  // For a full offline-first PWA, you would implement caching strategies here.
+  // We are not doing any caching here, just fulfilling the PWA requirement.
 });
 
-// Handle background messages
+
+// Handle background messages. This is triggered for "data-only" messages
+// when the app is in the background or closed.
 messaging.onBackgroundMessage((payload) => {
   console.log('[sw.js] Background message received: ', payload);
-  
-  // A helper to safely parse the data payload sent from our Genkit flow.
-  const getWebpushData = () => {
-    try {
-      if (payload.data && payload.data.webpush) {
-        return JSON.parse(payload.data.webpush);
-      }
-    } catch (e) {
-      console.error("Failed to parse webpush data:", e);
+
+  // Safely parse the data payload
+  let data = {};
+  try {
+    if (payload.data) {
+      data = JSON.parse(payload.data);
     }
-    return {};
-  };
+  } catch(e) {
+    console.error("Failed to parse FCM data payload:", e);
+  }
 
-  const webpushData = getWebpushData();
-
-  // Use data from the webpush payload first, then fallback to the notification payload.
-  const notificationTitle = webpushData.title || payload.notification?.title || 'New Message';
+  // Use the title and body from the parsed data, or provide defaults.
+  const notificationTitle = data.title || 'New Message';
   const notificationOptions = {
-    body: webpushData.body || payload.notification?.body || 'You have a new notification!',
-    icon: webpushData.icon || '/logo.svg',
-    badge: '/logo.svg',
-    tag: payload.messageId || 'default-tag',
+    body: data.body || 'You have a new notification!',
+    icon: data.icon || '/logo.svg',
+    image: data.image || undefined,
     data: {
-      // Set a URL to open on click, defaulting to the app's root.
-      url: payload.data?.url || '/'
+        url: data.url || '/' // Pass URL for click handling
     }
   };
 
@@ -61,27 +58,43 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 
-// Handle notification click
-self.addEventListener('notificationclick', (event) => {
+// Handle notification click event
+self.addEventListener('notificationclick', function(event) {
+    console.log('[sw.js] Notification click Received.', event);
     event.notification.close();
 
-    const openUrl = event.notification.data?.url || '/';
-
+    let clickUrl = '/'; // Default URL
+    
+    // Safely parse the notification data to get the URL
+    if (event.notification.data) {
+        try {
+            const data = JSON.parse(event.notification.data);
+            if (data.url) {
+                clickUrl = data.url;
+            }
+        } catch (e) {
+            console.error("Couldn't parse notification data from string:", e);
+            // Fallback if data is an object but not a string
+            if (typeof event.notification.data === 'object' && event.notification.data.url) {
+                clickUrl = event.notification.data.url;
+            }
+        }
+    }
+    
+    // This logic looks for an existing window and focuses it, or opens a new one.
     event.waitUntil(
-        clients.matchAll({
-            type: "window",
-            includeUncontrolled: true,
-        }).then((clientList) => {
-            // If a window for the app is already open, focus it.
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+            // Check if there's a window already open with the target URL
             for (const client of clientList) {
-                // You might need to adjust the URL check depending on your app's routing.
-                if (client.url === openUrl && 'focus' in client) {
+                const clientUrl = new URL(client.url);
+                const targetUrl = new URL(clickUrl, client.url); // Resolve relative URL
+                if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
                     return client.focus();
                 }
             }
-            // Otherwise, open a new window.
+            // If no window is found, open a new one.
             if (clients.openWindow) {
-                return clients.openWindow(openUrl);
+                return clients.openWindow(clickUrl);
             }
         })
     );

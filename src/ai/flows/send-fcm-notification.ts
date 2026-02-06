@@ -57,20 +57,26 @@ const sendFcmTool = ai.defineTool(
             throw new Error('No FCM tokens provided. Cannot send notification.');
         }
         
-        const webpushDataPayload = {
-            title,
-            body,
-            ...(icon && { icon }),
-            ...(image && { image }),
-        };
-
         const message: admin.messaging.MulticastMessage = {
             tokens,
-            // The `data` payload is received by the service worker for custom handling.
-            // It MUST be a string. By sending a data-only payload, we ensure
-            // the service worker's `push` event is always triggered.
+            // The `notification` payload is handled by the browser automatically
+            // when the app is in the background.
+            notification: {
+                title,
+                body,
+            },
+            // The `webpush` config provides web-specific options.
             webpush: {
-                data: JSON.stringify(webpushDataPayload),
+                notification: {
+                    // Use 'image' for the main notification picture and 'icon' for the small badge icon.
+                    ...(image && { image: image }),
+                    ...(icon && { icon: icon }),
+                },
+                // The `data` payload is for custom data to be used in the service worker,
+                // for example, to handle a notification click.
+                data: JSON.stringify({
+                    url: '/discover', // URL to open on click
+                }),
             },
         };
 
