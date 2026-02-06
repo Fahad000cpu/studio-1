@@ -251,41 +251,37 @@ export default function ChatPage() {
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
     if (recipientTokens && recipientTokens.length > 0) {
         try {
-            console.log(`Attempting to send notification for chat message to tokens:`, recipientTokens);
             const result = await sendFcmNotification({
                 tokens: recipientTokens,
                 title: user.displayName || 'New Message',
                 body: messageText,
                 icon: user.photoURL || '/logo.svg',
-                url: `/chat?chatWith=${selectedChat.id}`
+                url: `/chat?chatWith=${user.uid}`
             });
             
-            console.log('Notification send result:', result);
-
             if (result.failureCount > 0) {
                 toast({
                     variant: 'default',
                     title: 'Notification Status',
-                    description: `${result.failureCount} of the recipient's devices are offline or no longer registered. We have automatically cleaned up these records.`,
-                    duration: 8000,
+                    description: `Notification failed for ${result.failureCount} device(s). The recipient may need to visit the Settings page to re-enable notifications.`,
+                    duration: 10000,
                 });
             }
 
             // Self-healing: Remove invalid tokens from the database
             if (result.invalidTokens && result.invalidTokens.length > 0) {
-                console.log("Attempting to remove invalid tokens:", result.invalidTokens);
                 const recipientUserRef = doc(firestore, "users", selectedChat.id);
                 updateDocumentNonBlocking(recipientUserRef, {
                     fcmTokens: arrayRemove(...result.invalidTokens)
                 });
             }
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to send chat notification:", error);
             toast({
                 variant: "destructive",
                 title: "Notification Error",
-                description: "An unexpected error occurred while trying to send the notification.",
+                description: `An unexpected error occurred while sending the notification: ${error.message}`,
             });
         }
     }
