@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,8 +36,17 @@ export default function AdminPage() {
   const [notificationUrl, setNotificationUrl] = useState('');
   const [notificationImage, setNotificationImage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [installationId, setInstallationId] = useState<string | null>(null);
   
   const isLoading = isAdminLoading || usersLoading;
+
+  useEffect(() => {
+    // Retrieve the installation ID from sessionStorage when the component mounts
+    const id = sessionStorage.getItem('firebaseInstallationId');
+    if (id) {
+        setInstallationId(id);
+    }
+  }, []);
 
   const handleSendNotification = async () => {
     if (!notificationTitle || !notificationBody) {
@@ -109,6 +118,16 @@ export default function AdminPage() {
     });
   };
 
+  const handleCopyInstallationId = () => {
+    if (installationId) {
+        navigator.clipboard.writeText(installationId);
+        toast({
+            title: "Installation ID Copied!",
+            description: "You can now paste this ID in the Firebase Console to test In-App Messages.",
+        });
+    }
+  };
+
 
   return (
     <div className="container mx-auto">
@@ -155,14 +174,31 @@ export default function AdminPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Alert>
-                        <Info className="h-4 w-4" />
-                        <AlertTitle>Kaise Kaam Karta Hai?</AlertTitle>
-                        <AlertDescription>
-                            <p>In-App messages Firebase Console se control hote hain. Testing ke liye aapko device ka **Installation ID** chahiye hoga, jo aapke browser ke Developer Console (F12) mein dikhega.</p>
-                        </AlertDescription>
-                    </Alert>
-                    
+                    <Card>
+                      <CardHeader>
+                          <CardTitle className="text-base">In-App Messaging Test ID</CardTitle>
+                          <CardDescription>
+                              Firebase Console mein test message bhejne ke liye is ID ko copy karein.
+                          </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                          {installationId ? (
+                              <div className="flex items-center gap-2">
+                                  <Badge variant="secondary" className="font-mono text-sm p-2 flex-grow truncate">
+                                      {installationId}
+                                  </Badge>
+                                  <Button onClick={handleCopyInstallationId} variant="outline" size="icon">
+                                      <Copy className="h-4 w-4" />
+                                  </Button>
+                              </div>
+                          ) : (
+                              <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                  <Info className="h-4 w-4" />
+                                  <p>Installation ID nahi mila. Page ko refresh karein.</p>
+                              </div>
+                          )}
+                      </CardContent>
+                    </Card>
                     <div className="pt-2">
                         <h4 className="font-semibold text-md mb-2">Isko Kab Use Karein? (Example Ideas)</h4>
                         <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">

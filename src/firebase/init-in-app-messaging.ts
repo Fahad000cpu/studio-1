@@ -26,6 +26,10 @@ export async function initializeInAppMessaging(app: FirebaseApp) {
         console.log(
           'Copy this ID and use it to test In-App Messages from the Firebase Console.'
         );
+        // Store the ID in sessionStorage so it can be accessed by the UI
+        if (typeof window !== 'undefined') {
+            sessionStorage.setItem('firebaseInstallationId', installationId);
+        }
       })
       .catch(err => {
         console.error('Failed to get In-App Messaging Installation ID:', err);
