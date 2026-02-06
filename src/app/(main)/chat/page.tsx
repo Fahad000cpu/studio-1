@@ -235,7 +235,7 @@ export default function ChatPage() {
 
     try {
       const result = await sendFcmNotification({
-        tokens: recipientTokens,
+        tokens: [...new Set(recipientTokens)], // Send to unique tokens
         title: user.displayName || 'New Message',
         body: body,
         icon: user.photoURL || '/logo.svg',
@@ -246,19 +246,18 @@ export default function ChatPage() {
       // SILENTLY clean up invalid tokens without notifying the sender
       if (result.invalidTokens && result.invalidTokens.length > 0) {
         const recipientUserRef = doc(firestore, 'users', selectedChat.id);
-        // This is a non-blocking update. It will happen in the background.
         updateDocumentNonBlocking(recipientUserRef, {
           fcmTokens: arrayRemove(...result.invalidTokens),
         });
       }
     } catch (error: any) {
       console.error('Failed to send chat notification:', error);
-      // Only show a toast for a REAL, unexpected error.
-      if (error.message && error.message.includes('FCM')) {
+      // Only show a toast for a REAL, unexpected error. Don't show for cleanup.
+      if (error.message && !error.message.includes('registration-token-not-registered')) {
         toast({
           variant: 'destructive',
           title: 'Notification Send Error',
-          description: `Could not send notification via FCM: ${error.message}`,
+          description: `Could not send notification: ${error.message}`,
         });
       }
     }
