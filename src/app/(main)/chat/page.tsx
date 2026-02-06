@@ -234,37 +234,42 @@ export default function ChatPage() {
     }
 
     try {
-        const result = await sendFcmNotification({
-            tokens: recipientTokens,
-            title: user.displayName || 'New Message',
-            body: body,
-            icon: user.photoURL || '/logo.svg',
-            url: `/chat?chatWith=${user.uid}`,
-            image: image, // Pass image if available
-        });
-
-        if (result.failureCount > 0) {
-            toast({
-                variant: 'default',
-                title: 'Notification Status',
-                description: `Notification failed for ${result.failureCount} device(s). The recipient may need to visit the Settings page to re-enable notifications.`,
-                duration: 10000,
-            });
-        }
-
-        if (result.invalidTokens && result.invalidTokens.length > 0) {
-            const recipientUserRef = doc(firestore, "users", selectedChat.id);
-            updateDocumentNonBlocking(recipientUserRef, {
-                fcmTokens: arrayRemove(...result.invalidTokens)
-            });
-        }
-    } catch (error: any) {
-        console.error("Failed to send chat notification:", error);
+      const result = await sendFcmNotification({
+        tokens: recipientTokens,
+        title: user.displayName || 'New Message',
+        body: body,
+        icon: user.photoURL || '/logo.svg',
+        url: `/chat?chatWith=${user.uid}`,
+        image: image,
+      });
+  
+      if (result.failureCount > 0) {
         toast({
-            variant: "destructive",
-            title: "Notification Error",
-            description: `An unexpected error occurred while sending the notification: ${error.message}`,
+          variant: 'default',
+          title: 'Auto-Cleanup Complete',
+          description: `Removed ${result.failureCount} inactive device(s) for this user. If they still don't receive notifications, they may need to re-enable them in Settings.`,
+          duration: 10000,
         });
+      }
+  
+      if (result.invalidTokens && result.invalidTokens.length > 0) {
+        const recipientUserRef = doc(firestore, 'users', selectedChat.id);
+        // This is a non-blocking update. It will happen in the background.
+        updateDocumentNonBlocking(recipientUserRef, {
+          fcmTokens: arrayRemove(...result.invalidTokens),
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to send chat notification:', error);
+      // We check for a specific error message to avoid showing generic network errors
+      // as critical notification failures.
+      if (error.message && error.message.includes('FCM')) {
+        toast({
+          variant: 'destructive',
+          title: 'Notification Send Error',
+          description: `Could not send notification via FCM: ${error.message}`,
+        });
+      }
     }
   };
 
