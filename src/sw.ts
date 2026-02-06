@@ -27,34 +27,37 @@ self.addEventListener("activate", () => {
 self.addEventListener("push", (event) => {
   // IMPORTANT: The push event logic MUST be wrapped in event.waitUntil
   const promiseChain = (async () => {
-    if (!event.data) {
-      console.warn("Push event but no data");
-      return;
-    }
-    
-    let data;
-    try {
-      // The most reliable way to get data is to read it as text and then parse it as JSON.
-      const dataText = event.data.text();
-      data = JSON.parse(dataText);
-    } catch (e) {
-      console.error("Push event data is not valid JSON:", e);
-      // If parsing fails, we can use the raw text as the body.
-      data = { body: event.data.text() };
-    }
-    
-    const title = data.title || "ConnectSphere";
-    const options = {
-      body: data.body || "You have a new message.",
-      icon: data.icon || "/logo.svg",
-      image: data.image,
-      // Adding a badge and a vibration pattern for better user experience
+    // Default notification options
+    const notificationOptions: any = {
+      body: "You have a new message.",
+      icon: "/logo.svg",
       badge: "/logo.svg",
       vibrate: [200, 100, 200],
     };
+    let notificationTitle = "ConnectSphere";
+
+    if (event.data) {
+      try {
+        const dataText = event.data.text();
+        const payload = JSON.parse(dataText);
+
+        notificationTitle = payload.title || notificationTitle;
+        notificationOptions.body = payload.body || notificationOptions.body;
+        notificationOptions.icon = payload.icon || notificationOptions.icon;
+        
+        if (payload.image) {
+          notificationOptions.image = payload.image;
+        }
+
+      } catch (e) {
+        console.error("Push event data parsing error:", e);
+        // If parsing fails, use the raw text as the body
+        notificationOptions.body = event.data.text();
+      }
+    }
     
     // Show the notification.
-    await self.registration.showNotification(title, options);
+    await self.registration.showNotification(notificationTitle, notificationOptions);
   })();
   
   event.waitUntil(promiseChain);
