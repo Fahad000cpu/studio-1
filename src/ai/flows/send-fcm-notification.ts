@@ -32,26 +32,36 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
-    // This is a data-only payload. The service worker MUST handle it.
+    // This is a standard notification payload with both `notification` for display
+    // and `data` for custom logic (like click actions).
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        data: {
-            title: title || "New Message",
-            body: body || "You have a new message",
-            icon: icon || '/logo.svg',
-            url: url || '/',
-            ...(image && { image: image }),
+        notification: {
+            title: title,
+            body: body,
+            // Generic image for APNS/Android. Web uses the one in webpush.
+            imageUrl: image, 
         },
-        // IMPORTANT: We configure webpush to deliver this as a high-priority background message
-        // so our service worker always wakes up.
         webpush: {
-            headers: {
-                Urgency: 'high',
+            notification: {
+                title: title,
+                body: body,
+                icon: icon || '/logo.svg',
+                ...(image && { image: image }),
+            },
+            fcmOptions: {
+                link: url || '/', // Critical for handling clicks on web push notifications.
             },
         },
+        // Custom data payload for foreground handling or other clients.
+        data: {
+            url: url || '/',
+            title: title,
+            body: body,
+        }
     };
 
-    console.log(`Sending data-only FCM message to ${validTokens.length} token(s).`);
+    console.log(`Sending push notification to ${validTokens.length} token(s).`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
