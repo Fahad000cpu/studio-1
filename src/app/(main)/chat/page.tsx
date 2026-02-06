@@ -264,17 +264,20 @@ export default function ChatPage() {
 
     // 2. Directly trigger the notification
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
+    
+    console.log('[ConnectSphere Chat] Attempting to send notification.');
+    console.log(`[ConnectSphere Chat] Recipient: ${selectedChat.name}, Found tokens:`, recipientTokens);
+
     if (recipientTokens.length > 0) {
-      console.log(`Sending notification for text message to ${recipientTokens.length} token(s).`);
       sendFcmNotification({
         tokens: recipientTokens,
         title: user.displayName || 'New Message',
         body: messageText,
         url: `/chat?chatWith=${user.uid}`,
         icon: user.photoURL || undefined,
-      }).catch(err => console.error("Failed to send text message notification:", err));
+      }).catch(err => console.error("[ConnectSphere Chat] Failed to send text message notification:", err));
     } else {
-        console.log("No FCM tokens found for recipient to send notification.");
+        console.log("[ConnectSphere Chat] No valid FCM tokens found for recipient. Skipping notification.");
     }
 };
 
@@ -303,22 +306,24 @@ export default function ChatPage() {
 
       // 2. Directly trigger the notification for the media message
       const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
-      if (recipientTokens.length > 0) {
-        let body = 'Sent a file';
-        if (type === 'image') body = '📷 Photo';
-        if (type === 'video') body = '🎥 Video';
-        if (type === 'audio') body = '🎤 Voice Message';
+      let body = 'Sent a file';
+      if (type === 'image') body = '📷 Photo';
+      if (type === 'video') body = '🎥 Video';
+      if (type === 'audio') body = '🎤 Voice Message';
+      
+      console.log('[ConnectSphere Chat] Attempting to send media notification.');
+      console.log(`[ConnectSphere Chat] Recipient: ${selectedChat.name}, Found tokens:`, recipientTokens);
 
-        console.log(`Sending notification for media message to ${recipientTokens.length} token(s).`);
+      if (recipientTokens.length > 0) {
         sendFcmNotification({
           tokens: recipientTokens,
           title: user.displayName || 'New Message',
           body: body,
           url: `/chat?chatWith=${user.uid}`,
           icon: user.photoURL || undefined,
-        }).catch(err => console.error("Failed to send media message notification:", err));
+        }).catch(err => console.error("[ConnectSphere Chat] Failed to send media message notification:", err));
       } else {
-         console.log("No FCM tokens found for recipient to send media notification.");
+         console.log("[ConnectSphere Chat] No valid FCM tokens found for recipient to send media notification.");
       }
 
     } catch (error) {

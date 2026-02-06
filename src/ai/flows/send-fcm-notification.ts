@@ -32,40 +32,25 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
-    // This is a standard notification payload with both `notification` for display
-    // and `data` for custom logic (like click actions).
+    // This is the most reliable payload for web push.
+    // It's a "data-only" message that our service worker (`sw.js`) will intercept
+    // and use to construct the notification locally. This gives us maximum control.
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        notification: {
-            title: title,
-            body: body,
-            // Generic image for APNS/Android. Web uses the one in webpush.
-            imageUrl: image, 
-        },
-        webpush: {
-            notification: {
-                title: title,
-                body: body,
-                icon: icon || '/logo.svg',
-                ...(image && { image: image }),
-            },
-            fcmOptions: {
-                link: url || '/', // Critical for handling clicks on web push notifications.
-            },
-        },
-        // Custom data payload for foreground handling or other clients.
         data: {
-            url: url || '/',
             title: title,
             body: body,
+            icon: icon || '/logo.svg',
+            url: url || '/',
+            ...(image && { image: image }),
         }
     };
 
-    console.log(`Sending push notification to ${validTokens.length} token(s).`);
+    console.log(`[FCM Action] Sending DATA-ONLY push notification to ${validTokens.length} token(s).`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
-        console.log(`FCM sendEachForMulticast response: Successes: ${response.successCount}, Failures: ${response.failureCount}`);
+        console.log(`[FCM Action] FCM response: Successes: ${response.successCount}, Failures: ${response.failureCount}`);
         
         const invalidTokens: string[] = [];
         if (response.failureCount > 0) {
@@ -73,7 +58,7 @@ export async function sendFcmNotification(
                 if (!resp.success) {
                     const error = resp.error;
                     const failedToken = validTokens[idx];
-                    console.error(`Token failed: ${failedToken}, Error: ${error?.code} - ${error?.message}`);
+                    console.error(`[FCM Action] Token failed: ${failedToken}, Error: ${error?.code} - ${error?.message}`);
                     if (
                         error?.code === 'messaging/registration-token-not-registered' ||
                         error?.code === 'messaging/invalid-registration-token'
