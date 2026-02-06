@@ -101,7 +101,7 @@ export default function ChatPage() {
 
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
-  const [selectedChat, setSelectedChat] = useState<UserProfile | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -109,6 +109,12 @@ export default function ChatPage() {
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
+
+  // This is the reactive fix. `selectedChat` is now always derived from the latest `allUsers` data.
+  const selectedChat = useMemo(() => {
+    if (!selectedChatId || !allUsers) return null;
+    return allUsers.find(u => u.id === selectedChatId) ?? null;
+  }, [selectedChatId, allUsers]);
 
   useEffect(() => {
     const fetchAndSortUsers = (latitude?: number, longitude?: number) => {
@@ -173,9 +179,9 @@ export default function ChatPage() {
 
 
   const chatId = useMemo(() => {
-    if (!user || !selectedChat) return null;
-    return getChatId(user.uid, selectedChat.id);
-  }, [user, selectedChat]);
+    if (!user || !selectedChatId) return null;
+    return getChatId(user.uid, selectedChatId);
+  }, [user, selectedChatId]);
 
   const messagesCollection = useMemoFirebase(() => {
     if (!firestore || !chatId) return null;
@@ -211,32 +217,31 @@ export default function ChatPage() {
   }, [messages]);
 
   useEffect(() => {
-    if (!isMobile && contacts && contacts.length > 0 && !selectedChat) {
+    if (!isMobile && contacts && contacts.length > 0 && !selectedChatId) {
       const firstContact = contacts.find(c => c.id !== user?.uid);
       if (firstContact) {
         handleSelectChat(firstContact);
       }
     }
-  }, [contacts, isMobile, selectedChat, user]);
+  }, [contacts, isMobile, selectedChatId, user]);
 
   const handleSelectChat = (contact: UserProfile) => {
-    setSelectedChat(contact);
+    setSelectedChatId(contact.id);
   };
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
   const sendChatNotification = async (body: string, image?: string) => {
+    // This function now uses the `selectedChat` object which is reactively updated,
+    // ensuring it always has the latest data, including `fcmTokens`.
     if (!selectedChat || !user) return;
     
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
 
+    // As requested, this no longer shows a disruptive error to the user.
+    // It will silently fail if no tokens are found, but log a warning for developers.
     if (!recipientTokens || recipientTokens.length === 0) {
-      toast({
-          variant: 'destructive',
-          title: 'Notification Not Sent',
-          description: `${selectedChat.name || 'The recipient'} cannot receive push notifications. They need to enable it in their settings.`,
-          duration: 8000,
-      });
+      console.warn(`Chat notification not sent to ${selectedChat.name || selectedChat.id}: No valid FCM tokens found.`);
       return;
     }
 
@@ -286,6 +291,7 @@ export default function ChatPage() {
       mediaUrl: null,
     });
     
+    // This will now use the latest user data to check for tokens.
     await sendChatNotification(messageText);
 };
 
@@ -480,7 +486,7 @@ export default function ChatPage() {
                 key={contact.id}
                 className={cn(
                   'flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
-                  selectedChat?.id === contact.id && 'bg-accent/80'
+                  selectedChatId === contact.id && 'bg-accent/80'
                 )}
                 onClick={() => handleSelectChat(contact)}
               >
@@ -516,7 +522,7 @@ export default function ChatPage() {
             variant="ghost"
             size="icon"
             className="mr-2"
-            onClick={() => setSelectedChat(null)}
+            onClick={() => setSelectedChatId(null)}
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>
