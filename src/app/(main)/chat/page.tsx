@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef } from 'react';
@@ -256,16 +257,17 @@ export default function ChatPage() {
                 title: user.displayName || 'New Message',
                 body: messageText,
                 icon: user.photoURL || '/logo.svg',
+                url: `/chat?chatWith=${selectedChat.id}`
             });
             
             console.log('Notification send result:', result);
 
             if (result.failureCount > 0) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Notification Issue',
-                    description: `Could not send notification to ${result.failureCount} device(s). We will attempt to clean up invalid device records.`,
-                    duration: 7000,
+                toast({
+                    variant: 'default',
+                    title: 'Notification Status',
+                    description: `${result.failureCount} of the recipient's devices are offline or no longer registered. We have automatically cleaned up these records.`,
+                    duration: 8000,
                 });
             }
 

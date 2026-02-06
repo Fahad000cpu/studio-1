@@ -76,7 +76,6 @@ export default function AdminPage() {
         title: notificationTitle,
         body: notificationBody,
         icon: '/logo.svg',
-        image: '/logo.svg',
       });
 
       toast({
