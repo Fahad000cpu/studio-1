@@ -238,7 +238,7 @@ export default function LoginPage() {
             toast({
                 variant: "destructive",
                 title: "Phone Sign-In Disabled",
-                description: "Phone authentication is not enabled for this project. An administrator must enable it in the Firebase Console's 'Sign-in method' tab.",
+                description: "Phone sign-in is not enabled. Please check two things: 1) In the Firebase Console, go to Authentication > Sign-in method and ensure 'Phone' is enabled. 2) In your Google Cloud project, ensure the 'Identity Platform' API is enabled.",
                 duration: 20000,
             });
         } else if (error.code === 'auth/internal-error') {
@@ -482,3 +482,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
