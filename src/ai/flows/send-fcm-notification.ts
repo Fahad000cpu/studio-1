@@ -32,21 +32,40 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
-    // This is the most reliable payload for web push.
-    // It's a "data-only" message that our service worker (`sw.js`) will intercept
-    // and use to construct the notification locally. This gives us maximum control.
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        data: {
+        notification: {
             title: title,
             body: body,
-            icon: icon || '/logo.svg',
-            url: url || '/',
-            ...(image && { image: image }),
-        }
+            ...(image && { imageUrl: image }),
+        },
+        data: {
+            url: url || '/', // Fallback data for SW and other platforms
+        },
+        webpush: {
+            notification: {
+                icon: icon || '/logo.svg',
+                badge: '/logo.svg',
+                tag: 'connectsphere-chat', // To stack notifications
+            },
+            fcmOptions: {
+                link: url || '/', // This is key for click actions on web
+            },
+        },
+        apns: {
+            payload: {
+                aps: { 'content-available': 1 },
+            },
+        },
+        android: {
+            priority: 'high',
+            notification: {
+                color: '#8A2BE2',
+            },
+        },
     };
 
-    console.log(`[FCM Action] Sending DATA-ONLY push notification to ${validTokens.length} token(s).`);
+    console.log(`[FCM Action] Sending robust push notification to ${validTokens.length} token(s).`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
