@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BellRing, MapPin, Camera, Bell, CheckCircle2, XCircle, Loader2, AlertCircle } from "lucide-react";
+import { BellRing, MapPin, Camera, Bell, CheckCircle2, XCircle, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
 import { uploadToCloudinary } from "@/lib/cloudinary";
@@ -352,10 +352,16 @@ export default function SettingsPage() {
                                 </div>
                             )}
                              {!isLoading.auth && !isLoading.profile && !isLoading.serviceWorker && permissionGranted && tokenInFirestore && serviceWorkerActive && (
-                               <div className="flex items-center gap-2 text-green-600 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
-                                  <CheckCircle2 className="h-5 w-5" />
-                                  <p className="font-medium">You are all set to receive notifications!</p>
-                               </div>
+                                <div className="flex items-center justify-between gap-4 text-green-600 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle2 className="h-5 w-5" />
+                                        <p className="font-medium">You are all set!</p>
+                                    </div>
+                                    <Button onClick={handleEnableNotifications} size="sm" variant="ghost" className="text-green-700 hover:text-green-800 hover:bg-green-500/20" disabled={isRequestingPermission}>
+                                        {isRequestingPermission ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                                        Re-sync Token
+                                    </Button>
+                                </div>
                              )}
                         </>
                     )}
