@@ -151,18 +151,27 @@ export default function AdminPage() {
                         In-App Messaging (Pop-ups & Banners)
                     </CardTitle>
                     <CardDescription>
-                       Send messages to **active users** inside the app. These are managed from the Firebase Console, not from here.
+                       Bhejein aise messages jo users ko **app ke andar** dikhein, jab woh app use kar rahe hon.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                     <Alert>
                         <Info className="h-4 w-4" />
-                        <AlertTitle>How It Works</AlertTitle>
+                        <AlertTitle>Kaise Kaam Karta Hai?</AlertTitle>
                         <AlertDescription>
-                            <p>In-App messages do not use the FCM tokens listed on this page. They are handled automatically by Firebase.</p>
-                            <p className="mt-2 font-semibold">To test a message on your device before sending it to everyone, you need your device's unique **Installation ID**. Open your browser's developer console (F12) to find it.</p>
+                            <p>In-App messages Firebase Console se control hote hain. Testing ke liye aapko device ka **Installation ID** chahiye hoga, jo aapke browser ke Developer Console (F12) mein dikhega.</p>
                         </AlertDescription>
                     </Alert>
+                    
+                    <div className="pt-2">
+                        <h4 className="font-semibold text-md mb-2">Isko Kab Use Karein? (Example Ideas)</h4>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
+                            <li><b>Naye Features Promote Karna:</b> "Dekhiye hamara naya Status feature!"</li>
+                            <li><b>Special Offers Dena:</b> "Affiliate products par is hafte 20% ki chhoot!"</li>
+                            <li><b>Users ko Guide Karna:</b> "Welcome! Yahan se aap naye dost dhoondh sakte hain."</li>
+                            <li><b>Announcements Karna:</b> "ConnectSphere ka naya version aa gaya hai!"</li>
+                        </ul>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -173,7 +182,7 @@ export default function AdminPage() {
                   Broadcast Push Notifications
                 </CardTitle>
                 <CardDescription>
-                  Send notifications that appear on a user's device, **even when the app is closed**. This uses the FCM Push Tokens listed below.
+                  Bhejein aise notifications jo user ke device par dikhein, **jab app band ho**. Iske liye FCM Push Tokens ki zaroorat hoti hai.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
