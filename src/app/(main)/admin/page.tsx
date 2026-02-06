@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useUser, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useState } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,7 +20,6 @@ import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
-import { sendPushAllNotification } from '@/ai/flows/send-pushall-notification';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -35,10 +34,6 @@ export default function AdminPage() {
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
   const [isSending, setIsSending] = useState(false);
-
-  const [pushAllTitle, setPushAllTitle] = useState('');
-  const [pushAllBody, setPushAllBody] = useState('');
-  const [isSendingPushAll, setIsSendingPushAll] = useState(false);
   
   const isLoading = isAdminLoading || usersLoading;
 
@@ -99,46 +94,6 @@ export default function AdminPage() {
       });
     } finally {
       setIsSending(false);
-    }
-  };
-
-  const handleSendPushAllNotification = async () => {
-    if (!pushAllTitle || !pushAllBody) {
-      toast({
-        variant: 'destructive',
-        title: 'Missing fields',
-        description: 'Please enter a title and body for the PushAll notification.',
-      });
-      return;
-    }
-
-    setIsSendingPushAll(true);
-    try {
-      const result = await sendPushAllNotification({
-        title: pushAllTitle,
-        body: pushAllBody,
-      });
-
-      if (result.success) {
-        toast({
-          title: 'PushAll Notification Sent',
-          description: 'The PushAll broadcast has been sent.',
-        });
-        setPushAllTitle('');
-        setPushAllBody('');
-      } else {
-        throw new Error(result.message || 'Unknown error sending PushAll notification');
-      }
-
-    } catch (error) {
-      console.error('Failed to send PushAll notification', error);
-      toast({
-        variant: 'destructive',
-        title: 'Send Failed',
-        description: error instanceof Error ? error.message : 'An error occurred while sending the PushAll notification.',
-      });
-    } finally {
-      setIsSendingPushAll(false);
     }
   };
   
@@ -219,36 +174,6 @@ export default function AdminPage() {
                 <Button onClick={handleSendNotification} disabled={isSending}>
                   <Send className="mr-2 h-4 w-4" />
                   {isSending ? 'Sending...' : 'Send Notification'}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BellRing className="h-5 w-5 text-blue-500"/>
-                  Send PushAll Broadcast
-                </CardTitle>
-                <CardDescription>
-                  Send a broadcast notification to all PushAll channel subscribers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Input
-                  placeholder="PushAll Notification Title"
-                  value={pushAllTitle}
-                  onChange={(e) => setPushAllTitle(e.target.value)}
-                  disabled={isSendingPushAll}
-                />
-                <Textarea
-                  placeholder="PushAll Notification Body"
-                  value={pushAllBody}
-                  onChange={(e) => setPushAllBody(e.target.value)}
-                  disabled={isSendingPushAll}
-                />
-                <Button onClick={handleSendPushAllNotification} disabled={isSendingPushAll}>
-                  <Send className="mr-2 h-4 w-4" />
-                  {isSendingPushAll ? 'Sending...' : 'Send PushAll Notification'}
                 </Button>
               </CardContent>
             </Card>

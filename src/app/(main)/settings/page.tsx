@@ -359,21 +359,6 @@ export default function SettingsPage() {
                         </>
                     )}
                 </div>
-
-                <div className="flex items-center justify-between pt-4 border-t">
-                    <div>
-                        <Label>PushAll Notifications</Label>
-                        <p className="text-sm text-muted-foreground">
-                            Subscribe to our PushAll channel for more notification options.
-                        </p>
-                    </div>
-                    <Button asChild variant="outline">
-                        <a href="https://pushall.ru/?fs=5995" target="_blank" rel="noopener noreferrer">
-                            <Bell className="mr-2 h-4 w-4" />
-                            Subscribe
-                        </a>
-                    </Button>
-                </div>
             </CardContent>
         </Card>
 
