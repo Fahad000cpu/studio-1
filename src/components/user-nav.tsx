@@ -4,8 +4,10 @@
 import { LogOut, Settings, User } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import { getMessaging, getToken, isSupported } from 'firebase/messaging';
+import { doc, updateDoc, arrayRemove } from 'firebase/firestore';
 
-import { useAuth, useUser } from "@/firebase";
+import { useAuth, useUser, useFirestore } from "@/firebase";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,10 +23,31 @@ import { getInitials } from "@/lib/utils";
 
 export function UserNav() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
 
   const handleLogout = async () => {
+    if (user) {
+      try {
+        const supported = await isSupported();
+        if (supported) {
+          const messaging = getMessaging();
+          const currentToken = await getToken(messaging);
+          if (currentToken) {
+            // Remove this device's token from the logged-out user's profile
+            const userDocRef = doc(firestore, 'users', user.uid);
+            await updateDoc(userDocRef, {
+              fcmTokens: arrayRemove(currentToken)
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error removing FCM token from user profile on logout:', error);
+        // Do not block logout if this fails, just log it.
+      }
+    }
+
     await signOut(auth);
     router.push("/");
   };

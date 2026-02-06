@@ -117,7 +117,7 @@ export default function SignupPage() {
     const userRef = doc(firestore, 'users', user.uid);
     try {
         // First, request notification permission and get the token.
-        const token = await requestPermission(firestore, user.uid);
+        const token = await requestPermission(firestore, user);
         const initialTokens = token ? [token] : [];
   
         const userDoc = await getDoc(userRef);
