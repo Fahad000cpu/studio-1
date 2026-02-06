@@ -227,13 +227,15 @@ export default function ChatPage() {
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
 
-  const handleSendMessage = (e: FormEvent) => {
+  const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
 
     const messageText = newMessage;
-    const isLink = urlRegex.test(messageText.trim());
+    setNewMessage(''); // Clear input immediately for better UX
 
+    // Optimistically add message to local state
+    const isLink = urlRegex.test(messageText.trim());
     addDocumentNonBlocking(messagesCollection, {
       text: messageText,
       senderId: user.uid,
@@ -242,21 +244,36 @@ export default function ChatPage() {
       messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
     });
-    setNewMessage('');
     
-    // Send FCM notification to the recipient
+    // Asynchronously send FCM notification to the recipient
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
     if (recipientTokens && recipientTokens.length > 0) {
-      sendFcmNotification({
-        tokens: recipientTokens,
-        title: `New message from ${user.displayName || 'Someone'}`,
-        body: messageText,
-        icon: user.photoURL || undefined,
-      }).catch(error => {
-          console.error("Failed to send chat notification:", error);
-      });
+        try {
+            console.log(`Attempting to send notification for chat message to tokens:`, recipientTokens);
+            const result = await sendFcmNotification({
+                tokens: recipientTokens,
+                title: user.displayName || 'New Message',
+                body: messageText,
+                icon: user.photoURL || '/logo.svg',
+            });
+            console.log('Notification send result:', result);
+            if (result.failureCount > 0) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Notification Issue',
+                    description: `Could not send notification to ${result.failureCount} device(s). The recipient may need to re-enable notifications.`,
+                });
+            }
+        } catch (error) {
+            console.error("Failed to send chat notification:", error);
+            toast({
+                variant: "destructive",
+                title: "Notification Error",
+                description: "An unexpected error occurred while trying to send the notification.",
+            });
+        }
     }
-  };
+};
 
   const handleAttachmentClick = () => {
     fileInputRef.current?.click();

@@ -8,18 +8,15 @@ import type { SendFcmNotificationInput, SendFcmNotificationOutput } from '@/type
 
 // Helper function to initialize Firebase Admin SDK idempotently
 function initializeFirebaseAdmin() {
-  // Check if the app is already initialized
   if (admin.apps.length === 0) {
     try {
-      console.log("Initializing Firebase Admin SDK...");
       admin.initializeApp({
-        // Using applicationDefault() is the standard for Google Cloud environments
-        // like Cloud Functions and App Hosting.
         credential: admin.credential.applicationDefault(),
       });
-      console.log("Firebase Admin SDK initialized successfully.");
     } catch (e) {
       console.error('Firebase Admin initialization error:', e);
+      // Re-throw as a critical failure if initialization is essential for every call
+      throw new Error("Could not initialize Firebase Admin SDK. Notifications will not be sent.");
     }
   }
 }
@@ -27,10 +24,13 @@ function initializeFirebaseAdmin() {
 export async function sendFcmNotification(
     input: SendFcmNotificationInput
   ): Promise<SendFcmNotificationOutput> {
-    console.log("sendFcmNotification server action called with input:", input);
-
-    // Run the initialization check on every call
-    initializeFirebaseAdmin();
+    
+    try {
+      initializeFirebaseAdmin();
+    } catch(e) {
+      console.error(e);
+      return { successCount: 0, failureCount: input.tokens?.length || 0 };
+    }
     
     // After initialization, check again if it's ready. If not, exit.
     if (admin.apps.length === 0) {
@@ -40,16 +40,12 @@ export async function sendFcmNotification(
 
     const { tokens, title, body, icon } = input;
 
-    // Validate tokens: ensure it's an array of non-empty strings
     const validTokens = Array.isArray(tokens) ? tokens.filter(t => typeof t === 'string' && t.length > 0) : [];
 
     if (validTokens.length === 0) {
-        console.log("No valid FCM tokens provided. Skipping notification.");
         return { successCount: 0, failureCount: 0 };
     }
     
-    // We send a data-only payload to give our service worker full control
-    // over the notification display.
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
         data: {
@@ -60,32 +56,30 @@ export async function sendFcmNotification(
         },
         webpush: {
             headers: {
-                // Setting Urgency to 'high' can help with timely delivery
                 Urgency: 'high',
             },
         },
     };
 
-    console.log("Attempting to send FCM message:", JSON.stringify(message, null, 2));
-
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
-        console.log(`FCM send report: ${response.successCount} success, ${response.failureCount} failure.`);
         if (response.failureCount > 0) {
-            response.responses.forEach(resp => {
+            const failedTokens: string[] = [];
+            response.responses.forEach((resp, idx) => {
                 if (!resp.success) {
-                    console.error('FCM send failure:', resp.error);
+                    failedTokens.push(validTokens[idx]);
+                    console.error(`Token failed: ${validTokens[idx]}, Error: ${JSON.stringify(resp.error)}`);
                 }
             });
+            console.error('List of failed tokens:', failedTokens);
         }
         return {
             successCount: response.successCount,
             failureCount: response.failureCount,
         };
     } catch (error) {
-        console.error('Critical error sending FCM message:', error);
-        // The error might be a generic one if it's an auth/permission issue
-        // on the Admin SDK side itself.
+        console.error('Critical error calling admin.messaging().sendEachForMulticast():', error);
+        // This catch block handles errors during the API call itself (e.g., network issues, auth problems with the SDK)
         return { successCount: 0, failureCount: validTokens.length };
     }
 }
