@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,7 +20,7 @@ import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { NotificationPermissionAlert } from '@/components/notification-permission-alert';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -322,14 +321,7 @@ export default function AdminPage() {
               </CardContent>
             </Card>
             
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>How Push Tokens Work</AlertTitle>
-              <AlertDescription>
-                FCM tokens for Push Notifications will only appear below after users have gone to the <strong>Settings</strong> page and enabled them.
-              </AlertDescription>
-            </Alert>
-
+            <NotificationPermissionAlert />
 
             <Card>
               <CardHeader>
@@ -396,5 +388,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
