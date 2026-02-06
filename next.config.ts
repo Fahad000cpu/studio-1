@@ -1,5 +1,5 @@
 import type {NextConfig} from 'next';
-import withSerwist from "@serwist/next";
+import { withSerwist } from "@serwist/next";
 
 const nextConfig: NextConfig = {
   /* config options here */

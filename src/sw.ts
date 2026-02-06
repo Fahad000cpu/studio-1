@@ -1,7 +1,6 @@
 
 import { cleanupOutdatedCaches, precacheAndRoute } from "@serwist/precaching";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { defaultCache } from "@serwist/next/worker";
 
 declare global {
   interface SerwistWorkerGlobalScope extends SerwistGlobalConfig {
@@ -11,80 +10,93 @@ declare global {
 
 declare const self: SerwistWorkerGlobalScope;
 
-// --- Serwist Setup ---
-cleanupOutdatedCaches();
-precacheAndRoute(self.__SW_MANIFEST || []);
-self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", () => self.clients.claim());
+try {
+    // --- Serwist Setup ---
+    // This must be called to make sure the new service worker is used on all pages.
+    self.addEventListener("install", () => self.skipWaiting());
+    self.addEventListener("activate", () => self.clients.claim());
+
+    // Cleans up old caches.
+    cleanupOutdatedCaches();
+
+    // This is the part that enables offline functionality.
+    // It uses a manifest injected by Serwist to know what to cache.
+    if (self.__SW_MANIFEST) {
+        precacheAndRoute(self.__SW_MANIFEST);
+    }
+
+} catch (error) {
+    console.error("Serwist setup failed in service worker:", error);
+}
 
 
 // --- Custom Push Notification Handler ---
 self.addEventListener("push", (event: PushEvent) => {
-  const handlePushEvent = async () => {
-    const title = "ConnectSphere";
-    let options: NotificationOptions = {
-      body: "You have a new message.",
-      icon: "/logo.svg",
-      badge: "/logo.svg",
-      vibrate: [200, 100, 200],
-      data: { url: self.location.origin },
+    const handlePushEvent = async () => {
+        let payload: any = {};
+        try {
+            if (event.data) {
+                payload = event.data.json();
+            }
+        } catch (e) {
+            // If JSON parsing fails, try to get it as text.
+            try {
+                if(event.data) {
+                    payload.body = event.data.text();
+                }
+            } catch(textErr) {
+                console.error("Push event data could not be parsed as JSON or text.", textErr);
+                // Fallback to a default body if data is unreadable
+                payload.body = "You have a new message.";
+            }
+        }
+
+        const title = payload.title || "ConnectSphere";
+        const options: NotificationOptions = {
+            body: payload.body || "You have a new notification.",
+            icon: payload.icon || "/logo.svg",
+            badge: payload.badge || "/logo.svg",
+            image: payload.image,
+            vibrate: [200, 100, 200],
+            // Use the URL from the payload, or fallback to the app's origin
+            data: { url: payload.url || self.location.origin },
+        };
+
+        try {
+             await self.registration.showNotification(title, options);
+        } catch(e) {
+            console.error("Failed to show notification:", e);
+        }
     };
 
-    if (event.data) {
-      try {
-        const payload = event.data.json();
-        options = {
-          ...options,
-          body: payload.body || options.body,
-          icon: payload.icon || options.icon,
-          image: payload.image,
-          data: {
-            url: payload.url || options.data.url,
-          },
-        };
-      } catch (e) {
-        try {
-            options.body = event.data.text();
-        } catch (textErr) {
-            console.error("Push event data could not be parsed as JSON or text.", textErr);
-        }
-      }
-    }
-
-    await self.registration.showNotification(title, options);
-  };
-
-  event.waitUntil(handlePushEvent());
+    event.waitUntil(handlePushEvent());
 });
+
 
 // --- Custom Notification Click Handler ---
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
-  // Close the notification pop-up.
-  event.notification.close();
+    // Close the notification pop-up.
+    event.notification.close();
 
-  // This function is executed when a notification is clicked.
-  const handleNotificationClick = async () => {
-    const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    const urlToOpen = new URL(event.notification.data?.url || "/", self.location.origin).href;
+    // This function is executed when a notification is clicked.
+    const handleNotificationClick = async () => {
+        const allClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        const urlToOpen = new URL(event.notification.data?.url || "/", self.location.origin).href;
 
-    // Check if a window with the same URL is already open.
-    for (const client of windowClients) {
-      if (client.url === urlToOpen && "focus" in client) {
-        return client.focus();
-      }
-    }
+        // Check if a window with the same URL is already open.
+        const matchingClient = allClients.find(client => new URL(client.url).href === urlToOpen);
 
-    // If no such window is found, open a new one.
-    if (self.clients.openWindow) {
-      await self.clients.openWindow(urlToOpen);
-    }
-  };
+        if (matchingClient && "focus" in matchingClient) {
+            // If found, focus it.
+            return matchingClient.focus();
+        }
+        
+        // If no such window is found, open a new one.
+        if (self.clients.openWindow) {
+            return self.clients.openWindow(urlToOpen);
+        }
+    };
 
-  // Tell the browser to wait for our async function to finish.
-  event.waitUntil(handleNotificationClick());
+    // Tell the browser to wait for our async function to finish.
+    event.waitUntil(handleNotificationClick());
 });
-
-// --- Serwist Default Cache Handler ---
-// This was removed as it was likely causing script evaluation to fail.
-// Pre-caching via precacheAndRoute is still active.
-// defaultCache();
