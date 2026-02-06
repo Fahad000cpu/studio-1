@@ -1,15 +1,8 @@
-
-import serwist from "@serwist/next";
-
-const withSerwist = serwist({
-  swSrc: "src/sw.ts",
-  swDest: "public/sw.js",
-  disable: process.env.NODE_ENV === "development",
-});
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    // Your Next.js config
+  // Your Next.js configuration can go here.
+  // We have removed the withSerwist wrapper as it was causing server start issues.
+  // A new, manual service worker has been created in `public/sw.js` for PWA and push notifications.
 };
 
-export default withSerwist(nextConfig);
+export default nextConfig;

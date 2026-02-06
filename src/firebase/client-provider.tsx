@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, type ReactNode } from 'react';
+import React, { useMemo, type ReactNode, useEffect } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
@@ -55,6 +55,16 @@ const initializeFirebaseClient = (): FirebaseInstances => {
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const instances = useMemo(() => {
     return initializeFirebaseClient();
+  }, []);
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      // Register the new, manually created service worker.
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
+        .catch((error) => console.error('Service Worker registration failed:', error));
+    }
   }, []);
 
   return (
