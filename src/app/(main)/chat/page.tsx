@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, FormEvent, useRef } from 'react';
+import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   serverTimestamp,
   Timestamp,
@@ -93,6 +94,7 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const searchParams = useSearchParams();
 
   const [contacts, setContacts] = useState<UserProfile[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -109,6 +111,10 @@ export default function ChatPage() {
     if (!selectedChatId || !allUsers) return null;
     return allUsers.find(u => u.id === selectedChatId) ?? null;
   }, [selectedChatId, allUsers]);
+  
+  const handleSelectChat = useCallback((contact: UserProfile) => {
+    setSelectedChatId(contact.id);
+  }, []);
 
   useEffect(() => {
     const fetchAndSortUsers = (latitude?: number, longitude?: number) => {
@@ -163,6 +169,28 @@ export default function ChatPage() {
     }
   }, [user, toast, allUsers, allUsersLoading]);
 
+  // Handles both initial chat from URL and default selection on desktop
+  useEffect(() => {
+    if (contacts.length === 0 || selectedChatId) return;
+
+    const chatWithId = searchParams.get('chatWith');
+    if (chatWithId) {
+        const userToChatWith = contacts.find(u => u.id === chatWithId);
+        if (userToChatWith) {
+            handleSelectChat(userToChatWith);
+            return;
+        }
+    }
+    
+    if (!isMobile) {
+        const firstContact = contacts.find(c => c.id !== user?.uid);
+        if (firstContact) {
+            handleSelectChat(firstContact);
+        }
+    }
+  }, [contacts, selectedChatId, searchParams, isMobile, user, handleSelectChat]);
+
+
     const filteredContacts = useMemo(() => {
     if (!contacts) return [];
     return contacts.filter(contact =>
@@ -210,18 +238,6 @@ export default function ChatPage() {
     }
   }, [messages]);
 
-  useEffect(() => {
-    if (!isMobile && contacts && contacts.length > 0 && !selectedChatId) {
-      const firstContact = contacts.find(c => c.id !== user?.uid);
-      if (firstContact) {
-        handleSelectChat(firstContact);
-      }
-    }
-  }, [contacts, isMobile, selectedChatId, user]);
-
-  const handleSelectChat = (contact: UserProfile) => {
-    setSelectedChatId(contact.id);
-  };
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   

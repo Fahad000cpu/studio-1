@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, GeoPoint } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import {
   Card,
@@ -15,122 +16,48 @@ import { Button } from '@/components/ui/button';
 import { MessageSquarePlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import type { CollectionOptions } from '@/firebase/firestore/use-collection';
 
 interface DiscoverUsersProps {
   searchTerm: string;
 }
 
-// Haversine distance formula to calculate distance between two points on Earth
-function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    if (lat1 === lat2 && lon1 === lon2) {
-        return 0;
-    }
-    const R = 6371; // Radius of the Earth in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c; // Distance in km
-    return distance;
-}
-
-
 export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   const router = useRouter();
   const { user } = useUser();
-  const { toast } = useToast();
   const firestore = useFirestore();
-  const [sortedUsers, setSortedUsers] = React.useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
 
+  // 1. Create a memoized reference to the users collection.
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: usersCollection, isLoading: usersCollectionLoading } = useCollection<UserProfile>(usersCollectionRef);
 
-  React.useEffect(() => {
-    const fetchAndSortUsers = (latitude?: number, longitude?: number) => {
-      setIsLoading(true);
-      if (usersCollectionLoading || !usersCollection) {
-          if (!usersCollectionLoading) {
-              setIsLoading(false);
-              setSortedUsers([]);
-          }
-          return;
-      };
+  // 2. Define query options to order users by name. This is much faster than fetching all and sorting on client.
+  const collectionOptions = useMemoFirebase<CollectionOptions>(() => ({
+      orderBy: ['name', 'asc']
+  }), []);
 
-      try {
-        const otherUsers = usersCollection.filter((u) => u.id !== user?.uid);
+  // 3. Use the hook with the query options. It will now fetch users in a sorted manner directly from Firestore.
+  const { data: allUsers, isLoading } = useCollection<UserProfile>(usersCollectionRef, collectionOptions);
 
-        // Sort users directly on the client
-        const sorted = otherUsers.sort((a, b) => {
-            if (latitude && longitude) {
-                const locationA = a.coordinates;
-                const locationB = b.coordinates;
-
-                if (locationA && locationB) {
-                    const distanceA = getDistance(latitude, longitude, locationA.latitude, locationA.longitude);
-                    const distanceB = getDistance(latitude, longitude, locationB.latitude, locationB.longitude);
-                    return distanceA - distanceB;
-                }
-                if (locationA) return -1; // A has location, B does not
-                if (locationB) return 1;  // B has location, A does not
-            }
-             // Fallback sort by name (or email)
-            const nameA = a.name || a.email || '';
-            const nameB = b.name || b.email || '';
-            return nameA.localeCompare(nameB);
-        });
-        
-        setSortedUsers(sorted);
-
-      } catch (error) {
-        console.error("Failed to sort users:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not load user suggestions.",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (user) {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    fetchAndSortUsers(position.coords.latitude, position.coords.longitude);
-                },
-                (error: GeolocationPositionError) => {
-                    fetchAndSortUsers(); // Sort alphabetically on geo error
-                }
-            );
-        } else {
-            fetchAndSortUsers(); // Sort alphabetically if geo is not supported
-        }
-    } else if (!usersCollectionLoading) {
-        setIsLoading(false);
-    }
-  }, [user, firestore, toast, usersCollection, usersCollectionLoading]);
-
+  // 4. Filter the results on the client (this is fast).
   const filteredUsers = React.useMemo(() => {
-    if (!sortedUsers) return [];
-    if (!searchTerm) return sortedUsers;
+    if (!allUsers) return [];
     
-    return sortedUsers.filter(u => {
+    // Filter out the current user, then apply the search term.
+    return allUsers.filter(u => {
+      if (u.id === user?.uid) return false;
+
+      if (!searchTerm) return true; // If no search term, show all other users
+      
       const searchTermLower = searchTerm.toLowerCase();
-      // Ensure name and email are treated as strings even if null/undefined
       const nameMatch = (u.name || '').toLowerCase().includes(searchTermLower);
       const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
       return nameMatch || emailMatch;
     });
-  }, [sortedUsers, searchTerm]);
+  }, [allUsers, user, searchTerm]);
 
 
-  const handleStartChat = () => {
-    router.push('/chat');
+  const handleStartChat = (selectedUser: UserProfile) => {
+    router.push(`/chat?chatWith=${selectedUser.id}`);
   };
 
   if (isLoading) {
@@ -160,6 +87,15 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     );
   }
 
+  if (!isLoading && filteredUsers.length === 0) {
+      return (
+          <div className="col-span-full text-center py-16">
+              <h2 className="text-2xl font-bold font-headline">No Users Found</h2>
+              <p className="text-muted-foreground mt-2">Try adjusting your search filters.</p>
+          </div>
+      );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
       {filteredUsers.map((userProfile) => (
@@ -185,7 +121,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
             <p className="text-muted-foreground mt-1 text-sm h-10">{userProfile.bio || 'Loves connecting with new people.'}</p>
           </CardContent>
           <CardFooter className="px-6 pb-6">
-            <Button className="w-full" variant="outline" onClick={handleStartChat}>
+            <Button className="w-full" variant="outline" onClick={() => handleStartChat(userProfile)}>
               <MessageSquarePlus className="mr-2 h-4 w-4" /> Start Chat
             </Button>
           </CardFooter>

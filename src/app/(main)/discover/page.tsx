@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import DiscoverUsers from "@/components/discover-users";
@@ -17,13 +18,13 @@ export default function DiscoverPage() {
         <div>
           <h1 className="text-3xl font-bold font-headline tracking-tight">Discover People</h1>
           <p className="text-muted-foreground">
-            Connect with people near you based on your location.
+            Connect with people in the community.
           </p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search for people..."
+            placeholder="Search for people by name or email..."
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
