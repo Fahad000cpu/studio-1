@@ -16,16 +16,6 @@ import * as admin from "firebase-admin";
 // Start writing functions
 // https://firebase.google.com/docs/functions/typescript
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
 setGlobalOptions({ maxInstances: 10 });
 
 
@@ -58,11 +48,10 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
           return;
       }
 
-      // For testing, we allow self-chats. In production, you might uncomment this.
-      // if (senderId === recipientId) {
-      //   logger.info("[EXIT] Sender and recipient are the same. No notification will be sent.");
-      //   return;
-      // }
+      if (senderId === recipientId) {
+        logger.info("[EXIT] Sender and recipient are the same. No notification will be sent for self-chat.");
+        return;
+      }
   
       // 1. Get recipient's tokens
       let tokens: string[] = [];
@@ -110,7 +99,7 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
       
       // 3. Determine message body
       logger.info("Step 3: Determining notification body from message type.");
-      let notificationBody = 'Sent you a file';
+      let notificationBody = 'Sent a file';
       if (message.messageType === 'text' && message.text) {
           notificationBody = message.text;
       } else if (message.messageType === 'image') {
@@ -124,34 +113,24 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
       }
       logger.info(`Step 3 SUCCESS: Notification body is: "${notificationBody.substring(0, 50)}..."`);
       
-      // 4. Construct and send the notification payload
+      // 4. Construct and send a pure DATA message.
+      // This ensures the service worker's 'push' event is always triggered.
       const payload: admin.messaging.MulticastMessage = {
           tokens,
-          notification: {
-              title: `${senderName} sent a message`,
-              body: notificationBody,
-              icon: senderPhoto, // Standard icon for mobile
-          },
-          webpush: {
-              notification: {
-                  title: `${senderName} sent a message`,
-                  body: notificationBody.length > 100 ? notificationBody.substring(0, 97) + '...' : notificationBody,
-                  icon: senderPhoto,
-                  badge: '/logo.svg',
-                  tag: `chat_${chatId}`,
-                  renotify: true,
-              },
-              fcmOptions: {
-                  link: `/chat?chatWith=${senderId}`,
-              },
-          },
+          // We DO NOT include the 'notification' key here.
+          // We put all data inside the 'data' key.
           data: {
+              // These are the fields our service worker will use to build the notification.
+              title: `${senderName} sent a message`,
+              body: notificationBody.length > 100 ? notificationBody.substring(0, 97) + '...' : notificationBody,
+              icon: senderPhoto,
+              badge: '/logo.svg',
+              tag: `chat_${chatId}`,
               url: `/chat?chatWith=${senderId}`,
-              senderId: senderId,
-          }
+          },
       };
       
-      logger.info("Step 4: Payload constructed. Attempting to send notification to tokens:", tokens);
+      logger.info("Step 4: DATA-ONLY payload constructed. Attempting to send notification to tokens:", tokens);
       
       try {
           const response = await messaging.sendEachForMulticast(payload);
@@ -166,7 +145,6 @@ export const sendChatNotificationOnNewMessage = onDocumentCreated(
                 if (!resp.success) {
                     const error = resp.error;
                     logger.warn(`Failed to send to token: ${tokens[idx]}`, error);
-                    // Check for specific error codes that indicate an invalid or unregistered token
                     if (error && (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token')) {
                         invalidTokens.push(tokens[idx]);
                     }

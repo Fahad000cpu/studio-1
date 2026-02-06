@@ -1,79 +1,66 @@
+// This is a standard, robust service worker for handling push notifications.
 
-// This service worker is essential for receiving push notifications when the app is in the background.
+// Listener for the 'push' event. This is triggered when a push message is received.
+self.addEventListener('push', event => {
+  console.log('[Service Worker] Push Received.');
 
-// Import the Firebase scripts that are needed in the service worker
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+  let data;
+  try {
+    data = event.data.json();
+    console.log('[Service Worker] Push data parsed as JSON:', data);
+  } catch (e) {
+    console.error('[Service Worker] Failed to parse push data as JSON. Treating as text.', e);
+    data = { notification: { title: 'New Message', body: event.data.text() } };
+  }
+  
+  if (!data || !data.notification) {
+      console.error('[Service Worker] Push data is missing "notification" property.');
+      return;
+  }
 
-// Initialize the Firebase app in the service worker with your project's configuration
-const firebaseConfig = {
-  "projectId": "studio-6505166944-ae18f",
-  "appId": "1:954303139735:web:1cb50131d512627c9d3ed2",
-  "storageBucket": "studio-6505166944-ae18f.appspot.com",
-  "apiKey": "AIzaSyB8ADt_BHfhhcIwDax82s13GVYJAefjA0g",
-  "authDomain": "studio-6505166944-ae18f.firebaseapp.com",
-  "measurementId": "G-1TC3B2RSWT",
-  "messagingSenderId": "954303139735"
-};
-
-firebase.initializeApp(firebaseConfig);
-
-// Retrieve an instance of Firebase Messaging so that it can handle background messages.
-const messaging = firebase.messaging();
-
-/**
- * onBackgroundMessage is the handler for messages received when the app is in the background.
- * It's responsible for showing the notification to the user.
- */
-messaging.onBackgroundMessage((payload) => {
-  console.log('[sw.js] Received background message ', payload);
-
-  // Extract the title and options from the incoming payload.
-  const notificationTitle = payload.notification?.title || 'New Message';
-  const notificationOptions = {
-    body: payload.notification?.body || 'You have a new message.',
-    icon: payload.notification?.icon || '/logo.svg',
-    badge: '/logo.svg',
-    tag: payload.notification?.tag,
-    renotify: true,
-    // Store the URL to open in the notification's data property.
+  const title = data.notification.title || 'New Message from ConnectSphere';
+  const options = {
+    body: data.notification.body || 'You have a new message.',
+    icon: data.notification.icon || '/logo.svg',
+    badge: data.notification.badge || '/logo.svg',
+    // The 'data' property of a notification is used to store custom data.
+    // Here we store the URL that should be opened when the notification is clicked.
     data: {
-        url: payload.data?.url || '/'
-    }
+      url: data.data?.url || '/',
+    },
   };
 
-  // Show the notification.
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  // The waitUntil() method ensures the service worker doesn't terminate
+  // until the asynchronous operation (showing the notification) is complete.
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-/**
- * This event listener handles the user clicking on the notification.
- */
-self.addEventListener('notificationclick', function(event) {
-    console.log('[sw.js] Notification click Received.', event.notification);
+// Listener for the 'notificationclick' event. This is triggered when a user clicks on a notification.
+self.addEventListener('notificationclick', event => {
+  console.log('[Service Worker] Notification click Received.');
 
-    // Close the notification.
-    event.notification.close();
-    
-    // Get the URL to open from the notification's data.
-    const urlToOpen = event.notification.data.url;
+  // Close the notification pop-up.
+  event.notification.close();
 
-    // This looks for an open window with the same URL and focuses it.
-    // If it's not found, it opens a new window.
-    event.waitUntil(
-        clients.matchAll({
-            type: "window",
-            includeUncontrolled: true
-        }).then(function(clientList) {
-            for (var i = 0; i < clientList.length; i++) {
-                var client = clientList[i];
-                if (client.url === urlToOpen && 'focus' in client) {
-                    return client.focus();
-                }
-            }
-            if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
-            }
-        })
-    );
+  const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+
+  // The waitUntil() method here ensures that the browser doesn't terminate the
+  // service worker before the new window/tab has been created.
+  event.waitUntil(
+    clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    }).then(clientList => {
+      // If a window for the app is already open, focus it.
+      for (const client of clientList) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise, open a new window.
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });
