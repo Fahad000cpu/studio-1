@@ -129,7 +129,7 @@ export default function SignupPage() {
       if (user) {
         await updateProfile(user, { displayName: values.name });
         await handlePostSignup(user, values.name, values.email, user.phoneNumber, user.photoURL);
-        window.location.replace("/discover");
+        router.push("/discover");
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -159,7 +159,7 @@ export default function SignupPage() {
         if (additionalInfo?.isNewUser) {
            await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
         }
-        window.location.replace("/discover");
+        router.push("/discover");
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
