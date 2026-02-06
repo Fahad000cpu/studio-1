@@ -34,7 +34,7 @@ export function NotificationPermissionAlert({ className }: { className?: string 
     await requestPermission(firestore, user.uid);
   };
   
-  if (isLoading) {
+  if (isLoading.auth || isLoading.profile || isLoading.serviceWorker) {
      return (
         <Alert className={cn("flex items-center gap-2", className)}>
             <Loader2 className="h-4 w-4 animate-spin" />
