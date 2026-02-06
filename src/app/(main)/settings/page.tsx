@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from "react";
@@ -350,7 +351,7 @@ export default function SettingsPage() {
                         </p>
                     </div>
                     <Button asChild variant="outline">
-                        <a href="https://pushall.ru/?fs=5965" target="_blank" rel="noopener noreferrer">
+                        <a href="https://pushall.ru/?fs=5995" target="_blank" rel="noopener noreferrer">
                             <Bell className="mr-2 h-4 w-4" />
                             Subscribe
                         </a>
@@ -368,5 +369,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
