@@ -35,27 +35,23 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
+    // Switched to a data-only payload for maximum reliability with the service worker.
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        notification: {
+        data: {
             title: title || "New Message",
             body: body || "You have a new message",
-            imageUrl: icon,
-        },
-        data: {
-          url: url || '/',
+            icon: icon || '/logo.svg',
+            url: url || '/',
         },
         webpush: {
-            fcmOptions: {
-                link: url || '/',
-            },
             headers: {
                 Urgency: 'high',
             },
         },
     };
 
-    console.log(`Sending FCM message to ${validTokens.length} token(s).`);
+    console.log(`Sending FCM data message to ${validTokens.length} token(s).`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
@@ -68,6 +64,7 @@ export async function sendFcmNotification(
                     const error = resp.error;
                     const failedToken = validTokens[idx];
                     console.error(`Token failed: ${failedToken}, Error: ${error?.code} - ${error?.message}`);
+                    // Identify tokens that are no longer registered.
                     if (
                         error?.code === 'messaging/registration-token-not-registered' ||
                         error?.code === 'messaging/invalid-registration-token'
