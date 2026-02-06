@@ -47,6 +47,7 @@ import type { Message } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
+import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -258,6 +259,17 @@ export default function ChatPage() {
       mediaUrl: null,
       chatId: chatId,
     });
+
+    const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
+    if (recipientTokens.length > 0) {
+      sendFcmNotification({
+        tokens: recipientTokens,
+        title: user.displayName || 'New Message',
+        body: messageText,
+        url: `/chat?chatWith=${user.uid}`,
+        icon: user.photoURL || undefined,
+      }).catch(err => console.error("Failed to send notification:", err));
+    }
 };
 
   const handleAttachmentClick = () => {
@@ -281,6 +293,22 @@ export default function ChatPage() {
         mediaUrl: downloadURL,
         chatId: chatId,
       });
+
+      const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
+      if (recipientTokens.length > 0) {
+        let body = 'Sent a file';
+        if (type === 'image') body = 'Sent an image 📷';
+        if (type === 'video') body = 'Sent a video 🎥';
+        if (type === 'audio') body = 'Sent a voice message 🎤';
+
+        sendFcmNotification({
+          tokens: recipientTokens,
+          title: user.displayName || 'New Message',
+          body: body,
+          url: `/chat?chatWith=${user.uid}`,
+          icon: user.photoURL || undefined,
+        }).catch(err => console.error("Failed to send notification:", err));
+      }
 
     } catch (error) {
       console.error("File upload failed:", error);
