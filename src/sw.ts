@@ -21,9 +21,9 @@ self.addEventListener("activate", () => self.clients.claim());
 // --- Custom Push Notification Handler ---
 self.addEventListener("push", (event: PushEvent) => {
   // This function is executed when a push message is received.
-  async function handlePushEvent() {
+  const handlePushEvent = async () => {
     // Default title and options
-    let title = "ConnectSphere";
+    const title = "ConnectSphere";
     let options: NotificationOptions = {
       body: "You have a new message.",
       icon: "/logo.svg",
@@ -36,7 +36,6 @@ self.addEventListener("push", (event: PushEvent) => {
     if (event.data) {
       try {
         const payload = event.data.json();
-        title = payload.title || title;
         options = {
           ...options,
           body: payload.body || options.body,
@@ -48,18 +47,17 @@ self.addEventListener("push", (event: PushEvent) => {
         };
       } catch (e) {
         // If JSON parsing fails, use the data as plain text for the body
-        console.warn("Push data was not valid JSON, falling back to text.", e);
         try {
             options.body = event.data.text();
         } catch (textErr) {
-            console.error("Could not even parse push data as text.", textErr);
+            // Can't even parse as text, use default.
         }
       }
     }
 
     // Show the notification.
     await self.registration.showNotification(title, options);
-  }
+  };
 
   // Tell the browser to wait for our async function to finish.
   event.waitUntil(handlePushEvent());
@@ -71,7 +69,7 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
 
   // This function is executed when a notification is clicked.
-  async function handleNotificationClick() {
+  const handleNotificationClick = async () => {
     const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     const urlToOpen = new URL(event.notification.data?.url || "/", self.location.origin).href;
 
@@ -84,9 +82,9 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
 
     // If no such window is found, open a new one.
     if (self.clients.openWindow) {
-      return self.clients.openWindow(urlToOpen);
+      await self.clients.openWindow(urlToOpen);
     }
-  }
+  };
 
   // Tell the browser to wait for our async function to finish.
   event.waitUntil(handleNotificationClick());
