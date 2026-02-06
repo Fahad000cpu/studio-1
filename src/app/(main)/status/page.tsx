@@ -341,7 +341,6 @@ export default function StatusPage() {
                             fill
                             className={cn("object-contain", isStoryLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300")}
                             onLoad={() => setIsStoryLoading(false)}
-                            unoptimized
                         />
                     }
                     {activeStory?.text && (
@@ -520,7 +519,6 @@ export default function StatusPage() {
                 alt={status.name}
                 fill
                 className="object-cover transition-transform duration-300 group-hover:scale-110"
-                unoptimized
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
               <div className="absolute bottom-0 left-0 p-3 text-white">
@@ -537,5 +535,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
-    
