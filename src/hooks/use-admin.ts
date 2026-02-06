@@ -1,26 +1,15 @@
 'use client';
 
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useUser } from '@/firebase';
 
 export function useAdmin() {
   const { user, isUserLoading: isUserAuthLoading } = useUser();
-  const firestore = useFirestore();
 
-  // Memoize the document reference to prevent re-renders
-  const adminRoleDocRef = useMemoFirebase(
-    () => (user ? doc(firestore, 'roles_admin', user.uid) : null),
-    [user, firestore]
-  );
-
-  // Use the useDoc hook to listen for the admin role document
-  const { data: adminRoleDoc, isLoading: isAdminRoleLoading } = useDoc(adminRoleDocRef);
-
-  // An admin is someone for whom the role document exists
-  const isAdmin = !!adminRoleDoc;
+  // An admin is the user with the specified email.
+  const isAdmin = user?.email === 'fahadkhanamrohivi@gmail.com';
   
-  // The overall loading state depends on both user authentication and the Firestore doc read
-  const isLoading = isUserAuthLoading || isAdminRoleLoading;
+  // The overall loading state only depends on user authentication.
+  const isLoading = isUserAuthLoading;
 
   return { isAdmin, isLoading };
 }

@@ -2,7 +2,7 @@
 
 import { getApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
-import { doc, arrayUnion, updateDoc } from 'firebase/firestore';
+import { doc, arrayUnion, setDoc } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 
@@ -54,9 +54,12 @@ export const requestPermission = async (firestore: Firestore, userId: string): P
       const userDocRef = doc(firestore, 'users', userId);
       // Use await and try/catch for robust error handling
       try {
-        await updateDoc(userDocRef, {
+        // Use setDoc with merge:true to prevent race conditions.
+        // This will create the document if it doesn't exist, or merge the fcmTokens field if it does.
+        await setDoc(userDocRef, {
           fcmTokens: arrayUnion(currentToken)
-        });
+        }, { merge: true });
+
         toast({
           title: "Notifications Enabled!",
           description: "You're all set to receive push notifications."
