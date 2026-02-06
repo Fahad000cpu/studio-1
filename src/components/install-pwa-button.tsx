@@ -44,8 +44,6 @@ export const InstallPwaButton = ({ className }: { className?: string }) => {
     }
     // Show the install prompt
     await installPrompt.prompt();
-    // Wait for the user to respond to the prompt
-    const { outcome } = await installPrompt.userChoice;
     // We've used the prompt, and can't use it again, throw it away
     setInstallPrompt(null);
   };
@@ -55,7 +53,7 @@ export const InstallPwaButton = ({ className }: { className?: string }) => {
   }
 
   return (
-    <Button onClick={handleInstallClick} className={className}>
+    <Button onClick={handleInstallClick} className={className} variant="outline" size="sm">
       <Download className="mr-2 h-4 w-4" />
       Install App
     </Button>

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect } from "react";
@@ -52,10 +51,10 @@ export default function MainLayout({
                 // Handle messages that arrive while the app is in the foreground
                 const unsubscribeOnMessage = onMessage(messaging, (payload) => {
                     console.log('Foreground message received.', payload);
-                    if (payload.notification) {
+                    if (payload.data) {
                         toast({
-                            title: payload.notification.title,
-                            description: payload.notification.body,
+                            title: payload.data.title,
+                            description: payload.data.body,
                         });
                     }
                 });
