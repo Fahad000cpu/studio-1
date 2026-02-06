@@ -243,15 +243,7 @@ export default function ChatPage() {
         image: image,
       });
   
-      if (result.failureCount > 0) {
-        toast({
-          variant: 'default',
-          title: 'Auto-Cleanup Complete',
-          description: `Removed ${result.failureCount} inactive device(s) for this user. If they still don't receive notifications, they may need to re-enable them in Settings.`,
-          duration: 10000,
-        });
-      }
-  
+      // SILENTLY clean up invalid tokens without notifying the sender
       if (result.invalidTokens && result.invalidTokens.length > 0) {
         const recipientUserRef = doc(firestore, 'users', selectedChat.id);
         // This is a non-blocking update. It will happen in the background.
@@ -261,8 +253,7 @@ export default function ChatPage() {
       }
     } catch (error: any) {
       console.error('Failed to send chat notification:', error);
-      // We check for a specific error message to avoid showing generic network errors
-      // as critical notification failures.
+      // Only show a toast for a REAL, unexpected error.
       if (error.message && error.message.includes('FCM')) {
         toast({
           variant: 'destructive',
