@@ -250,6 +250,8 @@ export default function ChatPage() {
     setNewMessage('');
 
     const isLink = urlRegex.test(messageText.trim());
+    
+    // 1. Add the message to the database
     addDocumentNonBlocking(messagesCollection, {
       text: messageText,
       senderId: user.uid,
@@ -260,15 +262,19 @@ export default function ChatPage() {
       chatId: chatId,
     });
 
+    // 2. Directly trigger the notification
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
     if (recipientTokens.length > 0) {
+      console.log(`Sending notification for text message to ${recipientTokens.length} token(s).`);
       sendFcmNotification({
         tokens: recipientTokens,
         title: user.displayName || 'New Message',
         body: messageText,
         url: `/chat?chatWith=${user.uid}`,
         icon: user.photoURL || undefined,
-      }).catch(err => console.error("Failed to send notification:", err));
+      }).catch(err => console.error("Failed to send text message notification:", err));
+    } else {
+        console.log("No FCM tokens found for recipient to send notification.");
     }
 };
 
@@ -284,6 +290,7 @@ export default function ChatPage() {
     try {
       const downloadURL = await uploadToCloudinary(file);
 
+      // 1. Add the media message to the database
       addDocumentNonBlocking(messagesCollection, {
         text: '',
         senderId: user.uid,
@@ -294,20 +301,24 @@ export default function ChatPage() {
         chatId: chatId,
       });
 
+      // 2. Directly trigger the notification for the media message
       const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
       if (recipientTokens.length > 0) {
         let body = 'Sent a file';
-        if (type === 'image') body = 'Sent an image 📷';
-        if (type === 'video') body = 'Sent a video 🎥';
-        if (type === 'audio') body = 'Sent a voice message 🎤';
+        if (type === 'image') body = '📷 Photo';
+        if (type === 'video') body = '🎥 Video';
+        if (type === 'audio') body = '🎤 Voice Message';
 
+        console.log(`Sending notification for media message to ${recipientTokens.length} token(s).`);
         sendFcmNotification({
           tokens: recipientTokens,
           title: user.displayName || 'New Message',
           body: body,
           url: `/chat?chatWith=${user.uid}`,
           icon: user.photoURL || undefined,
-        }).catch(err => console.error("Failed to send notification:", err));
+        }).catch(err => console.error("Failed to send media message notification:", err));
+      } else {
+         console.log("No FCM tokens found for recipient to send media notification.");
       }
 
     } catch (error) {
