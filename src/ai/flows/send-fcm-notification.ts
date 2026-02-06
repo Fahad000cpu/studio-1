@@ -59,23 +59,17 @@ const sendFcmTool = ai.defineTool(
         
         const message: admin.messaging.MulticastMessage = {
             tokens,
-            // The `notification` payload is handled by the browser automatically
-            // when the app is in the background.
             notification: {
                 title,
                 body,
             },
-            // The `webpush` config provides web-specific options.
             webpush: {
                 notification: {
-                    // Use 'image' for the main notification picture and 'icon' for the small badge icon.
-                    ...(image && { image: image }),
-                    ...(icon && { icon: icon }),
+                    ...(icon && { icon }),
+                    ...(image && { image }),
                 },
-                // The `data` payload is for custom data to be used in the service worker,
-                // for example, to handle a notification click.
                 data: JSON.stringify({
-                    url: '/discover', // URL to open on click
+                    url: '/chat', // URL to open on click
                 }),
             },
         };

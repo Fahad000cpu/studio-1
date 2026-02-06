@@ -501,31 +501,45 @@ export default function ChatPage() {
                 ? (user?.displayName || '?').charAt(0)
                 : (selectedChat.name || '?').charAt(0);
             return (
-            <div
-              key={msg.id || index}
-              className={cn(
-                'flex max-w-[75%] gap-2 group',
-                msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto',
-              )}
-            >
-              <Avatar className="w-8 h-8">
-                <AvatarImage src={avatarSrc} />
-                <AvatarFallback>{avatarFallback}</AvatarFallback>
-              </Avatar>
-              <div className="flex items-end gap-2">
+              <div
+                key={msg.id || index}
+                className={cn(
+                  'flex items-start max-w-[75%] gap-2 group',
+                  msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto'
+                )}
+              >
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={avatarSrc} />
+                  <AvatarFallback>{avatarFallback}</AvatarFallback>
+                </Avatar>
                 <div
                   className={cn(
-                    'rounded-lg',
-                     (msg.messageType !== 'audio' && msg.messageType !== 'video') && 'p-3',
-                     (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2',
-                    msg.own
-                      ? 'bg-primary text-primary-foreground rounded-br-none'
-                      : 'bg-muted rounded-bl-none'
+                    'flex flex-col gap-1',
+                    msg.own ? 'items-end' : 'items-start'
                   )}
                 >
-                   {renderMessageContent(msg)}
+                  <div
+                    className={cn(
+                      'rounded-lg',
+                      msg.messageType !== 'audio' &&
+                        msg.messageType !== 'video' &&
+                        'p-3',
+                      (msg.messageType === 'audio' ||
+                        msg.messageType === 'video') &&
+                        'p-2',
+                      msg.own
+                        ? 'bg-primary text-primary-foreground rounded-br-none'
+                        : 'bg-muted rounded-bl-none'
+                    )}
+                  >
+                    {renderMessageContent(msg)}
+                  </div>
+                  <span className="text-xs text-muted-foreground px-1">
+                    {getTimeString(msg.timestamp)}
+                  </span>
                 </div>
-                 {msg.own && (
+                {msg.own && (
+                  <div className="self-center">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -534,10 +548,11 @@ export default function ChatPage() {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                  )}
+                  </div>
+                )}
               </div>
-            </div>
-          )})}
+            );
+          })}
            {isUploading && (
              <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50">
                <Avatar className="w-8 h-8">
