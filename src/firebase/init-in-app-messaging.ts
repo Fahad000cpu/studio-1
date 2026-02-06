@@ -6,10 +6,11 @@ import type { FirebaseApp } from 'firebase/app';
 // This function is now async as it uses a dynamic import.
 export async function initializeInAppMessaging(app: FirebaseApp) {
   try {
-    // Dynamically import the In-App Messaging module only on the client-side.
-    const { getInAppMessaging, getInstallationId } = await import(
-      'firebase/in-app-messaging'
-    );
+    // This is a trick to prevent Next.js's server-side bundler from statically analyzing
+    // the import path, which would cause a "Module not found" error since 'firebase/in-app-messaging'
+    // is a client-only module.
+    const path = ['firebase', 'in-app-messaging'].join('/');
+    const { getInAppMessaging, getInstallationId } = await import(path);
 
     const inAppMessaging = getInAppMessaging(app);
     console.log('Firebase In-App Messaging initialized.');

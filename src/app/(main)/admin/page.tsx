@@ -14,7 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
@@ -144,22 +144,36 @@ export default function AdminPage() {
 
         {isAdmin && (
           <>
-             <Alert>
-              <Info className="h-4 w-4" />
-              <AlertTitle>How FCM Tokens Work</AlertTitle>
-              <AlertDescription>
-                FCM tokens will only appear for users after they have gone to the <strong>Settings</strong> page and enabled Push Notifications.
-              </AlertDescription>
-            </Alert>
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Smartphone className="h-5 w-5"/>
+                        How to use In-App Messaging
+                    </CardTitle>
+                    <CardDescription>
+                        Send targeted, contextual messages to users who are actively using your app.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Alert>
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Managed from Firebase Console</AlertTitle>
+                        <AlertDescription>
+                            <p>In-App messages (like pop-ups or banners) are created and managed entirely in the Firebase Console under the **In-App Messaging** section. You don't send them from here.</p>
+                            <p className="mt-2">To test a message on your own device before sending it to everyone, you need your device's **Installation ID**. Open your browser's developer console (F12) to find it.</p>
+                        </AlertDescription>
+                    </Alert>
+                </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BellRing className="h-5 w-5"/>
-                  Send Broadcast Notification
+                  Send Broadcast Push Notification
                 </CardTitle>
                 <CardDescription>
-                  Send a push notification to all users who have enabled them.
+                  Send a push notification to all users who have enabled them. This appears even when the app is closed.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -201,12 +215,21 @@ export default function AdminPage() {
                 </Button>
               </CardContent>
             </Card>
+            
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>How FCM Tokens Work</AlertTitle>
+              <AlertDescription>
+                FCM tokens for Push Notifications will only appear below after users have gone to the <strong>Settings</strong> page and enabled them.
+              </AlertDescription>
+            </Alert>
+
 
             <Card>
               <CardHeader>
                 <CardTitle>User FCM Tokens</CardTitle>
                 <CardDescription>
-                  List of users and their registered Firebase Cloud Messaging tokens.
+                  List of users and their registered Firebase Cloud Messaging (FCM) tokens for Push Notifications.
                 </CardDescription>
               </CardHeader>
               <CardContent>
