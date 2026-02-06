@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   
   const [avatarKey, setAvatarKey] = useState(Date.now());
   
@@ -177,7 +178,9 @@ export default function SettingsPage() {
       });
       return;
     }
+    setIsRequestingPermission(true);
     await requestPermission(firestore, user.uid);
+    setIsRequestingPermission(false);
   };
 
 
@@ -315,9 +318,18 @@ export default function SettingsPage() {
                     { isSupported && (
                         <>
                             {permission === 'default' && (
-                                <Button onClick={handleEnableNotifications}>
-                                    <Bell className="mr-2 h-4 w-4" />
-                                    Enable Notifications
+                                <Button onClick={handleEnableNotifications} disabled={isRequestingPermission}>
+                                    {isRequestingPermission ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Requesting...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Bell className="mr-2 h-4 w-4" />
+                                            Enable Notifications
+                                        </>
+                                    )}
                                 </Button>
                             )}
                              {permission === 'denied' && (
@@ -330,7 +342,12 @@ export default function SettingsPage() {
                                 <div className="flex items-start gap-2.5 text-muted-foreground text-sm p-3 bg-amber-500/10 border border-amber-500/20 rounded-md">
                                     <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                     <p>Permission is granted, but we couldn't save your notification token. Please try again.</p>
-                                    <Button onClick={handleEnableNotifications} size="sm" variant="outline" className="ml-auto">Retry</Button>
+                                    <Button onClick={handleEnableNotifications} size="sm" variant="outline" className="ml-auto" disabled={isRequestingPermission}>
+                                      {isRequestingPermission ? (
+                                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                      ) : null}
+                                      Retry
+                                    </Button>
                                 </div>
                             )}
                              {!isLoading.auth && !isLoading.profile && !isLoading.serviceWorker && permissionGranted && tokenInFirestore && serviceWorkerActive && (
