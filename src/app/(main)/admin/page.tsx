@@ -76,6 +76,7 @@ export default function AdminPage() {
         title: notificationTitle,
         body: notificationBody,
         icon: '/logo.svg',
+        url: '/discover', // Direct users to the discover page on click
       });
 
       toast({

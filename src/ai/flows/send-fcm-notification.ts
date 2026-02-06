@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A server action for sending FCM notifications. This has been made more robust
@@ -40,7 +41,7 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: input.tokens?.length || 0, invalidTokens: [] };
     }
 
-    const { tokens, title, body, icon } = input;
+    const { tokens, title, body, icon, url } = input;
 
     const validTokens = Array.isArray(tokens) ? tokens.filter(t => typeof t === 'string' && t.length > 0) : [];
 
@@ -50,15 +51,24 @@ export async function sendFcmNotification(
     
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        // Using `data` payload lets our service worker handle the notification display,
-        // which is more reliable and flexible than using the `notification` payload.
-        data: {
+        // The `notification` payload is displayed automatically by the browser/OS
+        // when the app is in the background.
+        notification: {
             title: title || "New Message",
             body: body || "You have a new message",
-            icon: icon || '/logo.svg',
-            url: '/chat', // URL to open on notification click
+            imageUrl: icon, // Use 'imageUrl' for the icon in the notification payload
         },
+        // The `data` payload is sent to the service worker so it knows
+        // which URL to open when the notification is clicked.
+        data: {
+          url: url || '/',
+        },
+        // Webpush-specific config for further customization.
         webpush: {
+            fcmOptions: {
+                // This link is a fallback for browsers that support it directly.
+                link: url || '/',
+            },
             headers: {
                 Urgency: 'high',
             },
