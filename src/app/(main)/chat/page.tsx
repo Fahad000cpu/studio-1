@@ -225,18 +225,24 @@ export default function ChatPage() {
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
-  // Yahan se asli PUSH NOTIFICATION (FCM) bheja jaata hai, In-App Message nahi.
   const sendChatNotification = async (body: string, image?: string) => {
     if (!selectedChat || !user) return;
     
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
+
     if (!recipientTokens || recipientTokens.length === 0) {
-        return; // No tokens to send to
+      toast({
+          variant: 'destructive',
+          title: 'Notification Not Sent',
+          description: `${selectedChat.name || 'The recipient'} cannot receive push notifications. They need to enable it in their settings.`,
+          duration: 8000,
+      });
+      return;
     }
 
     try {
       const result = await sendFcmNotification({
-        tokens: [...new Set(recipientTokens)], // Send to unique tokens
+        tokens: [...new Set(recipientTokens)],
         title: user.displayName || 'New Message',
         body: body,
         icon: user.photoURL || '/logo.svg',
@@ -244,7 +250,6 @@ export default function ChatPage() {
         image: image,
       });
   
-      // SILENTLY clean up invalid tokens without notifying the sender
       if (result.invalidTokens && result.invalidTokens.length > 0) {
         const recipientUserRef = doc(firestore, 'users', selectedChat.id);
         updateDocumentNonBlocking(recipientUserRef, {
@@ -253,7 +258,6 @@ export default function ChatPage() {
       }
     } catch (error: any) {
       console.error('Failed to send chat notification:', error);
-      // Only show a toast for a REAL, unexpected error. Don't show for cleanup.
       if (error.message && !error.message.includes('registration-token-not-registered')) {
         toast({
           variant: 'destructive',
@@ -270,7 +274,7 @@ export default function ChatPage() {
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
 
     const messageText = newMessage;
-    setNewMessage(''); // Clear input immediately for better UX
+    setNewMessage('');
 
     const isLink = urlRegex.test(messageText.trim());
     addDocumentNonBlocking(messagesCollection, {
@@ -282,7 +286,6 @@ export default function ChatPage() {
       mediaUrl: null,
     });
     
-    // YEH FUNCTION CHITTHI (PUSH NOTIFICATION) BHEJTA HAI.
     await sendChatNotification(messageText);
 };
 
