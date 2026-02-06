@@ -14,7 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info, Copy } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Copy, Link } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
@@ -33,6 +33,7 @@ export default function AdminPage() {
 
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
+  const [notificationUrl, setNotificationUrl] = useState('');
   const [isSending, setIsSending] = useState(false);
   
   const isLoading = isAdminLoading || usersLoading;
@@ -76,7 +77,7 @@ export default function AdminPage() {
         title: notificationTitle,
         body: notificationBody,
         icon: '/logo.svg',
-        url: '/discover', // Direct users to the discover page on click
+        url: notificationUrl || '/discover', // Direct users to the discover page on click
       });
 
       toast({
@@ -85,6 +86,7 @@ export default function AdminPage() {
       });
       setNotificationTitle('');
       setNotificationBody('');
+      setNotificationUrl('');
     } catch (error) {
       console.error('Failed to send notification', error);
       toast({
@@ -171,6 +173,16 @@ export default function AdminPage() {
                   onChange={(e) => setNotificationBody(e.target.value)}
                   disabled={isSending}
                 />
+                <div className="relative">
+                  <Link className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Optional: Notification URL (e.g., /products)"
+                    className="pl-10"
+                    value={notificationUrl}
+                    onChange={(e) => setNotificationUrl(e.target.value)}
+                    disabled={isSending}
+                  />
+                </div>
                 <Button onClick={handleSendNotification} disabled={isSending}>
                   <Send className="mr-2 h-4 w-4" />
                   {isSending ? 'Sending...' : 'Send Notification'}
