@@ -19,44 +19,42 @@ self.addEventListener("activate", () => self.clients.claim());
 
 // --- Custom Push Notification Handler ---
 self.addEventListener("push", (event) => {
-  // Define the async function that will handle the push event logic.
-  const handlePush = async () => {
-    // Set default title and options for the notification.
-    let title = "ConnectSphere";
-    let options: NotificationOptions = {
-      body: "You have a new message.",
-      icon: "/logo.svg",
-      badge: "/logo.svg",
-      vibrate: [200, 100, 200],
-    };
+  const eventData = event.data;
 
-    // Check if the push event has any data.
-    if (event.data) {
-      try {
-        // Try to parse the data as JSON.
-        const payload = event.data.json();
-        // Overwrite the defaults with data from the payload.
-        title = payload.title || title;
-        options = {
-          ...options,
-          body: payload.body || options.body,
-          icon: payload.icon || options.icon,
-          image: payload.image, // This can be undefined, which is fine.
-        };
-      } catch (e) {
-        // If parsing as JSON fails, assume the data is plain text.
-        console.error("Push event data was not valid JSON. Falling back to text.", e);
-        options.body = event.data.text();
-      }
-    }
-
-    // Display the notification to the user.
-    await self.registration.showNotification(title, options);
+  // Default title and options
+  let title = "ConnectSphere";
+  let options: NotificationOptions = {
+    body: "You have a new message.",
+    icon: "/logo.svg",
+    badge: "/logo.svg",
+    vibrate: [200, 100, 200],
   };
 
-  // Tell the browser to wait until our async function has finished executing.
-  event.waitUntil(handlePush());
+  if (eventData) {
+    try {
+      // Prefer parsing as JSON
+      const payload = eventData.json();
+      title = payload.title || title;
+      options = {
+        ...options,
+        body: payload.body || options.body,
+        icon: payload.icon || options.icon,
+        image: payload.image,
+      };
+    } catch (e) {
+      // If JSON parsing fails, fall back to plain text
+      console.warn("Push data was not JSON, falling back to text.");
+      options.body = eventData.text();
+    }
+  }
+
+  // Create the notification promise
+  const notificationPromise = self.registration.showNotification(title, options);
+
+  // Ensure the browser waits for the notification to be shown.
+  event.waitUntil(notificationPromise);
 });
+
 
 // --- Serwist Default Cache Handler ---
 // This handles caching for Next.js routes and assets.
