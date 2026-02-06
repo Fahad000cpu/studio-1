@@ -20,19 +20,16 @@ self.addEventListener("activate", () => self.clients.claim());
 
 // --- Custom Push Notification Handler ---
 self.addEventListener("push", (event: PushEvent) => {
-  // This function is executed when a push message is received.
   const handlePushEvent = async () => {
-    // Default title and options
     const title = "ConnectSphere";
     let options: NotificationOptions = {
       body: "You have a new message.",
       icon: "/logo.svg",
       badge: "/logo.svg",
       vibrate: [200, 100, 200],
-      data: { url: "/" }, // Default URL to open on click
+      data: { url: self.location.origin },
     };
 
-    // Check if there's data and try to parse it
     if (event.data) {
       try {
         const payload = event.data.json();
@@ -46,20 +43,17 @@ self.addEventListener("push", (event: PushEvent) => {
           },
         };
       } catch (e) {
-        // If JSON parsing fails, use the data as plain text for the body
         try {
             options.body = event.data.text();
         } catch (textErr) {
-            // Can't even parse as text, use default.
+            console.error("Push event data could not be parsed as JSON or text.", textErr);
         }
       }
     }
 
-    // Show the notification.
     await self.registration.showNotification(title, options);
   };
 
-  // Tell the browser to wait for our async function to finish.
   event.waitUntil(handlePushEvent());
 });
 
@@ -90,7 +84,7 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.waitUntil(handleNotificationClick());
 });
 
-
 // --- Serwist Default Cache Handler ---
-// This handles caching for Next.js routes and assets.
-defaultCache();
+// This was removed as it was likely causing script evaluation to fail.
+// Pre-caching via precacheAndRoute is still active.
+// defaultCache();
