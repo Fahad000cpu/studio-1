@@ -5,13 +5,12 @@ import * as admin from 'firebase-admin';
 import type { SendFcmNotificationInput, SendFcmNotificationOutput } from '@/types/fcm';
 
 // --- Simplified, top-level initialization ---
-// This code runs once when the module is loaded on the server.
 if (admin.apps.length === 0) {
   try {
     admin.initializeApp();
-    console.log("Firebase Admin SDK initialized for the first time.");
+    console.log("Firebase Admin SDK initialized successfully.");
   } catch (error: any) {
-    console.error("CRITICAL: Failed to initialize Firebase Admin SDK on load.", error.message);
+    console.error("CRITICAL: Failed to initialize Firebase Admin SDK.", error.message);
   }
 }
 
@@ -19,11 +18,9 @@ export async function sendFcmNotification(
     input: SendFcmNotificationInput
   ): Promise<SendFcmNotificationOutput> {
     
-    // --- Guard clause: Check if SDK is properly initialized ---
     if (admin.apps.length === 0) {
         const errorMessage = "Firebase Admin SDK is not initialized. Cannot send notification.";
         console.error(errorMessage);
-        // Throw an error that the client-side catch block will handle.
         throw new Error(errorMessage);
     }
     
@@ -35,19 +32,18 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
-    const dataPayload: { [key: string]: string } = {
-        title: title || "New Message",
-        body: body || "You have a new message",
-        icon: icon || '/logo.svg',
-        url: url || '/',
-    };
-    if (image) {
-        dataPayload.image = image;
-    }
-
+    // This is a data-only payload. The service worker MUST handle it.
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        data: dataPayload,
+        data: {
+            title: title || "New Message",
+            body: body || "You have a new message",
+            icon: icon || '/logo.svg',
+            url: url || '/',
+            ...(image && { image: image }),
+        },
+        // IMPORTANT: We configure webpush to deliver this as a high-priority background message
+        // so our service worker always wakes up.
         webpush: {
             headers: {
                 Urgency: 'high',
@@ -55,7 +51,7 @@ export async function sendFcmNotification(
         },
     };
 
-    console.log(`Sending FCM data message to ${validTokens.length} token(s).`);
+    console.log(`Sending data-only FCM message to ${validTokens.length} token(s).`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast(message);

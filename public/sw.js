@@ -1,63 +1,73 @@
 
-// This is the service worker file.
-// It runs in the background and handles push notifications.
+// public/sw.js
 
+// This listener is for data-only push messages. It MUST be able to
+// construct and show a notification. It works whether the app tab is open, 
+// in the background, or closed.
 self.addEventListener('push', (event) => {
-  let data;
-  try {
-    data = event.data.json();
-  } catch (e) {
-    console.error('Push event data is not valid JSON:', event.data.text());
-    data = {
-        title: 'New Notification',
-        body: event.data.text(),
+    console.log('[sw.js] Push Received.');
+
+    if (!event.data) {
+        console.log('[sw.js] Push event but no data');
+        return;
+    }
+
+    console.log(`[sw.js] Raw push data: "${event.data.text()}"`);
+
+    let notificationData;
+    try {
+        // The data sent from the Admin SDK is nested under a `data` property
+        const fcmPayload = event.data.json();
+        notificationData = fcmPayload.data;
+    } catch (e) {
+        console.error('[sw.js] Failed to parse JSON, treating as text.', e);
+        notificationData = {
+            title: 'New Message',
+            body: event.data.text(),
+            icon: '/logo.svg',
+            url: '/'
+        };
+    }
+
+    const title = notificationData.title || 'New Notification';
+    const options = {
+        body: notificationData.body,
+        icon: notificationData.icon,
+        image: notificationData.image, // `image` is a standard Notification API option
+        data: {
+            url: notificationData.url, // Pass custom data to the click handler
+        },
     };
-  }
 
-  if (!data) {
-    console.error('Push event has no data.');
-    return;
-  }
-
-  const title = data.title || 'ConnectSphere';
-  const options = {
-    body: data.body || 'You have a new message.',
-    icon: data.icon || '/logo.svg', // Small icon
-    badge: '/logo.svg', // Small icon for notification tray on Android
-    image: data.image, // Optional large image
-    data: {
-      url: data.url || '/', // URL to open on click
-    },
-  };
-
-  event.waitUntil(self.registration.showNotification(title, options));
+    event.waitUntil(self.registration.showNotification(title, options));
 });
 
+// This listener handles what happens when a user clicks the notification.
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
+    console.log('[sw.js] Notification click received.');
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Check if a window is already open at the target URL
-      for (const client of clientList) {
-        if (new URL(client.url).href === urlToOpen && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // If not, open a new window
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
-});
+    event.notification.close();
 
-// Boilerplate to ensure the new service worker activates quickly.
-self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting());
-});
+    const urlToOpen = event.notification.data.url || '/';
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            // Check if a window/tab of our app is already open.
+            for (const client of clientList) {
+                if (new URL(client.url).origin === self.location.origin) {
+                    // If so, focus it and navigate to the correct URL.
+                    if (client.navigate) {
+                        client.navigate(urlToOpen);
+                    }
+                    if (client.focus) {
+                        return client.focus();
+                    }
+                }
+            }
+            // If no window is open, open a new one.
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
 });
