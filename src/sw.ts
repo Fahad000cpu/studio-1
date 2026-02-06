@@ -25,35 +25,31 @@ self.addEventListener("activate", () => {
 
 // Your custom service worker logic goes here.
 self.addEventListener("push", (event) => {
-  const eventData = event as PushEvent;
-  
-  let notificationData = {
-    title: "New Notification",
-    body: "You have a new message.",
-    icon: "/logo.svg",
-    image: undefined as string | undefined,
-  };
-
-  if (eventData.data) {
-    try {
-      const parsedData = eventData.data.json();
-      // Ensure parsedData is an object before spreading
-      if (typeof parsedData === 'object' && parsedData !== null) {
-        notificationData = { ...notificationData, ...parsedData };
-      }
-    } catch (e) {
-      console.error("Push event data could not be parsed as JSON:", e);
-    }
+  if (!event.data) {
+    console.warn("Push event but no data");
+    return;
   }
 
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    console.error("Push event data is not valid JSON:", e);
+    // Fallback for plain text data if needed
+    data = {
+      title: "New Notification",
+      body: event.data.text(),
+    };
+  }
+  
+  const title = data.title || "ConnectSphere";
   const options = {
-    body: notificationData.body,
-    icon: notificationData.icon,
-    image: notificationData.image,
+    body: data.body || "You have a new message.",
+    icon: data.icon || "/logo.svg",
+    image: data.image,
   };
 
-  const promiseChain = self.registration.showNotification(notificationData.title, options);
-
+  const promiseChain = self.registration.showNotification(title, options);
   event.waitUntil(promiseChain);
 });
 
