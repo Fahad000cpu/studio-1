@@ -7,10 +7,6 @@ declare global {
   interface SerwistWorkerGlobalScope extends SerwistGlobalConfig {
     __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
   }
-  interface WindowEventMap {
-    "push": PushEvent;
-    "notificationclick": NotificationEvent;
-  }
 }
 
 declare const self: SerwistWorkerGlobalScope;
