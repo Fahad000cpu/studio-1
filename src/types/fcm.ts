@@ -9,4 +9,5 @@ export type SendFcmNotificationInput = {
 export type SendFcmNotificationOutput = {
   successCount: number;
   failureCount: number;
+  invalidTokens?: string[];
 };

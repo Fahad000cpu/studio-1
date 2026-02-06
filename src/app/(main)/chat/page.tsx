@@ -8,6 +8,7 @@ import {
   deleteDoc,
   doc,
   GeoPoint,
+  arrayRemove,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -26,6 +27,7 @@ import {
   useCollection,
   useMemoFirebase,
   deleteDocumentNonBlocking,
+  updateDocumentNonBlocking,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -234,7 +236,6 @@ export default function ChatPage() {
     const messageText = newMessage;
     setNewMessage(''); // Clear input immediately for better UX
 
-    // Optimistically add message to local state
     const isLink = urlRegex.test(messageText.trim());
     addDocumentNonBlocking(messagesCollection, {
       text: messageText,
@@ -245,7 +246,7 @@ export default function ChatPage() {
       mediaUrl: null,
     });
     
-    // Asynchronously send FCM notification to the recipient
+    // Asynchronously send FCM notification and handle self-healing
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean);
     if (recipientTokens && recipientTokens.length > 0) {
         try {
@@ -256,14 +257,27 @@ export default function ChatPage() {
                 body: messageText,
                 icon: user.photoURL || '/logo.svg',
             });
+            
             console.log('Notification send result:', result);
+
             if (result.failureCount > 0) {
-                toast({
+                 toast({
                     variant: 'destructive',
                     title: 'Notification Issue',
-                    description: `Could not send notification to ${result.failureCount} device(s). The recipient may need to re-enable notifications.`,
+                    description: `Could not send notification to ${result.failureCount} device(s). We will attempt to clean up invalid device records.`,
+                    duration: 7000,
                 });
             }
+
+            // Self-healing: Remove invalid tokens from the database
+            if (result.invalidTokens && result.invalidTokens.length > 0) {
+                console.log("Attempting to remove invalid tokens:", result.invalidTokens);
+                const recipientUserRef = doc(firestore, "users", selectedChat.id);
+                updateDocumentNonBlocking(recipientUserRef, {
+                    fcmTokens: arrayRemove(...result.invalidTokens)
+                });
+            }
+
         } catch (error) {
             console.error("Failed to send chat notification:", error);
             toast({
