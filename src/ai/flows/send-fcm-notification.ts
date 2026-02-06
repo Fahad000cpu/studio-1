@@ -67,17 +67,10 @@ const sendFcmTool = ai.defineTool(
         const message: admin.messaging.MulticastMessage = {
             tokens,
             // The `data` payload is received by the service worker for custom handling.
-            // It MUST be a string.
+            // It MUST be a string. By sending a data-only payload, we ensure
+            // the service worker's `push` event is always triggered.
             webpush: {
                 data: JSON.stringify(webpushDataPayload),
-            },
-            // The `notification` payload is a fallback for mobile devices or when the
-            // browser/FCM handles the notification automatically (e.g., app in background).
-            notification: {
-                title,
-                body,
-                ...(icon && { icon }),
-                ...(image && { image }),
             },
         };
 
