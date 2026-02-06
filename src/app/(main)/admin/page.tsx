@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -14,14 +14,24 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone, Trash2 } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
-import { collection } from 'firebase/firestore';
+import { collection, doc, arrayRemove } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+  } from "@/components/ui/alert-dialog"
 
 export default function AdminPage() {
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
@@ -37,15 +47,29 @@ export default function AdminPage() {
   const [notificationImage, setNotificationImage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [installationId, setInstallationId] = useState<string | null>(null);
+  const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
   
   const isLoading = isAdminLoading || usersLoading;
 
   useEffect(() => {
-    // Retrieve the installation ID from sessionStorage when the component mounts
-    const id = sessionStorage.getItem('firebaseInstallationId');
-    if (id) {
+    // This reliably polls for the installation ID, as it might be set after the initial render.
+    const interval = setInterval(() => {
+      const id = sessionStorage.getItem('firebaseInstallationId');
+      if (id) {
         setInstallationId(id);
-    }
+        clearInterval(interval);
+      }
+    }, 500);
+
+    // Stop polling after 10 seconds to prevent an infinite loop
+    const timeout = setTimeout(() => {
+        clearInterval(interval);
+    }, 10000);
+
+    return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+    };
   }, []);
 
   const handleSendNotification = async () => {
@@ -128,6 +152,21 @@ export default function AdminPage() {
     }
   };
 
+  const handleConfirmDeleteToken = () => {
+    if (!tokenToDelete) return;
+
+    const userDocRef = doc(firestore, 'users', tokenToDelete.userId);
+    updateDocumentNonBlocking(userDocRef, {
+        fcmTokens: arrayRemove(tokenToDelete.token)
+    });
+
+    toast({
+        title: "Token Deleted",
+        description: `The token has been removed from ${tokenToDelete.userName}'s profile.`,
+    });
+    setTokenToDelete(null); // Close the dialog
+  };
+
 
   return (
     <div className="container mx-auto">
@@ -139,6 +178,28 @@ export default function AdminPage() {
           Manage application settings, users, and messaging.
         </p>
       </div>
+
+      <AlertDialog open={!!tokenToDelete} onOpenChange={() => setTokenToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the selected FCM token for user <strong>{tokenToDelete?.userName}</strong>.
+                <Badge variant="secondary" className="font-mono text-xs max-w-full truncate block mt-2 p-2">
+                    {tokenToDelete?.token}
+                </Badge>
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDeleteToken} className="bg-destructive hover:bg-destructive/90">
+                Delete Token
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
       <div className="space-y-8">
         <Card>
           <CardHeader>
@@ -194,7 +255,7 @@ export default function AdminPage() {
                           ) : (
                               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                                   <Info className="h-4 w-4" />
-                                  <p>Installation ID nahi mila. Page ko refresh karein.</p>
+                                  <p>Installation ID nahi mila. Thoda intezaar karein ya page ko refresh karein.</p>
                               </div>
                           )}
                       </CardContent>
@@ -310,6 +371,9 @@ export default function AdminPage() {
                                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyToken(token)}>
                                             <Copy className="h-3 w-3" />
                                         </Button>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setTokenToDelete({ userId: u.id, token, userName: u.name })}>
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
                                       </div>
                                     ))}
                                   </div>
@@ -332,3 +396,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
