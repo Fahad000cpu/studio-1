@@ -17,7 +17,7 @@
  * - /roles_admin/{userId}: Indicates admin privileges.
  *
  * Key Security Decisions:
- * - User profiles are readable by any authenticated user to enable discovery, but writable only by the owner.
+ * - User profiles are readable by any authenticated user to enable discovery, but writable only by the owner or an admin.
  * - Group chat access is determined by membership, enforced through denormalized data to avoid costly 'get' calls.
  * - Affiliate products are only manageable by admins, identified via the roles_admin collection.
  *
@@ -44,18 +44,18 @@ service cloud.firestore {
 
 
     /**
-     * @description Protects user profiles. Any authenticated user can read profiles, but only the owner can write.
+     * @description Protects user profiles. Any authenticated user can read profiles. Only the owner or an admin can write.
      * @path /users/{userId}
      * @allow (get, list) Any signed-in user can discover other user profiles.
-     * @allow (create, update, delete) User 'user123' can create, update, and delete their own profile.
+     * @allow (create, update, delete) User 'user123' can create, update, and delete their own profile. An admin can also update any profile.
      * @deny (create, update, delete) User 'user456' cannot write to user 'user123's profile.
-     * @principle Enforces document ownership for writes, restricting access to a user's own data tree.
+     * @principle Enforces document ownership for writes, restricting access to a user's own data tree, with an exception for admins.
      */
     match /users/{userId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn(); 
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
       allow delete: if isOwner(userId);
     }
     
