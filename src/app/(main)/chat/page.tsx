@@ -225,6 +225,7 @@ export default function ChatPage() {
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
+  // Yahan se asli PUSH NOTIFICATION (FCM) bheja jaata hai, In-App Message nahi.
   const sendChatNotification = async (body: string, image?: string) => {
     if (!selectedChat || !user) return;
     
@@ -281,6 +282,7 @@ export default function ChatPage() {
       mediaUrl: null,
     });
     
+    // YEH FUNCTION CHITTHI (PUSH NOTIFICATION) BHEJTA HAI.
     await sendChatNotification(messageText);
 };
 
