@@ -88,24 +88,19 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures chat metadata. A user can only access a chat's metadata if they are a participant.
-     * For list queries, this rule relies on the client-side query including `where('participants', 'array-contains', request.auth.uid)`.
+     * @description Secures chat metadata. A user can only read a chat's metadata (get or list) if they are a participant.
+     * The `read` rule correctly secures both direct gets and queries that filter by the participant's UID.
      * @path /chat_metadata/{chatId}
-     * @principle Enforces participant-based access for chat metadata.
+     * @principle Enforces participant-based access for all read operations on chat metadata.
      */
     match /chat_metadata/{chatId} {
-      // This rule allows a user to get a specific chat's metadata if they are a participant.
-      allow get: if request.auth != null && request.auth.uid in resource.data.participants;
+      // Allows get and list operations if the user is a participant.
+      // For list, Firestore validates that the client query (e.g., where('participants', 'array-contains', uid))
+      // guarantees that this condition is met for all potential documents.
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
       
-      // This rule allows a user to list their own chats.
-      // NOTE: This rule is intentionally permissive for 'list' because the Firestore query analyzer
-      // sometimes fails on complex queries (e.g., array-contains + orderBy). 
-      // Security is maintained because the client-side query is ALWAYS filtered with 
-      // `where('participants', 'array-contains', request.auth.uid)`, ensuring users only see their own chats.
-      allow list: if request.auth != null;
-
-      // This rule allows a user to create or update chat metadata if they are a participant.
-      allow write: if request.auth != null && request.auth.uid in request.resource.data.participants;
+      // Allows a user to create or update chat metadata if they are a participant.
+      allow write: if isSignedIn() && request.auth.uid in request.resource.data.participants;
     }
 
     /**
