@@ -30,13 +30,9 @@ export default function MainLayout({
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
-  // The useUser hook now handles all redirection logic.
-  // This keeps the layout clean and focused on rendering.
-
-  // The service worker (sw.js) now handles all push notifications,
-  // ensuring a consistent experience whether the app is in the foreground or background.
-
-  // If we are checking auth, or if there's no user and we are about to redirect, show a loader.
+  // If we are still checking for a user, or if there is no user
+  // and we are about to redirect, show a full-screen loader.
+  // The redirection itself is handled by the useUser hook.
   if (isUserLoading || !user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading your sphere..." : "Redirecting..."} />

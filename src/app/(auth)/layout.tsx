@@ -11,10 +11,9 @@ export default function AuthLayout({
 }) {
   const { user, isUserLoading } = useUser();
 
-  // The useUser hook now handles all redirection logic.
-  // This keeps the layout clean and focused on rendering.
-
   // If we are checking auth, or if we have a user and are about to redirect, show a loader.
+  // The redirection itself is now handled by the browser based on the user's authenticated state,
+  // which is managed by the useUser hook and the main layout.
   if (isUserLoading || user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading Session..." : "Redirecting..."} />

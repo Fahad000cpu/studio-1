@@ -6,7 +6,7 @@ import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { Functions } from 'firebase/functions';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
 
 interface FirebaseProviderProps {
@@ -190,36 +190,23 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
 
 /**
  * Hook specifically for accessing the authenticated user's state.
- * This provides the User object, loading status, and any auth errors.
- * It also handles redirecting the user based on their auth state.
+ * It's now a pure hook that just returns the state, without side effects.
+ * Redirection logic is handled by the consuming layouts.
  * @returns {UserHookResult} Object with user, isUserLoading, userError.
  */
 export const useUser = (): UserHookResult => {
   const context = useContext(FirebaseContext);
-  const router = useRouter();
 
   if (context === undefined) {
     throw new Error('useUser must be used within a FirebaseProvider.');
   }
 
-  const { user, isUserLoading, userError } = context; 
-
-  useEffect(() => {
-    if (!isUserLoading) {
-      if (user) {
-        // If user is logged in, ensure they are on a main app page.
-        // This handles the redirect from /login or /signup after successful auth.
-        if (window.location.pathname === '/login' || window.location.pathname === '/signup') {
-          router.push('/discover');
-        }
-      } else {
-        // If no user and not on an auth page, redirect to login.
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-          router.push('/login');
-        }
-      }
-    }
-  }, [user, isUserLoading, router]);
-
-  return { user, isUserLoading, userError };
+  // This hook now simply passes through the authentication state.
+  // The layouts ((auth)/layout.tsx and (main)/layout.tsx) will use this
+  // state to decide whether to render their children or a loading/redirecting state.
+  return { 
+    user: context.user,
+    isUserLoading: context.isUserLoading,
+    userError: context.userError 
+  };
 };
