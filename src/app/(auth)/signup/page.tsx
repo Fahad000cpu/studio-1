@@ -153,9 +153,7 @@ export default function SignupPage() {
         });
         const fullPhoneNumber = values.phone ? `${selectedCountry.dial_code}${values.phone}` : null;
         
-        // IMPORTANT: Redirect immediately after successful login.
-        router.push("/discover");
-        
+        // The AuthLayout will handle redirection.
         // Handle profile creation/update in the background. Do NOT await this.
         handlePostSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
       }
@@ -183,9 +181,7 @@ export default function SignupPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        // IMPORTANT: Redirect immediately after successful login.
-        router.push("/discover");
-
+        // The AuthLayout will handle redirection.
         // Handle profile creation/update in the background. Do NOT await this.
         handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
 

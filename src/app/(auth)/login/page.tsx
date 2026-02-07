@@ -75,7 +75,6 @@ export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const router = useRouter();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -92,7 +91,7 @@ export default function LoginPage() {
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push("/discover");
+      // The AuthLayout will handle the redirection.
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
@@ -181,9 +180,7 @@ export default function LoginPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         
-        // IMPORTANT: Redirect immediately after successful login.
-        router.push("/discover");
-        
+        // The AuthLayout will handle redirection.
         // Handle profile creation/update in the background. Do NOT await this.
         handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
 
