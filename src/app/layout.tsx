@@ -4,7 +4,7 @@ import { PT_Sans, Space_Grotesk } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
-import { FirebaseClientProvider } from '@/firebase';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
@@ -52,5 +52,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    
