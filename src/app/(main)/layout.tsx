@@ -19,6 +19,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Flame } from "lucide-react";
+import { InstallPwaButton } from "@/components/install-pwa-button";
 
 export default function MainLayout({
   children,
@@ -86,6 +87,7 @@ export default function MainLayout({
               <div className="w-full flex-1">
                   {/* Can add breadcrumbs or search here */}
               </div>
+              <InstallPwaButton />
               <ThemeToggle />
               <UserNav />
               </header>
