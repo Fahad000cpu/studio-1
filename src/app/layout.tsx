@@ -1,3 +1,4 @@
+
 import type { Metadata } from 'next';
 import { PT_Sans, Space_Grotesk } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/theme-provider';
@@ -51,3 +52,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -45,31 +46,9 @@ export default function AdminPage() {
   const [notificationUrl, setNotificationUrl] = useState('');
   const [notificationImage, setNotificationImage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [installationId, setInstallationId] = useState<string | null>(null);
   const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
   
   const isLoading = isAdminLoading || usersLoading;
-
-  useEffect(() => {
-    // This reliably polls for the installation ID, as it might be set after the initial render.
-    const interval = setInterval(() => {
-      const id = sessionStorage.getItem('firebaseInstallationId');
-      if (id) {
-        setInstallationId(id);
-        clearInterval(interval);
-      }
-    }, 500);
-
-    // Stop polling after 10 seconds to prevent an infinite loop
-    const timeout = setTimeout(() => {
-        clearInterval(interval);
-    }, 10000);
-
-    return () => {
-        clearInterval(interval);
-        clearTimeout(timeout);
-    };
-  }, []);
 
   const handleSendNotification = async () => {
     if (!notificationTitle || !notificationBody) {
@@ -139,16 +118,6 @@ export default function AdminPage() {
         title: "Token Copied",
         description: "The FCM token has been copied to your clipboard.",
     });
-  };
-
-  const handleCopyInstallationId = () => {
-    if (installationId) {
-        navigator.clipboard.writeText(installationId);
-        toast({
-            title: "Installation ID Copied!",
-            description: "You can now paste this ID in the Firebase Console to test In-App Messages.",
-        });
-    }
   };
 
   const handleConfirmDeleteToken = () => {
@@ -234,31 +203,6 @@ export default function AdminPage() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Card>
-                      <CardHeader>
-                          <CardTitle className="text-base">In-App Messaging Test ID</CardTitle>
-                          <CardDescription>
-                              Firebase Console mein test message bhejne ke liye is ID ko copy karein.
-                          </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                          {installationId ? (
-                              <div className="flex items-center gap-2">
-                                  <Badge variant="secondary" className="font-mono text-sm p-2 flex-grow truncate">
-                                      {installationId}
-                                  </Badge>
-                                  <Button onClick={handleCopyInstallationId} variant="outline" size="icon">
-                                      <Copy className="h-4 w-4" />
-                                  </Button>
-                              </div>
-                          ) : (
-                              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                                  <Info className="h-4 w-4" />
-                                  <p>Installation ID nahi mila. Thoda intezaar karein ya page ko refresh karein.</p>
-                              </div>
-                          )}
-                      </CardContent>
-                    </Card>
                     <div className="pt-2">
                         <h4 className="font-semibold text-md mb-2">Isko Kab Use Karein? (Example Ideas)</h4>
                         <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
@@ -388,3 +332,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
