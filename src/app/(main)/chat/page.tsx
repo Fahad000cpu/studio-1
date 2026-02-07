@@ -112,7 +112,7 @@ export default function ChatPage() {
     () => (user ? query(
         collection(firestore, 'chat_metadata'),
         where('participants', 'array-contains', user.uid)
-        // Note: orderBy is removed to prevent a complex query that can fail security rules.
+        // NOTE: orderBy is removed to prevent a complex query that can fail security rules.
         // Sorting is now handled on the client-side.
     ) : null),
     [firestore, user]
@@ -322,7 +322,7 @@ export default function ChatPage() {
     fileInputRef.current?.click();
   };
 
-  const uploadMedia = async (file: Blob, type: 'image' | 'audio' | 'video') => {
+  const uploadMedia = async (file: Blob, type: 'image' | 'video' | 'audio') => {
     if (!user || !messagesCollection || !chatId || !selectedChat) {
       return;
     }
