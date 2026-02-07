@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Loader2 } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -12,17 +13,20 @@ import {
 
 export const InstallPwaButton = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isAppInstalled, setIsAppInstalled] = useState(true); // Start as true to prevent flash
 
   useEffect(() => {
+    // This effect runs once to check the initial state.
+    if (typeof window !== 'undefined') {
+        if (!window.matchMedia('(display-mode: standalone)').matches) {
+            setIsAppInstalled(false); // Only show button if not installed
+        }
+    }
+
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setInstallPrompt(event);
     };
-
-    // Don't show the button if the app is already installed.
-    if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
-      return;
-    }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
@@ -39,13 +43,15 @@ export const InstallPwaButton = () => {
     const { outcome } = await installPrompt.userChoice;
     if (outcome === 'accepted') {
       console.log('User accepted the PWA installation prompt');
+      setIsAppInstalled(true); // Hide the button after installation
     } else {
       console.log('User dismissed the PWA installation prompt');
     }
     setInstallPrompt(null);
   };
-
-  if (!installPrompt) {
+  
+  // Don't render the button if the app is already installed
+  if (isAppInstalled) {
     return null;
   }
 
@@ -53,13 +59,14 @@ export const InstallPwaButton = () => {
     <TooltipProvider>
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleInstallClick}>
-                    <Download className="h-5 w-5" />
+                {/* The button is disabled with a loading spinner if the prompt isn't ready */}
+                <Button variant="ghost" size="icon" onClick={handleInstallClick} disabled={!installPrompt}>
+                    {installPrompt ? <Download className="h-5 w-5" /> : <Loader2 className="h-5 w-5 animate-spin" />}
                     <span className="sr-only">Install App</span>
                 </Button>
             </TooltipTrigger>
             <TooltipContent>
-                <p>Install App</p>
+                <p>{installPrompt ? 'Install App' : 'Preparing install...'}</p>
             </TooltipContent>
         </Tooltip>
     </TooltipProvider>
