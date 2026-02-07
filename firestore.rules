@@ -44,18 +44,16 @@ service cloud.firestore {
 
 
     /**
-     * @description Protects user profiles. Any authenticated user can list profiles for discovery.
-     * Only the owner or an admin can get a full profile document.
+     * @description Protects user profiles. Any authenticated user can list or get profiles for discovery.
      * Only the owner or an admin can write.
      * @path /users/{userId}
-     * @allow (get) User 'user123' or an admin can get the full profile.
-     * @allow (list) Any signed-in user can list profiles, but be aware this may expose all fields in queries.
+     * @allow (get, list) Any signed-in user can read profiles for discovery.
      * @allow (create, update, delete) User 'user123' can write to their own profile. An admin can also update any profile.
-     * @deny (get) User 'user456' cannot get user 'user123's full profile document.
-     * @principle Enforces document ownership for reads and writes, with an exception for admins.
+     * @deny (get) Unauthenticated users cannot read profiles.
+     * @principle Enforces document ownership for writes, while allowing reads for a social experience.
      */
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
+      allow get: if isSignedIn();
       allow list: if isSignedIn(); 
       allow create: if isOwner(userId) && request.resource.data.id == userId;
       allow update: if isOwner(userId) || isAdmin();
