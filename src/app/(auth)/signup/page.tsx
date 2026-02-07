@@ -191,6 +191,14 @@ export default function SignupPage() {
                 title: "Account Exists",
                 description: "An account already exists with this email. Please sign in with your original method.",
             });
+        } else if (error.code === 'auth/unauthorized-domain') {
+            const domain = window.location.hostname;
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: `The domain '${domain}' is not authorized. Go to Firebase Console > Authentication > Sign-in method > Authorized domains to add it.`,
+                duration: 15000,
+            });
         } else {
             console.error("Google Sign-In Error:", error);
             toast({

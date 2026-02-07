@@ -136,11 +136,21 @@ export default function LoginPage() {
             });
             return;
         }
+        if (error.code === 'auth/unauthorized-domain') {
+            const domain = window.location.hostname;
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: `The domain '${domain}' is not authorized. Go to Firebase Console > Authentication > Sign-in method > Authorized domains to add it.`,
+                duration: 15000,
+            });
+            return;
+        }
         console.error("Google Sign-In Error:", error);
         toast({
             variant: "destructive",
             title: "Google Sign-In Failed",
-            description: error.message || "Could not sign in with Google. Please ensure your domain is authorized in the Firebase console and try again.",
+            description: error.message || "Could not sign in with Google. Please try again later.",
             duration: 10000,
         });
     }
