@@ -279,7 +279,7 @@ export default function LoginPage() {
              toast({
                 variant: "destructive",
                 title: "Configuration or Security Error",
-                description: "Could not send OTP. Please check the following in your Firebase project: 1) Ensure 'Phone' sign-in is enabled. 2) Ensure your website's domain (e.g., localhost) is in 'Authorized domains' (Authentication > Settings). 3) Ensure 'Identity Platform' API is enabled in Google Cloud.",
+                description: "Could not send OTP. This often happens if the project is not on the Blaze plan or if the website's domain is not authorized in the Firebase Console (Authentication > Settings > Authorized domains).",
                 duration: 25000,
             });
         }
@@ -359,9 +359,8 @@ export default function LoginPage() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="email" className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="email">Email</TabsTrigger>
-                <TabsTrigger value="phone">Phone</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-1">
+                <TabsTrigger value="email">Sign in with Email</TabsTrigger>
             </TabsList>
             
             <TabsContent value="email">
@@ -424,100 +423,6 @@ export default function LoginPage() {
                 <GoogleIcon />
                 <span className="ml-2">Sign in with Google</span>
                 </Button>
-            </TabsContent>
-
-            <TabsContent value="phone">
-                 <Form {...phoneForm}>
-                    <form onSubmit={phoneForm.handleSubmit(isOtpSent ? handleVerifyOtp : handleSendOtp)} className="space-y-4 pt-4">
-                        {!isOtpSent ? (
-                            <FormField
-                                control={phoneForm.control}
-                                name="phone"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Phone Number</FormLabel>
-                                        <FormControl>
-                                            <div className="relative">
-                                                <div className="absolute inset-y-0 left-0 flex items-center">
-                                                    <Popover open={openCountryPicker} onOpenChange={setOpenCountryPicker}>
-                                                        <PopoverTrigger asChild>
-                                                            <Button
-                                                                variant="outline"
-                                                                role="combobox"
-                                                                aria-expanded={openCountryPicker}
-                                                                className="w-[130px] justify-between rounded-r-none border-r-0"
-                                                            >
-                                                                {selectedCountry.flag} {selectedCountry.dial_code}
-                                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                            </Button>
-                                                        </PopoverTrigger>
-                                                        <PopoverContent className="w-[300px] p-0">
-                                                            <Command>
-                                                                <CommandInput placeholder="Search country..." />
-                                                                <CommandList>
-                                                                    <CommandEmpty>No country found.</CommandEmpty>
-                                                                    <CommandGroup>
-                                                                        {countries.map((country) => (
-                                                                            <CommandItem
-                                                                                key={country.code}
-                                                                                value={`${country.name} (${country.dial_code})`}
-                                                                                onSelect={() => {
-                                                                                    setSelectedCountry(country)
-                                                                                    setOpenCountryPicker(false)
-                                                                                }}
-                                                                            >
-                                                                                <Check
-                                                                                    className={cn(
-                                                                                        "mr-2 h-4 w-4",
-                                                                                        selectedCountry.code === country.code ? "opacity-100" : "opacity-0"
-                                                                                    )}
-                                                                                />
-                                                                                <span className="mr-2">{country.flag}</span>
-                                                                                <span>{country.name}</span>
-                                                                                <span className="ml-auto text-muted-foreground">{country.dial_code}</span>
-                                                                            </CommandItem>
-                                                                        ))}
-                                                                    </CommandGroup>
-                                                                </CommandList>
-                                                            </Command>
-                                                        </PopoverContent>
-                                                    </Popover>
-                                                </div>
-                                                <Input placeholder="98765 43210" {...field} className="pl-[140px]" />
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        ) : (
-                            <FormField
-                                control={phoneForm.control}
-                                name="otp"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Verification Code</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Enter the 6-digit code" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                             />
-                        )}
-                        <Button type="submit" className="w-full" disabled={isSendingOtp || isVerifyingOtp}>
-                            {isOtpSent 
-                                ? (isVerifyingOtp ? "Verifying..." : "Verify OTP") 
-                                : (isSendingOtp ? "Sending OTP..." : "Send OTP")
-                            }
-                        </Button>
-                        {isOtpSent && (
-                            <Button variant="link" size="sm" className="w-full" onClick={() => setIsOtpSent(false)}>
-                                Back to phone number
-                            </Button>
-                        )}
-                    </form>
-                 </Form>
             </TabsContent>
         </Tabs>
 
