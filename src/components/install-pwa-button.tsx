@@ -15,7 +15,6 @@ export const InstallPwaButton = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // This effect runs only on the client
     const handleBeforeInstallPrompt = (event: Event) => {
       // Prevent the default mini-infobar from appearing on mobile
       event.preventDefault();
@@ -25,8 +24,6 @@ export const InstallPwaButton = () => {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // After the app is installed, the browser will not fire the 'beforeinstallprompt' event again.
-    // We can listen for the 'appinstalled' event to clear our prompt state.
     const handleAppInstalled = () => {
       setInstallPrompt(null);
     };
@@ -46,8 +43,8 @@ export const InstallPwaButton = () => {
     await installPrompt.prompt();
   };
 
-  // The button is always rendered permanently in the header. 
-  // It is only enabled (clickable) when the browser is ready for installation.
+  // The button is always rendered. It is only enabled when the browser has fired the
+  // `beforeinstallprompt` event and made the installation prompt available.
   return (
     <TooltipProvider>
         <Tooltip>
