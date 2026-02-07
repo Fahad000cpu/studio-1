@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, type User } from "firebase/auth";
+import { doc, GeoPoint, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth } from "@/firebase";
+import { useAuth, useFirestore, requestPermission } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
@@ -72,6 +73,7 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
   
@@ -117,11 +119,70 @@ export default function LoginPage() {
     }
 }
 
+ const createUserProfile = async (user: User, name: string, email: string, initialTokens: string[], phoneNumber?: string | null, photoURL?: string | null) => {
+    const userRef = doc(firestore, "users", user.uid);
+  
+    const createUserDoc = (coordinates: GeoPoint | null) => {
+      const userProfile = {
+        id: user.uid,
+        name: name,
+        email: email,
+        phoneNumber: phoneNumber || user.phoneNumber || null,
+        profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+        coordinates,
+        fcmTokens: initialTokens,
+        createdAt: new Date(),
+      };
+      // Use await to ensure the document is created before proceeding.
+      return setDoc(userRef, userProfile);
+    };
+  
+    return new Promise<void>((resolve) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            await createUserDoc(new GeoPoint(latitude, longitude));
+            resolve();
+          },
+          async () => {
+            await createUserDoc(null);
+            resolve();
+          }
+        );
+      } else {
+        createUserDoc(null).then(resolve);
+      }
+    });
+  };
+
+  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
+    const userRef = doc(firestore, 'users', user.uid);
+    try {
+        const token = await requestPermission(firestore, user);
+        const initialTokens = token ? [token] : [];
+  
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            await createUserProfile(user, name, email, initialTokens, phoneNumber, photoURL);
+        } else if (token) {
+            await updateDoc(userRef, {
+                fcmTokens: arrayUnion(token)
+            });
+        }
+    } catch (error) {
+        console.error("Post-signup/login actions failed:", error);
+    }
+  }
+
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     try {
-        await signInWithPopup(auth, provider);
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        // Ensure user profile exists before redirecting
+        await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
         router.push("/discover");
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
