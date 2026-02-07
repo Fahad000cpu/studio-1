@@ -1,8 +1,7 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -17,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone, Trash2 } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
-import { collection, doc, arrayRemove } from 'firebase/firestore';
+import { collection, doc, arrayRemove, updateDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
@@ -49,14 +48,35 @@ export default function AdminPage() {
   const [isSending, setIsSending] = useState(false);
   const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
   const [installationId, setInstallationId] = useState('');
+  const [isDeletingToken, setIsDeletingToken] = useState(false);
 
   useEffect(() => {
-    // This effect runs on the client and retrieves the installation ID from sessionStorage
     if (typeof window !== 'undefined') {
-      const id = sessionStorage.getItem('firebaseInstallationId');
-      if (id) {
-        setInstallationId(id);
-      }
+      // Function to check for the ID
+      const checkAndSetId = () => {
+        const id = sessionStorage.getItem('firebaseInstallationId');
+        if (id) {
+          setInstallationId(id);
+          // If we found it, no need to check again
+          if (intervalId) clearInterval(intervalId);
+        }
+      };
+
+      // Check immediately on mount
+      checkAndSetId();
+
+      // Set up an interval to check every second for a few seconds,
+      // in case the admin page loads before the ID is set.
+      const intervalId = setInterval(checkAndSetId, 1000);
+
+      // Clean up the interval after a certain time (e.g., 10 seconds)
+      // and when the component unmounts.
+      const timeoutId = setTimeout(() => clearInterval(intervalId), 10000);
+
+      return () => {
+        clearInterval(intervalId);
+        clearTimeout(timeoutId);
+      };
     }
   }, []);
   
@@ -132,19 +152,32 @@ export default function AdminPage() {
     });
   };
 
-  const handleConfirmDeleteToken = () => {
-    if (!tokenToDelete) return;
+  const handleConfirmDeleteToken = async () => {
+    if (!tokenToDelete || !firestore) return;
 
+    setIsDeletingToken(true);
     const userDocRef = doc(firestore, 'users', tokenToDelete.userId);
-    updateDocumentNonBlocking(userDocRef, {
+    
+    try {
+      await updateDoc(userDocRef, {
         fcmTokens: arrayRemove(tokenToDelete.token)
-    });
+      });
 
-    toast({
-        title: "Token Deleted",
-        description: `The token has been removed from ${tokenToDelete.userName}'s profile.`,
-    });
-    setTokenToDelete(null); // Close the dialog
+      toast({
+          title: "Token Deleted",
+          description: `The token has been removed from ${tokenToDelete.userName}'s profile.`,
+      });
+      setTokenToDelete(null);
+    } catch (error) {
+       console.error("Failed to delete token:", error);
+       toast({
+            variant: "destructive",
+            title: "Deletion Failed",
+            description: "Could not remove the token. Please check the console for errors or verify your admin permissions.",
+       });
+    } finally {
+      setIsDeletingToken(false);
+    }
   };
 
 
@@ -172,8 +205,8 @@ export default function AdminPage() {
             </AlertDialogHeader>
             <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDeleteToken} className="bg-destructive hover:bg-destructive/90">
-                Delete Token
+            <AlertDialogAction onClick={handleConfirmDeleteToken} className="bg-destructive hover:bg-destructive/90" disabled={isDeletingToken}>
+                {isDeletingToken ? 'Deleting...' : 'Delete Token'}
             </AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
