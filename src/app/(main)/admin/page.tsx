@@ -284,6 +284,7 @@ export default function AdminPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>FCM Tokens</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -292,6 +293,7 @@ export default function AdminPage() {
                         <TableRow key={u.id}>
                           <TableCell className="font-medium">{u.name}</TableCell>
                           <TableCell>{u.email}</TableCell>
+                          <TableCell>{u.phoneNumber || 'N/A'}</TableCell>
                           <TableCell>
                             {(() => {
                               const validTokens = u.fcmTokens?.filter(Boolean) ?? [];
@@ -332,5 +334,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

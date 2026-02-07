@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -28,14 +28,19 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth, useFirestore, requestPermission } from "@/firebase";
-import { Flame } from "lucide-react";
+import { Flame, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { countries, type Country } from "@/lib/countries";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  phone: z.string().optional(),
 });
 
 const GoogleIcon = () => (
@@ -66,12 +71,16 @@ export default function SignupPage() {
   const { toast } = useToast();
   const router = useRouter();
 
+  const [openCountryPicker, setOpenCountryPicker] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       email: "",
       password: "",
+      phone: "",
     },
   });
 
@@ -116,16 +125,13 @@ export default function SignupPage() {
   const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
     const userRef = doc(firestore, 'users', user.uid);
     try {
-        // First, request notification permission and get the token.
         const token = await requestPermission(firestore, user);
         const initialTokens = token ? [token] : [];
   
         const userDoc = await getDoc(userRef);
         if (!userDoc.exists()) {
-            // Now, create the profile, including the token from the start.
             await createUserProfile(user, name, email, initialTokens, phoneNumber, photoURL);
         } else if (token) {
-            // If the profile already exists (e.g., from a previous failed signup), just add the token.
             await updateDoc(userRef, {
                 fcmTokens: arrayUnion(token)
             });
@@ -146,7 +152,8 @@ export default function SignupPage() {
             title: "Verification Email Sent",
             description: "Please check your inbox to verify your email address.",
         });
-        await handlePostSignup(user, values.name, values.email, user.phoneNumber, user.photoURL);
+        const fullPhoneNumber = values.phone ? `${selectedCountry.dial_code}${values.phone}` : null;
+        await handlePostSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
         router.push("/discover");
       }
     } catch (error: any) {
@@ -172,10 +179,7 @@ export default function SignupPage() {
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        
-        // Always run post-signup actions to ensure token is present.
         await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
-        
         router.push("/discover");
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
@@ -245,6 +249,62 @@ export default function SignupPage() {
                   <FormControl>
                     <Input type="password" placeholder="••••••••" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number (Optional)</FormLabel>
+                   <div className="flex gap-2">
+                        <Popover open={openCountryPicker} onOpenChange={setOpenCountryPicker}>
+                            <PopoverTrigger asChild>
+                            <Button
+                                variant="outline"
+                                role="combobox"
+                                aria-expanded={openCountryPicker}
+                                className="w-[130px] justify-between"
+                            >
+                                {selectedCountry.flag} {selectedCountry.dial_code}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Search country..." />
+                                    <CommandList>
+                                        <CommandEmpty>No country found.</CommandEmpty>
+                                        <CommandGroup>
+                                        {countries.map((country) => (
+                                            <CommandItem
+                                            key={country.code}
+                                            value={`${country.name} (${country.dial_code})`}
+                                            onSelect={() => {
+                                                setSelectedCountry(country)
+                                                setOpenCountryPicker(false)
+                                            }}
+                                            >
+                                            <Check
+                                                className={cn(
+                                                "mr-2 h-4 w-4",
+                                                selectedCountry.code === country.code ? "opacity-100" : "opacity-0"
+                                                )}
+                                            />
+                                            {country.flag} <span className="ml-2 font-medium">{country.name}</span> <span className="ml-auto text-muted-foreground">{country.dial_code}</span>
+                                            </CommandItem>
+                                        ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                        <FormControl>
+                            <Input placeholder="98765 43210" {...field} />
+                        </FormControl>
+                    </div>
                   <FormMessage />
                 </FormItem>
               )}
