@@ -6,7 +6,7 @@ import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo } from "firebase/auth";
+import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo, sendEmailVerification } from "firebase/auth";
 import { doc, GeoPoint, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
@@ -141,6 +141,11 @@ export default function SignupPage() {
       const user = userCredential.user;
       if (user) {
         await updateProfile(user, { displayName: values.name });
+        await sendEmailVerification(user);
+        toast({
+            title: "Verification Email Sent",
+            description: "Please check your inbox to verify your email address.",
+        });
         await handlePostSignup(user, values.name, values.email, user.phoneNumber, user.photoURL);
         router.push("/discover");
       }
