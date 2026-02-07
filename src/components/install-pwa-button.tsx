@@ -13,27 +13,20 @@ import {
 
 export const InstallPwaButton = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isInstalled, setIsInstalled] = useState(true); // Assume installed to prevent flash on SSR
 
   useEffect(() => {
-    // This effect runs only on the client.
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    setIsInstalled(isStandalone);
-
-    if (isStandalone) {
-      return; // No need for further listeners if already installed
-    }
-
+    // This effect runs only on the client
     const handleBeforeInstallPrompt = (event: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
       event.preventDefault();
+      // Stash the event so it can be triggered later.
       setInstallPrompt(event);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // This event fires after the user accepts the installation prompt
     const handleAppInstalled = () => {
-      setIsInstalled(true);
+      // After installation, clear the prompt to disable the button
       setInstallPrompt(null);
     };
     window.addEventListener('appinstalled', handleAppInstalled);
@@ -48,15 +41,13 @@ export const InstallPwaButton = () => {
     if (!installPrompt) {
       return;
     }
+    // Show the install prompt to the user
     await installPrompt.prompt();
-    // The 'appinstalled' event will handle hiding the button after success
   };
   
-  if (isInstalled) {
-    return null; // Don't render anything if the app is installed or on the server
-  }
-
-  // If not installed, always render the button. Its state will be managed by `installPrompt`.
+  // As per your request, the button is now permanently visible in the header.
+  // It will be disabled with a loading spinner until the browser is ready for installation.
+  // After installation, it will return to this disabled state on future visits.
   return (
     <TooltipProvider>
         <Tooltip>
