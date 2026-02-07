@@ -1,23 +1,21 @@
 {
   "name": "ConnectSphere",
   "short_name": "ConnectSphere",
-  "description": "A modern chat application.",
+  "start_url": "/discover",
+  "display": "standalone",
+  "background_color": "#240945",
+  "theme_color": "#8A2BE2",
+  "description": "A modern chat application to connect with people.",
   "icons": [
     {
       "src": "/logo192.png",
-      "type": "image/png",
       "sizes": "192x192",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
       "src": "/logo512.png",
-      "type": "image/png",
       "sizes": "512x512",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
-  ],
-  "start_url": "/",
-  "display": "standalone",
-  "theme_color": "#8A2BE2",
-  "background_color": "#F5F5F5"
+  ]
 }

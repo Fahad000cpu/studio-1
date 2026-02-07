@@ -3,9 +3,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser, useFirestore, useFirebaseApp } from "@/firebase";
-import { doc, arrayUnion } from 'firebase/firestore';
-import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/firebase";
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -20,9 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Flame, Bell } from "lucide-react";
-import Link from "next/link";
-import { getMessaging, onMessage, isSupported } from 'firebase/messaging';
+import { Flame } from "lucide-react";
 
 export default function MainLayout({
   children,
@@ -30,10 +26,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const firestore = useFirestore();
-  const firebaseApp = useFirebaseApp();
   const router = useRouter();
-  const { toast } = useToast();
 
   useEffect(() => {
     // If auth state is confirmed and there is NO user, redirect them to the login page.
@@ -42,7 +35,6 @@ export default function MainLayout({
     }
   }, [user, isUserLoading, router]);
 
-  // The foreground message handler (onMessage) has been removed.
   // The service worker (sw.js) now handles all push notifications,
   // ensuring a consistent experience whether the app is in the foreground or background.
 

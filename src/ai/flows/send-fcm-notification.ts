@@ -7,6 +7,7 @@ import type { SendFcmNotificationInput, SendFcmNotificationOutput } from '@/type
 // --- Simplified, top-level initialization ---
 if (admin.apps.length === 0) {
   try {
+    // This will use the default credentials (GOOGLE_APPLICATION_CREDENTIALS)
     admin.initializeApp();
     console.log("Firebase Admin SDK initialized successfully.");
   } catch (error: any) {
@@ -32,6 +33,8 @@ export async function sendFcmNotification(
         return { successCount: 0, failureCount: 0, invalidTokens: [] };
     }
     
+    // The service worker will receive this payload.
+    // It expects a specific structure to show the notification correctly.
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
         data: {
@@ -40,9 +43,9 @@ export async function sendFcmNotification(
             icon: icon || '/logo192.png',
             badge: '/logo192.png',
             image: image || '',
-            url: url || '/discover',
-            tag: 'connectsphere-chat',
+            url: url || '/discover', // The URL to open on click
         },
+        // Webpush config for advanced options if needed in the future
         webpush: {
             headers: {
               Urgency: 'high',
@@ -76,6 +79,7 @@ export async function sendFcmNotification(
                     const error = resp.error;
                     const failedToken = validTokens[idx];
                     console.error(`[FCM Action] Token failed: ${failedToken}, Error: ${error?.code} - ${error?.message}`);
+                    // Common codes for tokens that should be removed from the database
                     if (
                         error?.code === 'messaging/registration-token-not-registered' ||
                         error?.code === 'messaging/invalid-registration-token'

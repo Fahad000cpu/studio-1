@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 export function DeviceIdFetcher() {
   const { toast } = useToast();
   const [installationId, setInstallationId] = useState('');
-  const [isFetchingId, setIsFetchingId] = useState(false);
+  const [isFetchingId, setIsFetchingId] = useState(true); // Start fetching on mount
 
   const handleFetchId = async () => {
     setIsFetchingId(true);
@@ -27,7 +28,7 @@ export function DeviceIdFetcher() {
 
         setInstallationId(fid);
         toast({
-            title: 'Installation ID Fetched!',
+            title: 'Device ID Fetched!',
             description: 'The ID has been retrieved and displayed below.',
         });
 
@@ -42,6 +43,10 @@ export function DeviceIdFetcher() {
         setIsFetchingId(false);
     }
   };
+
+  useEffect(() => {
+    handleFetchId();
+  }, []);
 
   const handleCopyId = () => {
     if (!installationId) return;
@@ -61,32 +66,20 @@ export function DeviceIdFetcher() {
             </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <Button onClick={handleFetchId} disabled={isFetchingId}>
-                {isFetchingId ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Fetching ID...
-                    </>
-                ) : (
-                    <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Fetch Device ID
-                    </>
-                )}
-            </Button>
-            {installationId && (
-                <div className="space-y-2">
-                    <Label htmlFor="installationId">Your In-App Messaging Installation ID</Label>
-                    <div className="flex items-center gap-2">
-                        <Input id="installationId" readOnly value={installationId} className="font-mono"/>
-                        <Button variant="outline" size="icon" onClick={handleCopyId}>
-                            <Copy className="h-4 w-4"/>
-                        </Button>
-                    </div>
+            <div className="space-y-2">
+                <Label htmlFor="installationId">Your In-App Messaging Installation ID</Label>
+                <div className="flex items-center gap-2">
+                    <Input id="installationId" readOnly value={installationId || "Fetching..."} disabled={isFetchingId} className="font-mono"/>
+                    <Button variant="outline" size="icon" onClick={handleCopyId} disabled={!installationId}>
+                        <Copy className="h-4 w-4"/>
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={handleFetchId} disabled={isFetchingId}>
+                        {isFetchingId ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
                 </div>
-            )}
+            </div>
             <p className="text-xs text-muted-foreground pt-2">
-                Click the button to get the unique ID for this browser. To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, start a campaign, and use this ID on the "Test on device" screen.
+                This is the unique ID for this browser. To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, start a campaign, and use this ID on the "Test on device" screen.
             </p>
         </CardContent>
     </Card>

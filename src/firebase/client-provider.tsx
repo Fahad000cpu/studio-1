@@ -44,7 +44,6 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   }, []);
 
   useEffect(() => {
-    // This effect registers the vanilla JavaScript service worker.
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/sw.js')

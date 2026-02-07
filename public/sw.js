@@ -1,74 +1,85 @@
-// This is the service worker script for the PWA.
+// This is a basic service worker for PWA capabilities and handling push notifications.
 
-// On install, the service worker will be installed.
+// Listen for the 'install' event, which fires when the service worker is installing.
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
-  // Skip waiting to activate the new service worker immediately.
-  self.skipWaiting();
+  // event.waitUntil(caches.open(CACHE_NAME).then(...)); // Optional: Caching assets
+  self.skipWaiting(); // Force the waiting service worker to become the active service worker.
 });
 
-// On activate, take control of all clients.
+// Listen for the 'activate' event, which fires when the service worker becomes active.
 self.addEventListener('activate', (event) => {
   console.log('Service Worker: Activating...');
-  // This claims control over all uncontrolled clients.
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(self.clients.claim()); // Become the controller for all clients within its scope.
 });
 
-// The fetch event is required for a PWA to be considered installable.
-// This basic handler just passes the request through to the network.
+// Listen for 'fetch' events to handle network requests.
 self.addEventListener('fetch', (event) => {
-  // We are not implementing any caching strategy here,
-  // just fulfilling the PWA requirement.
+  // This is a basic pass-through fetch handler.
+  // For offline capabilities, you would implement a cache-first strategy here.
   event.respondWith(fetch(event.request));
 });
 
-// Listen for push notifications. This is triggered by a data-only FCM message.
+// Listen for 'push' events to handle incoming push notifications.
 self.addEventListener('push', (event) => {
   console.log('Service Worker: Push Received.');
-  let data = {};
-  try {
-    data = event.data ? event.data.json() : {};
-  } catch (e) {
-    console.error('Failed to parse push data:', e);
+
+  if (!event.data) {
+    console.error('Service Worker: Push event but no data');
+    return;
   }
 
-  const title = data.title || 'ConnectSphere';
-  const options = {
-    body: data.body || 'You have a new message.',
-    icon: data.icon || '/logo192.png',
-    badge: data.badge || '/logo192.png',
-    image: data.image,
-    tag: data.tag || 'connectsphere-notification',
-    renotify: true,
-    data: {
-      url: data.url || '/',
-    },
-  };
+  try {
+    const data = event.data.json();
+    console.log('Service Worker: Push data', data);
 
-  event.waitUntil(self.registration.showNotification(title, options));
+    const title = data.title || 'ConnectSphere';
+    const options = {
+      body: data.body || 'You have a new message.',
+      icon: data.icon || '/logo192.png',
+      badge: data.badge || '/logo192.png',
+      image: data.image,
+      data: {
+        url: data.url, // The URL to open when the notification is clicked
+      },
+    };
+
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (e) {
+    console.error('Error parsing push data:', e);
+    // Fallback for plain text notifications
+    const title = 'ConnectSphere';
+    const options = {
+        body: event.data.text(),
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  }
 });
 
-// Handle notification click event.
+// Listen for 'notificationclick' events.
 self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification click Received.');
-  event.notification.close();
+  console.log('Service Worker: Notification clicked.');
+  event.notification.close(); // Close the notification
 
-  const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
+  const urlToOpen = event.notification.data.url || '/';
 
+  // This looks for an existing window/tab with the same URL and focuses it.
+  // If not found, it opens a new one.
   event.waitUntil(
-    clients.matchAll({
+    self.clients.matchAll({
       type: 'window',
       includeUncontrolled: true,
     }).then((clientList) => {
-      // Check if a window is already open with the target URL.
-      for (const client of clientList) {
+      for (let i = 0; i < clientList.length; i++) {
+        const client = clientList[i];
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // If not, open a new window.
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(urlToOpen);
       }
     })
   );

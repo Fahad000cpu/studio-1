@@ -89,7 +89,7 @@ export default function AdminPage() {
         tokens: uniqueTokens,
         title: notificationTitle,
         body: notificationBody,
-        icon: '/logo.svg',
+        icon: '/logo192.png',
         url: notificationUrl || '/discover',
         image: notificationImage,
       });
@@ -215,7 +215,7 @@ export default function AdminPage() {
                         In-App Messaging (Pop-ups & Banners)
                     </CardTitle>
                     <CardDescription>
-                       Bhejein aise messages jo users ko **app ke andar** dikhein, jab woh app use kar rahe hon.
+                       Bhejein aise messages jo users ko **app ke andar** dikhein, jab woh app use kar rahe hon. Iske liye app ka "Device ID" test karne ke liye istemaal hota hai.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -225,7 +225,6 @@ export default function AdminPage() {
                             <li><b>Naye Features Promote Karna:</b> "Dekhiye hamara naya Status feature!"</li>
                             <li><b>Special Offers Dena:</b> "Affiliate products par is hafte 20% ki chhoot!"</li>
                             <li><b>Users ko Guide Karna:</b> "Welcome! Yahan se aap naye dost dhoondh sakte hain."</li>
-                            <li><b>Announcements Karna:</b> "ConnectSphere ka naya version aa gaya hai!"</li>
                         </ul>
                     </div>
                 </CardContent>
@@ -238,7 +237,7 @@ export default function AdminPage() {
                   Broadcast Push Notifications
                 </CardTitle>
                 <CardDescription>
-                  Bhejein aise notifications jo user ke device par dikhein, **jab app band ho**. Iske liye FCM Push Tokens ki zaroorat hoti hai.
+                  Bhejein aise notifications jo user ke device par dikhein, **jab app band ho**. Iske liye neeche diye gaye 'FCM Tokens' ki zaroorat hoti hai.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">

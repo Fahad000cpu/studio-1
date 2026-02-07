@@ -34,6 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#8A2BE2" />
       </head>
       <body className={cn("font-body antialiased", ptSans.variable, spaceGrotesk.variable)}>
