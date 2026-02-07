@@ -98,7 +98,6 @@ export default function SignupPage() {
         fcmTokens: initialTokens,
         createdAt: new Date(),
       };
-      // Use await to ensure the document is created before proceeding.
       return setDoc(userRef, userProfile);
     };
   
@@ -153,8 +152,12 @@ export default function SignupPage() {
             description: "Please check your inbox to verify your email address.",
         });
         const fullPhoneNumber = values.phone ? `${selectedCountry.dial_code}${values.phone}` : null;
-        await handlePostSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
+        
+        // IMPORTANT: Redirect immediately after successful login.
         router.push("/discover");
+        
+        // Handle profile creation/update in the background. Do NOT await this.
+        handlePostSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -179,8 +182,13 @@ export default function SignupPage() {
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+
+        // IMPORTANT: Redirect immediately after successful login.
         router.push("/discover");
+
+        // Handle profile creation/update in the background. Do NOT await this.
+        handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;

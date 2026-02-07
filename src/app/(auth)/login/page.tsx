@@ -133,7 +133,6 @@ export default function LoginPage() {
         fcmTokens: initialTokens,
         createdAt: new Date(),
       };
-      // Use await to ensure the document is created before proceeding.
       return setDoc(userRef, userProfile);
     };
   
@@ -181,9 +180,13 @@ export default function LoginPage() {
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
-        // Ensure user profile exists before redirecting
-        await handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        
+        // IMPORTANT: Redirect immediately after successful login.
         router.push("/discover");
+        
+        // Handle profile creation/update in the background. Do NOT await this.
+        handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
@@ -237,7 +240,6 @@ export default function LoginPage() {
         setIsResetAlertOpen(false);
         setResetEmail('');
     } catch (error: any) {
-        // To prevent email enumeration attacks, we show the same message for success and "user not found".
         toast({
             title: "Password Reset Email Sent",
             description: `If an account exists for ${resetEmail}, you will receive an email with instructions.`,
