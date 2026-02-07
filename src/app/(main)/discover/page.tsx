@@ -1,17 +1,14 @@
-
 'use client';
 import { useState } from 'react';
 import DiscoverUsers from "@/components/discover-users";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { DeviceIdFetcher } from '@/components/device-id-fetcher';
 
 export default function DiscoverPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   return (
     <div className="container mx-auto space-y-8">
-      <DeviceIdFetcher />
       <div>
         <div className="mb-8 bg-card/80 p-6 rounded-lg shadow-lg backdrop-blur-sm space-y-4">
           <div>

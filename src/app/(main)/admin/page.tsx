@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -22,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
 import { NotificationPermissionAlert } from '@/components/notification-permission-alert';
+import { DeviceIdFetcher } from '@/components/device-id-fetcher';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -206,6 +206,7 @@ export default function AdminPage() {
 
         {isAdmin && (
           <>
+            <DeviceIdFetcher />
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
