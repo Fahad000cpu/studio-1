@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone, Trash2 } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
@@ -47,6 +48,17 @@ export default function AdminPage() {
   const [notificationImage, setNotificationImage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
+  const [installationId, setInstallationId] = useState('');
+
+  useEffect(() => {
+    // This effect runs on the client and retrieves the installation ID from sessionStorage
+    if (typeof window !== 'undefined') {
+      const id = sessionStorage.getItem('firebaseInstallationId');
+      if (id) {
+        setInstallationId(id);
+      }
+    }
+  }, []);
   
   const isLoading = isAdminLoading || usersLoading;
 
@@ -192,6 +204,40 @@ export default function AdminPage() {
 
         {isAdmin && (
           <>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Info className="h-5 w-5"/>
+                        Device & Testing Information
+                    </CardTitle>
+                    <CardDescription>
+                        Use this information to test features like In-App Messaging for your specific device.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {installationId ? (
+                        <div className="space-y-2">
+                            <Label htmlFor="installationId">In-App Messaging Installation ID</Label>
+                            <div className="flex items-center gap-2">
+                                <Input id="installationId" readOnly value={installationId} className="font-mono"/>
+                                <Button variant="outline" size="icon" onClick={() => {
+                                    navigator.clipboard.writeText(installationId);
+                                    toast({ title: 'Installation ID Copied!' });
+                                }}>
+                                    <Copy className="h-4 w-4"/>
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, and start a new campaign. On the "Test on device" screen, enter this ID.
+                            </p>
+                        </div>
+                    ) : (
+                        <p className="text-sm text-muted-foreground">
+                            In-App Messaging Installation ID not found. It may still be loading. Please wait a moment and refresh.
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
