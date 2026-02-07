@@ -1,79 +1,66 @@
-// This is a basic service worker for handling push notifications.
 
-// Listen for the 'install' event, which signals that the service worker is being installed.
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] installing...');
-  // Skip waiting to ensure the new service worker activates immediately.
-  event.waitUntil(self.skipWaiting());
+  console.log('Service Worker: Install event');
 });
 
-// Listen for the 'activate' event, which signals that the service worker has been activated.
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] activated.');
-  // Claim clients to take control of the page without needing a reload.
-  event.waitUntil(self.clients.claim());
+  console.log('Service Worker: Activate event');
 });
 
-// The core logic: listen for 'push' events from the server.
-self.addEventListener('push', (event) => {
-  console.log('[Service Worker] Push Received.');
-
-  let notificationData = {};
-  
-  // The payload might be a string, so we try to parse it as JSON.
-  try {
-    notificationData = event.data.json();
-  } catch (e) {
-    // If it's not JSON, we'll use the text directly as the body.
-    notificationData = {
-      title: 'New Notification',
-      body: event.data.text(),
-    };
-  }
-
-  // Extract notification details from the parsed data.
-  const title = notificationData.title || 'ConnectSphere';
-  const options = {
-    body: notificationData.body || 'You have a new message.',
-    icon: notificationData.icon || '/logo.svg', // Default icon
-    badge: '/logo.svg', // Badge for the notification bar
-    // 'data' stores extra information, like the URL to open on click.
-    data: {
-      url: notificationData.url || '/',
-    },
-  };
-  
-  // Display the notification.
-  event.waitUntil(
-    self.registration.showNotification(title, options)
+self.addEventListener('fetch', function(event) {
+  // A basic fetch handler to satisfy the PWA installability criteria.
+  // This strategy is network-first. For offline capabilities, this would need to be expanded.
+  event.respondWith(
+    fetch(event.request).catch(function() {
+      // This is a very basic offline fallback. 
+      // A real app would have a cached offline page.
+      return new Response(
+        '<h1>You are offline</h1><p>Please check your internet connection.</p>',
+        { headers: { 'Content-Type': 'text/html' } }
+      );
+    })
   );
 });
 
-// Listen for the 'notificationclick' event, which happens when a user clicks the notification.
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('push', function(event) {
+  console.log('[Service Worker] Push Received.');
+  if (!event.data) {
+    console.log('[Service Worker] Push event but no data');
+    return;
+  }
+  const data = event.data.json();
+  console.log('[Service Worker] Push data: ', data);
+
+  const title = data.title || 'New Message';
+  const options = {
+    body: data.body || 'You have a new message.',
+    icon: data.icon || '/logo.svg',
+    badge: data.badge || '/logo.svg',
+    data: {
+      url: data.url || '/'
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', function(event) {
   console.log('[Service Worker] Notification click Received.');
 
-  // Close the notification.
   event.notification.close();
 
-  // Get the URL from the notification's data payload.
-  const urlToOpen = event.notification.data.url;
+  const urlToOpen = event.notification.data.url || '/';
 
-  // This complex part checks if a window with the target URL is already open.
-  // If it is, it focuses that window. If not, it opens a new one.
   event.waitUntil(
     clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true,
-    }).then((clientList) => {
-      // Check if there's an open window with the same URL.
+      type: 'window'
+    }).then(function(clientList) {
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
-        if (client.url === urlToOpen && 'focus' in client) {
+        if (client.url === '/' && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no matching window is found, open a new one.
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
