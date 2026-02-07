@@ -39,10 +39,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth, useFirestore } from "@/firebase";
-import { Flame, Phone } from "lucide-react";
+import { Flame, Phone, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { countries, type Country } from "@/lib/countries";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -50,7 +55,7 @@ const formSchema = z.object({
 });
 
 const phoneFormSchema = z.object({
-    phone: z.string().min(10, { message: "Please enter a valid phone number." }),
+    phone: z.string().min(1, { message: "Please enter a valid phone number." }),
     otp: z.string().optional(),
 });
 
@@ -95,6 +100,9 @@ export default function LoginPage() {
 
   const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+  
+  const [openCountryPicker, setOpenCountryPicker] = useState(false)
+  const [selectedCountry, setSelectedCountry] = useState<Country>(countries[0]);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -158,7 +166,7 @@ export default function LoginPage() {
         });
     }
     
-    // Cleanup function to clear the verifier when the tab changes or component unmounts.
+    // Cleanup function to clear the verifier when the component unmounts or tab changes.
     return () => {
         if (recaptchaVerifierRef.current) {
             recaptchaVerifierRef.current.clear();
@@ -239,8 +247,7 @@ export default function LoginPage() {
     
     setIsSendingOtp(true);
     try {
-        // Ensure phone number has country code
-        const phoneNumber = values.phone.startsWith('+') ? values.phone : `+${values.phone}`;
+        const phoneNumber = `${selectedCountry.dial_code}${values.phone}`;
         const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
         confirmationResultRef.current = confirmationResult;
         setIsOtpSent(true);
@@ -420,14 +427,58 @@ export default function LoginPage() {
                                 name="phone"
                                 render={({ field }) => (
                                     <FormItem>
-                                    <FormLabel>Phone Number</FormLabel>
-                                    <FormControl>
-                                        <div className="relative">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                            <Input placeholder="+91 98765 43210" {...field} className="pl-10" />
-                                        </div>
-                                    </FormControl>
-                                    <FormMessage />
+                                        <FormLabel>Phone Number</FormLabel>
+                                        <FormControl>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 flex items-center">
+                                                    <Popover open={openCountryPicker} onOpenChange={setOpenCountryPicker}>
+                                                        <PopoverTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                role="combobox"
+                                                                aria-expanded={openCountryPicker}
+                                                                className="w-[130px] justify-between rounded-r-none border-r-0"
+                                                            >
+                                                                {selectedCountry.flag} {selectedCountry.dial_code}
+                                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                            </Button>
+                                                        </PopoverTrigger>
+                                                        <PopoverContent className="w-[300px] p-0">
+                                                            <Command>
+                                                                <CommandInput placeholder="Search country..." />
+                                                                <CommandList>
+                                                                    <CommandEmpty>No country found.</CommandEmpty>
+                                                                    <CommandGroup>
+                                                                        {countries.map((country) => (
+                                                                            <CommandItem
+                                                                                key={country.code}
+                                                                                value={`${country.name} (${country.dial_code})`}
+                                                                                onSelect={() => {
+                                                                                    setSelectedCountry(country)
+                                                                                    setOpenCountryPicker(false)
+                                                                                }}
+                                                                            >
+                                                                                <Check
+                                                                                    className={cn(
+                                                                                        "mr-2 h-4 w-4",
+                                                                                        selectedCountry.code === country.code ? "opacity-100" : "opacity-0"
+                                                                                    )}
+                                                                                />
+                                                                                <span className="mr-2">{country.flag}</span>
+                                                                                <span>{country.name}</span>
+                                                                                <span className="ml-auto text-muted-foreground">{country.dial_code}</span>
+                                                                            </CommandItem>
+                                                                        ))}
+                                                                    </CommandGroup>
+                                                                </CommandList>
+                                                            </Command>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                </div>
+                                                <Input placeholder="98765 43210" {...field} className="pl-[140px]" />
+                                            </div>
+                                        </FormControl>
+                                        <FormMessage />
                                     </FormItem>
                                 )}
                             />
