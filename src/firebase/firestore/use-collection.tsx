@@ -156,8 +156,8 @@ export function useCollection<T = any>(
                 path: path,
             });
             // We set the raw error here so the UI can react to it.
-            // We also emit it for global error handling / boundary.
             setError(contextualError); 
+            // We also emit it for global error handling / boundary.
             errorEmitter.emit('permission-error', contextualError);
         } else {
              setError(err);

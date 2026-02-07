@@ -111,23 +111,12 @@ export default function ChatPage() {
   const chatMetadataCollection = useMemoFirebase(
     () => (user ? query(
         collection(firestore, 'chat_metadata'),
-        where('participants', 'array-contains', user.uid)
-        // NOTE: orderBy is removed to prevent a complex query that can fail security rules.
-        // Sorting is now handled on the client-side.
+        where('participants', 'array-contains', user.uid),
+        orderBy('lastMessageTimestamp', 'desc')
     ) : null),
     [firestore, user]
   );
-  const { data: unsortedChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
-  
-  const chatMetadatas = useMemo(() => {
-    if (!unsortedChatMetadatas) return null;
-    // Perform client-side sorting to ensure the latest chats are always on top.
-    return [...unsortedChatMetadatas].sort((a, b) => {
-        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
-        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
-        return timeB - timeA;
-    });
-  }, [unsortedChatMetadatas]);
+  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
@@ -542,7 +531,7 @@ export default function ChatPage() {
         ) : error ? (
             <div className="p-4 text-center text-sm text-destructive">
                 <p>Could not load chats.</p>
-                <p className="text-xs">Please check your Firestore rules.</p>
+                <p className="text-xs">Please check your Firestore rules and indexes.</p>
             </div>
         ) : filteredChats.length > 0 ? (
           filteredChats.map((metadata) => {
