@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { Flame } from "lucide-react";
+import { InstallPwaButton } from "@/components/install-pwa-button";
 
 export default function AuthLayout({
   children,
@@ -39,6 +40,9 @@ export default function AuthLayout({
   return (
     <main className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
+      <div className="absolute top-4 right-4 z-20">
+        <InstallPwaButton />
+      </div>
       <div className="relative z-10 w-full flex justify-center p-4">
         {children}
       </div>
