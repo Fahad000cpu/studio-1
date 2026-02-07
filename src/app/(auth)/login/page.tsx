@@ -72,8 +72,8 @@ const GoogleIcon = () => (
   );
 
 // This function handles creating/updating the user profile in Firestore.
-// It's now async to be awaited properly.
-const handleLoginOrSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
+// It can run in the background without blocking the UI.
+const handleLoginOrSignup = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
     if (!user) {
         console.error("handleLoginOrSignup called with no user.");
         return;
@@ -86,8 +86,7 @@ const handleLoginOrSignup = async (user: User, name: string, email: string, phon
     
     const userRef = doc(firestore, 'users', user.uid);
 
-    try {
-        const userDoc = await getDoc(userRef);
+    getDoc(userRef).then(userDoc => {
         if (!userDoc.exists()) {
             const userProfile = {
                 id: user.uid,
@@ -99,13 +98,13 @@ const handleLoginOrSignup = async (user: User, name: string, email: string, phon
                 fcmTokens: [],
                 createdAt: new Date(),
             };
-            await setDoc(userRef, userProfile);
+            setDoc(userRef, userProfile).catch(e => {
+                console.error("Error creating user profile in background:", e);
+            });
         }
-    } catch (e) {
-        console.error("Error creating or checking user profile:", e);
-        // We don't re-throw, as the login itself was successful.
-        // We can add more robust error handling/reporting here if needed.
-    }
+    }).catch(e => {
+        console.error("Error checking user profile in background:", e);
+    });
 };
 
 
@@ -166,12 +165,9 @@ export default function LoginPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         
-        // **GUARANTEED REDIRECT LOGIC**
-        // 1. Await the profile creation/check
-        await handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
-        
-        // 2. Manually and forcefully redirect after everything is done.
-        router.push('/discover');
+        // Let the AuthLayout handle the redirect.
+        // We can fire-and-forget the profile creation in the background.
+        handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
