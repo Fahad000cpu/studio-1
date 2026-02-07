@@ -283,14 +283,15 @@ export default function ChatPage() {
       chatId: chatId,
     });
 
-    await updateChatMetadata(messageText);
+    const metadataText = isLink ? '🔗 Link' : messageText;
+    await updateChatMetadata(metadataText);
 
     const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
     if (recipientTokens.length > 0) {
       sendFcmNotification({
         tokens: recipientTokens,
         title: user.displayName || 'New Message',
-        body: messageText,
+        body: metadataText,
         url: `/chat?chatWith=${user.uid}`,
         icon: user.photoURL || undefined,
       }).catch(err => console.error("[ConnectSphere Chat] Failed to send text message notification:", err));
