@@ -24,7 +24,6 @@ import { Flame, Bell } from "lucide-react";
 import Link from "next/link";
 import { getMessaging, onMessage, isSupported } from 'firebase/messaging';
 import { InstallPwaButton } from "@/components/install-pwa-button";
-import { initializeInAppMessaging } from "@/firebase/init-in-app-messaging";
 
 export default function MainLayout({
   children,
@@ -69,13 +68,6 @@ export default function MainLayout({
         });
     }
   }, [user, firestore, toast]);
-
-  // New Effect for In-App Messaging Initialization
-  useEffect(() => {
-    if (user && firebaseApp) {
-      initializeInAppMessaging(firebaseApp);
-    }
-  }, [user, firebaseApp]);
 
   // If we are checking auth, or if there's no user and we are about to redirect, show a loader.
   if (isUserLoading || !user) {

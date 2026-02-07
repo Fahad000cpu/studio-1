@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, type ReactNode, useEffect } from 'react';
@@ -55,7 +56,16 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
         .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
         .catch((error) => console.error('Service Worker registration failed:', error));
     }
-  }, []);
+    
+    // Initialize In-App Messaging as soon as the provider mounts on the client.
+    // This ensures the SDK is active and can communicate with the Firebase backend.
+    if (instances.app) {
+      import('@/firebase/init-in-app-messaging').then(({ initializeInAppMessaging }) => {
+        initializeInAppMessaging(instances.app);
+      });
+    }
+
+  }, [instances.app]);
 
   return (
     <FirebaseProvider
