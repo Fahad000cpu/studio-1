@@ -113,45 +113,58 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    if (!auth || activeTab !== 'phone' || isRecaptchaInitialized) {
-      return;
+    // This effect manages the lifecycle of the reCAPTCHA verifier.
+    if (!auth || activeTab !== 'phone') {
+        return;
     }
 
     const recaptchaContainer = document.getElementById('recaptcha-container');
     if (!recaptchaContainer) {
-      console.error("reCAPTCHA container not found");
-      return;
-    }
-    
-    // This check prevents re-creating the verifier if the container already has the widget.
-    if (recaptchaContainer.innerHTML !== '') {
+        console.error("reCAPTCHA container not found");
         return;
     }
-    
-    try {
-      const verifier = new RecaptchaVerifier(auth, recaptchaContainer, {
-        size: 'invisible',
-        callback: (response: any) => {
-          // reCAPTCHA solved, allow signInWithPhoneNumber.
-        },
-      });
-      recaptchaVerifierRef.current = verifier;
-      setIsRecaptchaInitialized(true);
-      
-    } catch (e) {
-      console.error("Error creating RecaptchaVerifier", e);
-    }
-  }, [auth, activeTab, isRecaptchaInitialized]);
 
-  // This effect handles the cleanup when the component is unmounted.
-  useEffect(() => {
+    // Ensure a clean state for the verifier on each render.
+    if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+    }
+    recaptchaContainer.innerHTML = '';
+
+    try {
+        const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            size: 'invisible',
+            callback: () => {
+                // This callback is for user actions on a visible reCAPTCHA.
+                // For invisible, signInWithPhoneNumber triggers the process.
+            },
+            'expired-callback': () => {
+                // Handle expired verification
+                toast({
+                    variant: "destructive",
+                    title: "Verification Expired",
+                    description: "The security check expired. Please try sending the OTP again."
+                });
+                setIsOtpSent(false); // Go back to the phone number input screen
+            }
+        });
+        recaptchaVerifierRef.current = verifier;
+        setIsRecaptchaInitialized(true);
+    } catch (e) {
+        console.error("Error creating RecaptchaVerifier", e);
+        toast({
+            variant: "destructive",
+            title: "Security Setup Failed",
+            description: "Could not initialize security check. Please refresh the page.",
+        });
+    }
+    
+    // Cleanup function to clear the verifier when the tab changes or component unmounts.
     return () => {
         if (recaptchaVerifierRef.current) {
             recaptchaVerifierRef.current.clear();
-            recaptchaVerifierRef.current = null;
         }
-    }
-  }, []);
+    };
+  }, [auth, activeTab, toast]);
 
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
