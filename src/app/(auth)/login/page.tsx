@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -254,28 +253,32 @@ export default function LoginPage() {
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
         console.error("Error sending OTP:", error);
+        // Reset reCAPTCHA on most errors to allow for a retry
+        recaptchaVerifierRef.current?.clear();
+
         if (error.code === 'auth/invalid-phone-number') {
             toast({
                 variant: "destructive",
                 title: "Invalid Phone Number",
-                description: "Please enter the number in international format, including the country code (e.g., +919876543210).",
+                description: `The number format is incorrect. Please ensure it is a valid number for the selected country (${selectedCountry.name}).`,
                 duration: 10000,
             });
-        } else if (error.code === 'auth/operation-not-allowed') {
+        } else if (error.code === 'auth/too-many-requests') {
             toast({
                 variant: "destructive",
-                title: "Phone Sign-In Disabled",
-                description: "Phone sign-in is not enabled. Please check two things: 1) In the Firebase Console, go to Authentication > Sign-in method and ensure 'Phone' is enabled. 2) In your Google Cloud project, ensure the 'Identity Platform' API is enabled.",
-                duration: 20000,
+                title: "Too Many Attempts",
+                description: "You have tried to send an OTP too many times. Please wait a while before trying again.",
+                duration: 10000,
             });
-        } else if (error.code === 'auth/internal-error') {
-            toast({
+        } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/internal-error') {
+             toast({
                 variant: "destructive",
-                title: "Configuration Error",
-                description: "An internal error occurred. This can happen if the 'Identity Platform API' is not enabled in your Google Cloud project. Please check your project settings.",
-                duration: 20000,
+                title: "Configuration or Security Error",
+                description: "Could not send OTP. Please check the following in your Firebase project: 1) Ensure 'Phone' sign-in is enabled. 2) Ensure your website's domain (e.g., localhost) is in 'Authorized domains' (Authentication > Settings). 3) Ensure 'Identity Platform' API is enabled in Google Cloud.",
+                duration: 25000,
             });
-        } else {
+        }
+        else {
             toast({
                 variant: "destructive",
                 title: "Failed to Send OTP",
@@ -553,5 +556,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    
