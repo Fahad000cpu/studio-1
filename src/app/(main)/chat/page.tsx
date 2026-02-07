@@ -108,15 +108,24 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const chatMetadataCollection = useMemoFirebase(
+  const chatMetadataQuery = useMemoFirebase(
     () => (user ? query(
         collection(firestore, 'chat_metadata'),
-        where('participants', 'array-contains', user.uid),
-        orderBy('lastMessageTimestamp', 'desc')
+        where('participants', 'array-contains', user.uid)
     ) : null),
     [firestore, user]
   );
-  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
+  const { data: unsortedChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataQuery);
+
+  const chatMetadatas = useMemo(() => {
+    if (!unsortedChatMetadatas) return null;
+    return [...unsortedChatMetadatas].sort((a, b) => {
+        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
+        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
+        return timeB - timeA;
+    });
+  }, [unsortedChatMetadatas]);
+
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
