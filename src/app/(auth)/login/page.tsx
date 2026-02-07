@@ -5,9 +5,8 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import React, { useEffect, useState, useRef } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc } from 'firebase/firestore';
+import React, { useState } from "react";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -38,27 +37,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth, useFirestore } from "@/firebase";
-import { Flame, Phone, Check, ChevronsUpDown } from "lucide-react";
+import { useAuth } from "@/firebase";
+import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { countries, type Country } from "@/lib/countries";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
 
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
-
-const phoneFormSchema = z.object({
-    phone: z.string().min(1, { message: "Please enter a valid phone number." }),
-    otp: z.string().optional(),
-});
-
 
 const GoogleIcon = () => (
     <svg className="h-5 w-5" viewBox="0 0 24 24" >
@@ -84,25 +72,12 @@ const GoogleIcon = () => (
 
 export default function LoginPage() {
   const auth = useAuth();
-  const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState("email");
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [isRecaptchaInitialized, setIsRecaptchaInitialized] = useState(false);
-
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
-
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
-  
-  const [openCountryPicker, setOpenCountryPicker] = useState(false)
-  const [selectedCountry, setSelectedCountry] = useState<Country>(countries[0]);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -111,69 +86,6 @@ export default function LoginPage() {
       password: "",
     },
   });
-  
-  const phoneForm = useForm<z.infer<typeof phoneFormSchema>>({
-    resolver: zodResolver(phoneFormSchema),
-    defaultValues: {
-        phone: "",
-        otp: "",
-    },
-  });
-
-  useEffect(() => {
-    // This effect manages the lifecycle of the reCAPTCHA verifier.
-    if (!auth || activeTab !== 'phone') {
-        return;
-    }
-
-    const recaptchaContainer = document.getElementById('recaptcha-container');
-    if (!recaptchaContainer) {
-        console.error("reCAPTCHA container not found");
-        return;
-    }
-
-    // Ensure a clean state for the verifier on each render.
-    if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
-    }
-    recaptchaContainer.innerHTML = '';
-
-    try {
-        const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            size: 'invisible',
-            callback: () => {
-                // This callback is for user actions on a visible reCAPTCHA.
-                // For invisible, signInWithPhoneNumber triggers the process.
-            },
-            'expired-callback': () => {
-                // Handle expired verification
-                toast({
-                    variant: "destructive",
-                    title: "Verification Expired",
-                    description: "The security check expired. Please try sending the OTP again."
-                });
-                setIsOtpSent(false); // Go back to the phone number input screen
-            }
-        });
-        recaptchaVerifierRef.current = verifier;
-        setIsRecaptchaInitialized(true);
-    } catch (e) {
-        console.error("Error creating RecaptchaVerifier", e);
-        toast({
-            variant: "destructive",
-            title: "Security Setup Failed",
-            description: "Could not initialize security check. Please refresh the page.",
-        });
-    }
-    
-    // Cleanup function to clear the verifier when the component unmounts or tab changes.
-    return () => {
-        if (recaptchaVerifierRef.current) {
-            recaptchaVerifierRef.current.clear();
-        }
-    };
-  }, [auth, activeTab, toast]);
-
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -234,86 +146,6 @@ export default function LoginPage() {
     }
   };
   
-  const handleSendOtp = async (values: z.infer<typeof phoneFormSchema>) => {
-    const verifier = recaptchaVerifierRef.current;
-    if (!verifier) {
-        toast({ 
-            variant: "destructive", 
-            title: "Error", 
-            description: "Security verification failed. Please try switching tabs or refreshing the page." 
-        });
-        return;
-    }
-    
-    setIsSendingOtp(true);
-    try {
-        const phoneNumber = `${selectedCountry.dial_code}${values.phone}`;
-        const confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
-        confirmationResultRef.current = confirmationResult;
-        setIsOtpSent(true);
-        toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
-    } catch (error: any) {
-        console.error("Error sending OTP:", error);
-        // Reset reCAPTCHA on most errors to allow for a retry
-        recaptchaVerifierRef.current?.render().then(widgetId => {
-            // @ts-ignore
-            window.grecaptcha.reset(widgetId);
-        });
-
-
-        if (error.code === 'auth/invalid-phone-number') {
-            toast({
-                variant: "destructive",
-                title: "Invalid Phone Number",
-                description: `The number format is incorrect. Please include the country code (e.g., ${selectedCountry.dial_code}) and check the number.`,
-                duration: 10000,
-            });
-        } else if (error.code === 'auth/too-many-requests') {
-            toast({
-                variant: "destructive",
-                title: "Too Many Attempts",
-                description: "You have tried to send an OTP too many times. Please wait a while before trying again.",
-                duration: 10000,
-            });
-        } else if (error.code === 'auth/operation-not-allowed' || error.code === 'auth/internal-error') {
-             toast({
-                variant: "destructive",
-                title: "Configuration or Security Error",
-                description: "Could not send OTP. This often happens if the project is not on the Blaze plan or if the website's domain is not authorized in the Firebase Console (Authentication > Settings > Authorized domains).",
-                duration: 25000,
-            });
-        }
-        else {
-            toast({
-                variant: "destructive",
-                title: "Failed to Send OTP",
-                description: error.message || "An unexpected error occurred. Please check the number and try again.",
-            });
-        }
-    } finally {
-        setIsSendingOtp(false);
-    }
-  };
-
-  const handleVerifyOtp = async (values: z.infer<typeof phoneFormSchema>) => {
-     const confirmationResult = confirmationResultRef.current;
-     if (!confirmationResult || !values.otp) {
-        toast({ variant: "destructive", title: "Error", description: "Something went wrong. Please try sending the OTP again." });
-        return;
-     }
-
-     setIsVerifyingOtp(true);
-     try {
-        await confirmationResult.confirm(values.otp);
-        router.push("/discover");
-     } catch (error: any) {
-        console.error("Error verifying OTP:", error);
-        toast({ variant: "destructive", title: "Invalid OTP", description: "The code you entered is incorrect. Please try again." });
-     } finally {
-        setIsVerifyingOtp(false);
-     }
-  }
-
   const handlePasswordReset = async () => {
     if (!resetEmail) {
         toast({
@@ -358,75 +190,65 @@ export default function LoginPage() {
         <CardDescription>Sign in to your ConnectSphere account</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="email" className="w-full" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-1">
-                <TabsTrigger value="email">Sign in with Email</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="email">
-                <Form {...emailForm}>
-                <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
-                    <FormField
-                    control={emailForm.control}
-                    name="email"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                            <Input placeholder="name@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <FormField
-                    control={emailForm.control}
-                    name="password"
-                    render={({ field }) => (
-                        <FormItem>
-                         <div className="flex items-center justify-between">
-                            <FormLabel>Password</FormLabel>
-                            <button
-                                type="button"
-                                onClick={() => setIsResetAlertOpen(true)}
-                                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-                            >
-                                Forgot password?
-                            </button>
-                        </div>
-                        <FormControl>
-                            <Input type="password" placeholder="••••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                    />
-                    <Button type="submit" className="w-full" disabled={emailForm.formState.isSubmitting}>
-                    {emailForm.formState.isSubmitting ? "Logging in..." : "Login"}
-                    </Button>
-                </form>
-                </Form>
-
-                <div className="relative my-6">
-                <Separator />
-                <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
+        <Form {...emailForm}>
+        <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4 pt-4">
+            <FormField
+            control={emailForm.control}
+            name="email"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                    <Input placeholder="name@example.com" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <FormField
+            control={emailForm.control}
+            name="password"
+            render={({ field }) => (
+                <FormItem>
+                    <div className="flex items-center justify-between">
+                    <FormLabel>Password</FormLabel>
+                    <button
+                        type="button"
+                        onClick={() => setIsResetAlertOpen(true)}
+                        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                        Forgot password?
+                    </button>
                 </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">
-                    Or continue with
-                    </span>
-                </div>
-                </div>
+                <FormControl>
+                    <Input type="password" placeholder="••••••••" {...field} />
+                </FormControl>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+            <Button type="submit" className="w-full" disabled={emailForm.formState.isSubmitting}>
+            {emailForm.formState.isSubmitting ? "Logging in..." : "Login"}
+            </Button>
+        </form>
+        </Form>
 
-                <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-                <GoogleIcon />
-                <span className="ml-2">Sign in with Google</span>
-                </Button>
-            </TabsContent>
-        </Tabs>
+        <div className="relative my-6">
+        <Separator />
+        <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+            Or continue with
+            </span>
+        </div>
+        </div>
 
-        <div id="recaptcha-container"></div>
+        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+        <GoogleIcon />
+        <span className="ml-2">Sign in with Google</span>
+        </Button>
 
         <div className="mt-4 text-center text-sm">
           Don&apos;t have an account?{" "}
@@ -466,5 +288,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    

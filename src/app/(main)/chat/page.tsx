@@ -59,6 +59,7 @@ import {
   Undo2,
   Check,
   CheckCheck,
+  MessageSquare,
 } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -528,8 +529,8 @@ export default function ChatPage() {
               </div>
             ))}
           </div>
-        ) : (
-          filteredChats?.map((metadata) => {
+        ) : filteredChats.length > 0 ? (
+          filteredChats.map((metadata) => {
             if (!user) return null;
             const otherUserId = metadata.participants.find(p => p !== user.uid);
             if (!otherUserId) return null;
@@ -595,6 +596,14 @@ export default function ChatPage() {
               </div>
             );
         })
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground">
+            <MessageSquare className="w-10 h-10 mb-4" />
+            <h3 className="font-semibold text-lg text-foreground">No chats yet</h3>
+            <p className="text-sm mt-1">
+              Find someone in Discover to start a conversation.
+            </p>
+          </div>
         )}
       </ScrollArea>
     </div>
