@@ -13,14 +13,15 @@ import {
 
 export const InstallPwaButton = () => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
-  const [isAppInstalled, setIsAppInstalled] = useState(true); // Start as true to prevent flash
+  const [isInstalled, setIsInstalled] = useState(true); // Assume installed to prevent flash on SSR
 
   useEffect(() => {
-    // This effect runs once to check the initial state.
-    if (typeof window !== 'undefined') {
-        if (!window.matchMedia('(display-mode: standalone)').matches) {
-            setIsAppInstalled(false); // Only show button if not installed
-        }
+    // This effect runs only on the client.
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    setIsInstalled(isStandalone);
+
+    if (isStandalone) {
+      return; // No need for further listeners if already installed
     }
 
     const handleBeforeInstallPrompt = (event: Event) => {
@@ -30,8 +31,16 @@ export const InstallPwaButton = () => {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // This event fires after the user accepts the installation prompt
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -40,26 +49,18 @@ export const InstallPwaButton = () => {
       return;
     }
     await installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-    if (outcome === 'accepted') {
-      console.log('User accepted the PWA installation prompt');
-      setIsAppInstalled(true); // Hide the button after installation
-    } else {
-      console.log('User dismissed the PWA installation prompt');
-    }
-    setInstallPrompt(null);
+    // The 'appinstalled' event will handle hiding the button after success
   };
   
-  // Don't render the button if the app is already installed
-  if (isAppInstalled) {
-    return null;
+  if (isInstalled) {
+    return null; // Don't render anything if the app is installed or on the server
   }
 
+  // If not installed, always render the button. Its state will be managed by `installPrompt`.
   return (
     <TooltipProvider>
         <Tooltip>
             <TooltipTrigger asChild>
-                {/* The button is disabled with a loading spinner if the prompt isn't ready */}
                 <Button variant="ghost" size="icon" onClick={handleInstallClick} disabled={!installPrompt}>
                     {installPrompt ? <Download className="h-5 w-5" /> : <Loader2 className="h-5 w-5 animate-spin" />}
                     <span className="sr-only">Install App</span>
