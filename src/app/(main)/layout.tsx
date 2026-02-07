@@ -23,7 +23,6 @@ import { Button } from "@/components/ui/button";
 import { Flame, Bell } from "lucide-react";
 import Link from "next/link";
 import { getMessaging, onMessage, isSupported } from 'firebase/messaging';
-import { InstallPwaButton } from "@/components/install-pwa-button";
 
 export default function MainLayout({
   children,
@@ -95,7 +94,6 @@ export default function MainLayout({
               <div className="w-full flex-1">
                   {/* Can add breadcrumbs or search here */}
               </div>
-              <InstallPwaButton />
               <ThemeToggle />
               <UserNav />
               </header>

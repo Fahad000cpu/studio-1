@@ -3,12 +3,14 @@ import { useState } from 'react';
 import DiscoverUsers from "@/components/discover-users";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import { InstallPwaAlert } from '@/components/install-pwa-alert';
 
 export default function DiscoverPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   return (
     <div className="container mx-auto space-y-8">
+      <InstallPwaAlert />
       <div>
         <div className="mb-8 bg-card/80 p-6 rounded-lg shadow-lg backdrop-blur-sm space-y-4">
           <div>
