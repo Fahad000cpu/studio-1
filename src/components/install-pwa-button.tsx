@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import {
     Tooltip,
     TooltipContent,
@@ -17,16 +17,17 @@ export const InstallPwaButton = () => {
   useEffect(() => {
     // This effect runs only on the client
     const handleBeforeInstallPrompt = (event: Event) => {
-      // Prevent the mini-infobar from appearing on mobile
+      // Prevent the default mini-infobar from appearing on mobile
       event.preventDefault();
-      // Stash the event so it can be triggered later.
+      // Stash the event so it can be triggered later by our button.
       setInstallPrompt(event);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // After the app is installed, the browser will not fire the 'beforeinstallprompt' event again.
+    // We can listen for the 'appinstalled' event to clear our prompt state.
     const handleAppInstalled = () => {
-      // After installation, clear the prompt to disable the button
       setInstallPrompt(null);
     };
     window.addEventListener('appinstalled', handleAppInstalled);
@@ -41,24 +42,23 @@ export const InstallPwaButton = () => {
     if (!installPrompt) {
       return;
     }
-    // Show the install prompt to the user
+    // Show the browser's installation prompt.
     await installPrompt.prompt();
   };
-  
-  // As per your request, the button is now permanently visible in the header.
-  // It will be disabled with a loading spinner until the browser is ready for installation.
-  // After installation, it will return to this disabled state on future visits.
+
+  // The button is always rendered permanently in the header. 
+  // It is only enabled (clickable) when the browser is ready for installation.
   return (
     <TooltipProvider>
         <Tooltip>
             <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={handleInstallClick} disabled={!installPrompt}>
-                    {installPrompt ? <Download className="h-5 w-5" /> : <Loader2 className="h-5 w-5 animate-spin" />}
+                    <Download className="h-5 w-5" />
                     <span className="sr-only">Install App</span>
                 </Button>
             </TooltipTrigger>
             <TooltipContent>
-                <p>{installPrompt ? 'Install App' : 'Preparing install...'}</p>
+                <p>{installPrompt ? 'Install App' : 'Installation not available'}</p>
             </TooltipContent>
         </Tooltip>
     </TooltipProvider>
