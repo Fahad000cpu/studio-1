@@ -6,8 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, type User } from "firebase/auth";
-import { doc, GeoPoint, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, type User, type UserCredential } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth, useFirestore, requestPermission } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
@@ -88,10 +88,40 @@ export default function LoginPage() {
     },
   });
 
+  // This new function handles creating the profile document if it's missing,
+  // without asking for any browser permissions during the auth flow.
+  const handleLoginOrSignup = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
+    if (!user || !firestore) return;
+    const userRef = doc(firestore, 'users', user.uid);
+
+    // Run this in the background. The AuthLayout will handle immediate redirection.
+    getDoc(userRef).then(userDoc => {
+        if (!userDoc.exists()) {
+            // If the user document doesn't exist, create it.
+            const userProfile = {
+                id: user.uid,
+                name: name,
+                email: email,
+                phoneNumber: phoneNumber || user.phoneNumber || null,
+                profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+                coordinates: null, // Geolocation will be requested inside the app, not here.
+                fcmTokens: [],     // Notification permission will be requested inside the app.
+                createdAt: new Date(),
+            };
+            // Set the doc, but don't wait for it.
+            setDoc(userRef, userProfile).catch(e => console.error("Error creating user profile on login:", e));
+        }
+    }).catch(e => console.error("Error checking user document on login:", e));
+  };
+
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
-      // The AuthLayout will handle the redirection.
+      const userCredential: UserCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      // Ensure profile exists in background, do not await.
+      // AuthLayout handles redirection.
+      if (userCredential.user) {
+        handleLoginOrSignup(userCredential.user, userCredential.user.displayName!, userCredential.user.email!);
+      }
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
@@ -118,61 +148,6 @@ export default function LoginPage() {
     }
 }
 
- const createUserProfile = async (user: User, name: string, email: string, initialTokens: string[], phoneNumber?: string | null, photoURL?: string | null) => {
-    const userRef = doc(firestore, "users", user.uid);
-  
-    const createUserDoc = (coordinates: GeoPoint | null) => {
-      const userProfile = {
-        id: user.uid,
-        name: name,
-        email: email,
-        phoneNumber: phoneNumber || user.phoneNumber || null,
-        profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
-        coordinates,
-        fcmTokens: initialTokens,
-        createdAt: new Date(),
-      };
-      return setDoc(userRef, userProfile);
-    };
-  
-    return new Promise<void>((resolve) => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            await createUserDoc(new GeoPoint(latitude, longitude));
-            resolve();
-          },
-          async () => {
-            await createUserDoc(null);
-            resolve();
-          }
-        );
-      } else {
-        createUserDoc(null).then(resolve);
-      }
-    });
-  };
-
-  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
-    const userRef = doc(firestore, 'users', user.uid);
-    try {
-        const token = await requestPermission(firestore, user);
-        const initialTokens = token ? [token] : [];
-  
-        const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
-            await createUserProfile(user, name, email, initialTokens, phoneNumber, photoURL);
-        } else if (token) {
-            await updateDoc(userRef, {
-                fcmTokens: arrayUnion(token)
-            });
-        }
-    } catch (error) {
-        console.error("Post-signup/login actions failed:", error);
-    }
-  }
-
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
@@ -182,7 +157,7 @@ export default function LoginPage() {
         
         // The AuthLayout will handle redirection.
         // Handle profile creation/update in the background. Do NOT await this.
-        handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {

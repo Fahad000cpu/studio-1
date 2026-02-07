@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo, sendEmailVerification } from "firebase/auth";
-import { doc, GeoPoint, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useAuth, useFirestore, requestPermission } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { Flame, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
@@ -84,61 +84,32 @@ export default function SignupPage() {
     },
   });
 
-  const createUserProfile = async (user: User, name: string, email: string, initialTokens: string[], phoneNumber?: string | null, photoURL?: string | null) => {
-    const userRef = doc(firestore, "users", user.uid);
-  
-    const createUserDoc = (coordinates: GeoPoint | null) => {
-      const userProfile = {
-        id: user.uid,
-        name: name,
-        email: email,
-        phoneNumber: phoneNumber || user.phoneNumber || null,
-        profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
-        coordinates,
-        fcmTokens: initialTokens,
-        createdAt: new Date(),
-      };
-      return setDoc(userRef, userProfile);
-    };
-  
-    return new Promise<void>((resolve) => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            await createUserDoc(new GeoPoint(latitude, longitude));
-            resolve();
-          },
-          async () => {
-            await createUserDoc(null);
-            resolve();
-          }
-        );
-      } else {
-        createUserDoc(null).then(resolve);
-      }
-    });
+  // This new function handles creating the profile document if it's missing,
+  // without asking for any browser permissions during the auth flow.
+  const handleLoginOrSignup = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
+    if (!user || !firestore) return;
+    const userRef = doc(firestore, 'users', user.uid);
+
+    // Run this in the background. The AuthLayout will handle immediate redirection.
+    getDoc(userRef).then(userDoc => {
+        if (!userDoc.exists()) {
+            // If the user document doesn't exist, create it.
+            const userProfile = {
+                id: user.uid,
+                name: name,
+                email: email,
+                phoneNumber: phoneNumber || user.phoneNumber || null,
+                profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+                coordinates: null, // Geolocation will be requested inside the app, not here.
+                fcmTokens: [],     // Notification permission will be requested inside the app.
+                createdAt: new Date(),
+            };
+            // Set the doc, but don't wait for it.
+            setDoc(userRef, userProfile).catch(e => console.error("Error creating user profile on signup:", e));
+        }
+    }).catch(e => console.error("Error checking user document on signup:", e));
   };
 
-
-  const handlePostSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
-    const userRef = doc(firestore, 'users', user.uid);
-    try {
-        const token = await requestPermission(firestore, user);
-        const initialTokens = token ? [token] : [];
-  
-        const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
-            await createUserProfile(user, name, email, initialTokens, phoneNumber, photoURL);
-        } else if (token) {
-            await updateDoc(userRef, {
-                fcmTokens: arrayUnion(token)
-            });
-        }
-    } catch (error) {
-        console.error("Post-signup actions failed:", error);
-    }
-  }
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -155,7 +126,7 @@ export default function SignupPage() {
         
         // The AuthLayout will handle redirection.
         // Handle profile creation/update in the background. Do NOT await this.
-        handlePostSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
+        handleLoginOrSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
       }
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -183,7 +154,7 @@ export default function SignupPage() {
 
         // The AuthLayout will handle redirection.
         // Handle profile creation/update in the background. Do NOT await this.
-        handlePostSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
