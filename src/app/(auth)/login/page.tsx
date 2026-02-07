@@ -71,9 +71,47 @@ const GoogleIcon = () => (
     </svg>
   );
 
+// This function handles creating/updating the user profile in Firestore.
+// It's now async to be awaited properly.
+const handleLoginOrSignup = async (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
+    if (!user) {
+        console.error("handleLoginOrSignup called with no user.");
+        return;
+    }
+    const firestore = useFirestore(); // Get firestore instance inside
+    if (!firestore) {
+        console.error("Firestore service not available.");
+        return;
+    }
+    
+    const userRef = doc(firestore, 'users', user.uid);
+
+    try {
+        const userDoc = await getDoc(userRef);
+        if (!userDoc.exists()) {
+            const userProfile = {
+                id: user.uid,
+                name: name,
+                email: email,
+                phoneNumber: phoneNumber || user.phoneNumber || null,
+                profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+                coordinates: null,
+                fcmTokens: [],
+                createdAt: new Date(),
+            };
+            await setDoc(userRef, userProfile);
+        }
+    } catch (e) {
+        console.error("Error creating or checking user profile:", e);
+        // We don't re-throw, as the login itself was successful.
+        // We can add more robust error handling/reporting here if needed.
+    }
+};
+
+
 export default function LoginPage() {
   const auth = useAuth();
-  const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
@@ -88,39 +126,12 @@ export default function LoginPage() {
     },
   });
 
-  // This new function handles creating the profile document if it's missing,
-  // without asking for any browser permissions during the auth flow.
-  const handleLoginOrSignup = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
-    if (!user || !firestore) return;
-    const userRef = doc(firestore, 'users', user.uid);
-
-    // Run this in the background. The AuthLayout will handle immediate redirection.
-    getDoc(userRef).then(userDoc => {
-        if (!userDoc.exists()) {
-            // If the user document doesn't exist, create it.
-            const userProfile = {
-                id: user.uid,
-                name: name,
-                email: email,
-                phoneNumber: phoneNumber || user.phoneNumber || null,
-                profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
-                coordinates: null, // Geolocation will be requested inside the app, not here.
-                fcmTokens: [],     // Notification permission will be requested inside the app.
-                createdAt: new Date(),
-            };
-            // Set the doc, but don't wait for it.
-            setDoc(userRef, userProfile).catch(e => console.error("Error creating user profile on login:", e));
-        }
-    }).catch(e => console.error("Error checking user document on login:", e));
-  };
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       const userCredential: UserCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      // Ensure profile exists in background, do not await.
-      // AuthLayout handles redirection.
       if (userCredential.user) {
-        handleLoginOrSignup(userCredential.user, userCredential.user.displayName!, userCredential.user.email!);
+        // We don't need to do anything else. The AuthLayout will handle the redirect.
       }
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
@@ -155,9 +166,12 @@ export default function LoginPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         
-        // The AuthLayout will handle redirection.
-        // Handle profile creation/update in the background. Do NOT await this.
-        handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        // **GUARANTEED REDIRECT LOGIC**
+        // 1. Await the profile creation/check
+        await handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        
+        // 2. Manually and forcefully redirect after everything is done.
+        router.push('/discover');
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
