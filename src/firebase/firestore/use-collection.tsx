@@ -148,13 +148,16 @@ export function useCollection<T = any>(
         setError(null);
         setIsLoading(false);
       },
-      async (err: FirestoreError) => {
+      (err: FirestoreError) => {
         if (err.code === 'permission-denied') {
             const path: string = (finalQuery as unknown as InternalQuery)._query.path.toString();
             const contextualError = new FirestorePermissionError({
                 operation: 'list',
                 path: path,
             });
+            // We set the raw error here so the UI can react to it.
+            // We also emit it for global error handling / boundary.
+            setError(contextualError); 
             errorEmitter.emit('permission-error', contextualError);
         } else {
              setError(err);
@@ -168,7 +171,7 @@ export function useCollection<T = any>(
   }, [finalQuery]);
 
   if(targetRefOrQuery && (targetRefOrQuery as any).__memo === false) {
-    console.warn('The query or reference passed to useCollection was not memoized. This can cause infinite loops. Please wrap it with useMemo or useMemoFirebase.');
+    console.warn('The document reference passed to useCollection was not memoized. This can cause infinite loops. Please wrap it with useMemo or useMemoFirebase.');
   }
 
 

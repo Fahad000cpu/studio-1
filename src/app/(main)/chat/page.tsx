@@ -116,8 +116,8 @@ export default function ChatPage() {
     ) : null),
     [firestore, user]
   );
-  const { data: chatMetadatas, isLoading: metadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection);
-
+  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
+  
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
@@ -527,6 +527,11 @@ export default function ChatPage() {
               </div>
             ))}
           </div>
+        ) : error ? (
+            <div className="p-4 text-center text-sm text-destructive">
+                <p>Could not load chats.</p>
+                <p className="text-xs">Please check your Firestore rules.</p>
+            </div>
         ) : filteredChats.length > 0 ? (
           filteredChats.map((metadata) => {
             if (!user) return null;
