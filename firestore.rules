@@ -83,7 +83,7 @@ service cloud.firestore {
 
         allow read: if isSignedIn();
         allow create: if isCreatingOwnStatus();
-        allow update: if isSignedIn() && isUpdatingLikesOrViews();
+        allow update: if isSignedIn() && (isUpdatingLikesOrViews() || isStatusOwner());
         allow delete: if isStatusOwner();
     }
 
@@ -118,8 +118,7 @@ service cloud.firestore {
         return isOwner(resource.data.senderId);
       }
       allow read, create: if isChatParticipant();
-      allow delete: if isSender();
-      allow update: if false;
+      allow update, delete: if isSender();
     }
 
 

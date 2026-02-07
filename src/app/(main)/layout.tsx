@@ -28,18 +28,13 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
 
-  // If we are still checking for a user, or if there is no user
-  // and we are about to redirect, show a full-screen loader.
-  // The redirection itself is handled by the useUser hook.
   if (isUserLoading || !user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading your sphere..." : "Redirecting..."} />
     );
   }
 
-  // Otherwise, we are done loading and have a user, render the main app layout.
   return (
       <div className="relative min-h-screen">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />

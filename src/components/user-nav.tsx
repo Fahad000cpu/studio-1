@@ -1,3 +1,4 @@
+
 "use client";
 
 import { LogOut, Settings, User } from "lucide-react";
@@ -27,7 +28,6 @@ export function UserNav() {
     // As per your request, the logic to remove the FCM token on logout
     // has been removed to allow for re-engagement notifications.
     await signOut(auth);
-    router.push("/");
   };
 
   if (!user) {
@@ -39,7 +39,7 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage key={user.photoURL} src={user.photoURL ?? `https://picsum.photos/seed/${user.uid}/200`} alt={user.displayName ?? ""} />
+            <AvatarImage key={user.photoURL} src={user.photoURL ?? ''} alt={user.displayName ?? ""} />
             <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
           </Avatar>
         </Button>

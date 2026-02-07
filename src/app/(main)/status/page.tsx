@@ -6,7 +6,7 @@ import Image from "next/image";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { PlusCircle, X, ImagePlus, Send, XCircle, Heart, Eye, MessageSquare } from "lucide-react";
+import { PlusCircle, X, ImagePlus, Send, Heart, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc, arrayUnion, arrayRemove } from "firebase/firestore";
@@ -14,29 +14,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
-import { Card } from "@/components/ui/card";
 import { uploadToCloudinary } from "@/lib/cloudinary";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getInitials } from "@/lib/utils";
-
-type StatusStory = {
-  id: string;
-  userId: string;
-  mediaUrl: string;
-  text?: string;
-  timestamp: Timestamp;
-  duration: number;
-  views: string[];
-  likes: string[];
-};
-
-type StatusUser = {
-  id: string;
-  name: string;
-  avatarUrl: string;
-  stories: StatusStory[];
-};
+import type { StatusStory, StatusUser } from "@/types/status";
 
 let cleanupHasRun = false;
 
@@ -188,10 +170,12 @@ export default function StatusPage() {
   const handleViewStory = useCallback((storyId: string) => {
     if (!user || !firestore) return;
     const storyRef = doc(firestore, 'status_updates', storyId);
+    // Avoid marking own story as viewed
+    if (user.uid === activeUser?.id) return;
     updateDocumentNonBlocking(storyRef, {
         views: arrayUnion(user.uid)
     });
-  }, [user, firestore]);
+  }, [user, firestore, activeUser]);
 
   const startTimer = useCallback(() => {
     if (!activeUser || !user) return;
@@ -341,6 +325,7 @@ export default function StatusPage() {
                             fill
                             className={cn("object-contain", isStoryLoading ? "opacity-0" : "opacity-100 transition-opacity duration-300")}
                             onLoad={() => setIsStoryLoading(false)}
+                            priority
                         />
                     }
                     {activeStory?.text && (
@@ -357,7 +342,7 @@ export default function StatusPage() {
                         <div className="flex items-center gap-3 text-white">
                             <Avatar className="w-10 h-10 border-2 border-white/80">
                                 <AvatarImage src={activeUser.avatarUrl} />
-                                <AvatarFallback>{activeUser.name.charAt(0)}</AvatarFallback>
+                                <AvatarFallback>{getInitials(activeUser.name)}</AvatarFallback>
                             </Avatar>
                             <div>
                                 <h3 className="font-bold font-headline">{activeUser.name}</h3>
@@ -399,8 +384,8 @@ export default function StatusPage() {
                         </div>
                     )}
                     
-                    <div className="absolute left-0 top-0 h-full w-1/3 z-10" onMouseDown={handlePrevStory} onTouchEnd={handlePrevStory}/>
-                    <div className="absolute right-0 top-0 h-full w-1/3 z-10" onMouseDown={handleNextStory} onTouchEnd={handleNextStory}/>
+                    <div className="absolute left-0 top-0 h-full w-1/3 z-10" onClick={handlePrevStory} onTouchEnd={handlePrevStory}/>
+                    <div className="absolute right-0 top-0 h-full w-1/3 z-10" onClick={handleNextStory} onTouchEnd={handleNextStory}/>
                 </div>
             </div>
 
@@ -524,7 +509,7 @@ export default function StatusPage() {
               <div className="absolute bottom-0 left-0 p-3 text-white">
                 <Avatar className={cn("w-10 h-10 mb-2 border-2", 'border-primary')}>
                   <AvatarImage src={status.avatarUrl} />
-                  <AvatarFallback>{status.name.charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{getInitials(status.name)}</AvatarFallback>
                 </Avatar>
                 <span className="font-semibold text-sm">{status.name}</span>
               </div>
@@ -535,5 +520,3 @@ export default function StatusPage() {
     </div>
   );
 }
-
-    

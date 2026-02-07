@@ -7,7 +7,7 @@ import { Firestore } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { Functions } from 'firebase/functions';
 import { usePathname, useRouter } from 'next/navigation';
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener'
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 interface FirebaseProviderProps {
   children: ReactNode;
@@ -170,7 +170,8 @@ export const useFirebaseApp = (): FirebaseApp => {
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 
-export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
+export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const memoized = useMemo(factory, deps);
   
   if(typeof memoized !== 'object' || memoized === null) return memoized;
@@ -196,17 +197,34 @@ export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | 
  */
 export const useUser = (): UserHookResult => {
   const context = useContext(FirebaseContext);
+  const router = useRouter();
+  const pathname = usePathname();
 
   if (context === undefined) {
     throw new Error('useUser must be used within a FirebaseProvider.');
   }
 
-  // This hook now simply passes through the authentication state.
-  // The layouts ((auth)/layout.tsx and (main)/layout.tsx) will use this
-  // state to decide whether to render their children or a loading/redirecting state.
+  const { user, isUserLoading, userError } = context;
+
+  useEffect(() => {
+    // This effect handles the redirection logic.
+    if (!isUserLoading) {
+      const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/signup');
+
+      if (user && isAuthPage) {
+        // If there's a user and they are on an auth page, redirect them away.
+        router.push('/discover');
+      } else if (!user && !isAuthPage) {
+        // If there's no user and they are on a protected page, redirect them to login.
+        router.push('/login');
+      }
+    }
+  }, [user, isUserLoading, pathname, router]);
+
+
   return { 
-    user: context.user,
-    isUserLoading: context.isUserLoading,
-    userError: context.userError 
+    user,
+    isUserLoading,
+    userError 
   };
 };
