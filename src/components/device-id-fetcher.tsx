@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -18,16 +17,13 @@ export function DeviceIdFetcher() {
     setIsFetchingId(true);
     setInstallationId(''); // Clear previous ID
     try {
-        // Dynamically import to ensure client-side execution
+        // Dynamically import to ensure client-side execution.
         const { getApp } = await import('firebase/app');
-        
-        // This trick prevents Next.js from trying to bundle the client-only module on the server.
-        const path = ['firebase', 'in-app-messaging'].join('/');
-        const { getInAppMessaging, getInstallationId } = await import(path);
+        const { getInstallations, getId } = await import('firebase/installations');
         
         const app = getApp();
-        const inAppMessaging = getInAppMessaging(app);
-        const fid = await getInstallationId(inAppMessaging);
+        const installations = getInstallations(app);
+        const fid = await getId(installations);
 
         setInstallationId(fid);
         toast({
