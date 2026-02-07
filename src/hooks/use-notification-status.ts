@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -59,8 +60,8 @@ export function useNotificationStatus(): NotificationStatus {
 
   const permissionGranted = isSupported && notificationPermission === 'granted';
   
-  // A token is considered in Firestore if the fcmTokens array exists and contains at least one non-empty string.
-  const tokenInFirestore = !!(userProfile?.fcmTokens && userProfile.fcmTokens.some(token => typeof token === 'string' && token.length > 0));
+  // A token is considered in Firestore if the fcmTokens array exists, is an array, and contains at least one non-empty string.
+  const tokenInFirestore = !!(userProfile?.fcmTokens && Array.isArray(userProfile.fcmTokens) && userProfile.fcmTokens.some(token => typeof token === 'string' && token.length > 0));
 
   return {
     isSupported,
@@ -75,5 +76,3 @@ export function useNotificationStatus(): NotificationStatus {
     permission: notificationPermission,
   };
 }
-
-    
