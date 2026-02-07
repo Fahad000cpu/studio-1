@@ -6,8 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, type User, type UserCredential } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +41,7 @@ import { useAuth, useFirestore } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 
 
 const formSchema = z.object({
@@ -71,45 +71,10 @@ const GoogleIcon = () => (
     </svg>
   );
 
-// This function handles creating/updating the user profile in Firestore.
-// It can run in the background without blocking the UI.
-const handleLoginOrSignup = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
-    if (!user) {
-        console.error("handleLoginOrSignup called with no user.");
-        return;
-    }
-    const firestore = useFirestore(); // Get firestore instance inside
-    if (!firestore) {
-        console.error("Firestore service not available.");
-        return;
-    }
-    
-    const userRef = doc(firestore, 'users', user.uid);
-
-    getDoc(userRef).then(userDoc => {
-        if (!userDoc.exists()) {
-            const userProfile = {
-                id: user.uid,
-                name: name,
-                email: email,
-                phoneNumber: phoneNumber || user.phoneNumber || null,
-                profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
-                coordinates: null,
-                fcmTokens: [],
-                createdAt: new Date(),
-            };
-            setDoc(userRef, userProfile).catch(e => {
-                console.error("Error creating user profile in background:", e);
-            });
-        }
-    }).catch(e => {
-        console.error("Error checking user profile in background:", e);
-    });
-};
-
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -128,10 +93,8 @@ export default function LoginPage() {
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const userCredential: UserCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-      if (userCredential.user) {
-        // We don't need to do anything else. The AuthLayout will handle the redirect.
-      }
+      // The AuthLayout will handle the redirect automatically after this is successful.
+      await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
@@ -165,9 +128,14 @@ export default function LoginPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         
-        // Let the AuthLayout handle the redirect.
-        // We can fire-and-forget the profile creation in the background.
-        handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        // Fire-and-forget the profile creation in the background.
+        // The AuthLayout will handle the redirect.
+        handleUserProfileUpdate(firestore, user, {
+            name: user.displayName,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            photoURL: user.photoURL,
+        });
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {

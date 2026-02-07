@@ -6,8 +6,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { updateProfile, UserCredential, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, User, getAdditionalUserInfo, sendEmailVerification } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { updateProfile, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendEmailVerification } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +34,7 @@ import { countries, type Country } from "@/lib/countries";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
+import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -65,44 +65,10 @@ const GoogleIcon = () => (
     </svg>
   );
 
-// This function handles creating/updating the user profile in Firestore.
-// It can run in the background without blocking the UI.
-const handleLoginOrSignup = (user: User, name: string, email: string, phoneNumber?: string | null, photoURL?: string | null) => {
-    if (!user) {
-        console.error("handleLoginOrSignup called with no user.");
-        return;
-    }
-    const firestore = useFirestore(); // Get firestore instance inside
-    if (!firestore) {
-        console.error("Firestore service not available.");
-        return;
-    }
-    
-    const userRef = doc(firestore, 'users', user.uid);
-
-    getDoc(userRef).then(userDoc => {
-        if (!userDoc.exists()) {
-            const userProfile = {
-                id: user.uid,
-                name: name,
-                email: email,
-                phoneNumber: phoneNumber || user.phoneNumber || null,
-                profilePictureUrl: photoURL || `https://picsum.photos/seed/${user.uid}/200`,
-                coordinates: null,
-                fcmTokens: [],
-                createdAt: new Date(),
-            };
-            setDoc(userRef, userProfile).catch(e => {
-                console.error("Error creating user profile in background:", e);
-            });
-        }
-    }).catch(e => {
-        console.error("Error checking user profile in background:", e);
-    });
-};
 
 export default function SignupPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -121,21 +87,27 @@ export default function SignupPage() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const userCredential: UserCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
-      if (user) {
-        await updateProfile(user, { displayName: values.name });
-        await sendEmailVerification(user);
-        toast({
-            title: "Verification Email Sent",
-            description: "Please check your inbox to verify your email address.",
-        });
-        const fullPhoneNumber = values.phone ? `${selectedCountry.dial_code}${values.phone}` : null;
-        
-        handleLoginOrSignup(user, values.name, values.email, fullPhoneNumber, user.photoURL);
-        
-        // The AuthLayout will handle the redirect automatically after state update.
-      }
+      
+      await updateProfile(user, { displayName: values.name });
+      
+      const fullPhoneNumber = values.phone ? `${selectedCountry.dial_code}${values.phone}` : null;
+      
+      // Fire-and-forget profile creation. AuthLayout will handle the redirect.
+      handleUserProfileUpdate(firestore, user, {
+        name: values.name,
+        email: values.email,
+        phoneNumber: fullPhoneNumber,
+        photoURL: user.photoURL,
+      });
+      
+      await sendEmailVerification(user);
+      toast({
+          title: "Verification Email Sent",
+          description: "Please check your inbox to verify your email address.",
+      });
+      
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
         toast({
@@ -160,9 +132,13 @@ export default function SignupPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        // Let the AuthLayout handle the redirect.
-        // We can fire-and-forget the profile creation in the background.
-        handleLoginOrSignup(user, user.displayName!, user.email!, user.phoneNumber, user.photoURL);
+        // Fire-and-forget profile creation. AuthLayout will handle the redirect.
+        handleUserProfileUpdate(firestore, user, {
+            name: user.displayName,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            photoURL: user.photoURL,
+        });
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
