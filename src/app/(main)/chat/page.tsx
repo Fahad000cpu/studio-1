@@ -111,13 +111,24 @@ export default function ChatPage() {
   const chatMetadataCollection = useMemoFirebase(
     () => (user ? query(
         collection(firestore, 'chat_metadata'),
-        where('participants', 'array-contains', user.uid),
-        orderBy('lastMessageTimestamp', 'desc')
+        where('participants', 'array-contains', user.uid)
+        // Note: orderBy is removed to prevent a complex query that can fail security rules.
+        // Sorting is now handled on the client-side.
     ) : null),
     [firestore, user]
   );
-  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
+  const { data: unsortedChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
   
+  const chatMetadatas = useMemo(() => {
+    if (!unsortedChatMetadatas) return null;
+    // Perform client-side sorting to ensure the latest chats are always on top.
+    return [...unsortedChatMetadatas].sort((a, b) => {
+        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
+        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
+        return timeB - timeA;
+    });
+  }, [unsortedChatMetadatas]);
+
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
@@ -254,6 +265,7 @@ export default function ChatPage() {
     } catch (error: any) {
       if (error.code === 'not-found') {
         const createPayload = {
+          id: chatId,
           lastMessageText: text,
           lastMessageTimestamp: serverTimestamp(),
           participants: [user.uid, recipientId],
@@ -534,7 +546,7 @@ export default function ChatPage() {
             </div>
         ) : filteredChats.length > 0 ? (
           filteredChats.map((metadata) => {
-            if (!user) return null;
+            if (!user || !metadata) return null;
             const otherUserId = metadata.participants.find(p => p !== user.uid);
             if (!otherUserId) return null;
     
