@@ -1,8 +1,6 @@
 
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { FullScreenLoader } from "@/components/full-screen-loader";
 
@@ -12,13 +10,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
 
-  useEffect(() => {
-    if (!isUserLoading && user) {
-      router.push("/discover");
-    }
-  }, [user, isUserLoading, router]);
+  // The useUser hook now handles all redirection logic.
+  // This keeps the layout clean and focused on rendering.
 
   // If we are checking auth, or if we have a user and are about to redirect, show a loader.
   if (isUserLoading || user) {

@@ -75,7 +75,6 @@ const GoogleIcon = () => (
 export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
-  const router = useRouter();
   const { toast } = useToast();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
@@ -93,14 +92,13 @@ export default function LoginPage() {
 
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
-      // The AuthLayout will handle the redirect automatically after this is successful.
       await signInWithEmailAndPassword(auth, values.email, values.password);
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
                 variant: "destructive",
                 title: "Login Method Disabled",
-                description: "Email/Password sign-in is not enabled for this project. An admin must enable it in the Firebase Console.",
+                description: "Email/Password sign-in is not enabled. An admin must enable it in the Firebase Console.",
                 duration: 10000,
             });
         } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -128,9 +126,7 @@ export default function LoginPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
         
-        // Fire-and-forget the profile creation in the background.
-        // The AuthLayout will handle the redirect.
-        handleUserProfileUpdate(firestore, user, {
+        await handleUserProfileUpdate(firestore, user, {
             name: user.displayName,
             email: user.email,
             phoneNumber: user.phoneNumber,

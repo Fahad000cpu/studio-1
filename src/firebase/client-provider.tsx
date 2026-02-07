@@ -7,6 +7,7 @@ import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getFunctions, type Functions } from 'firebase/functions';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -16,6 +17,7 @@ interface FirebaseInstances {
   app: FirebaseApp;
   auth: Auth;
   firestore: Firestore;
+  functions: Functions;
 }
 
 const initializeFirebaseClient = (): FirebaseInstances => {
@@ -28,8 +30,9 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const firestore = getFirestore(app);
+  const functions = getFunctions(app);
 
-  const instances: FirebaseInstances = { app, auth, firestore };
+  const instances: FirebaseInstances = { app, auth, firestore, functions };
   if (typeof window !== 'undefined') {
       (window as any)[F_INSTANCES_KEY] = instances;
   }
@@ -57,6 +60,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       firebaseApp={instances.app}
       auth={instances.auth}
       firestore={instances.firestore}
+      functions={instances.functions}
     >
       {children}
     </FirebaseProvider>

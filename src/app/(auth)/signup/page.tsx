@@ -70,7 +70,6 @@ export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
-  const router = useRouter();
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
@@ -94,8 +93,7 @@ export default function SignupPage() {
       
       const fullPhoneNumber = values.phone ? `${selectedCountry.dial_code}${values.phone}` : null;
       
-      // Fire-and-forget profile creation. AuthLayout will handle the redirect.
-      handleUserProfileUpdate(firestore, user, {
+      await handleUserProfileUpdate(firestore, user, {
         name: values.name,
         email: values.email,
         phoneNumber: fullPhoneNumber,
@@ -132,8 +130,7 @@ export default function SignupPage() {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
 
-        // Fire-and-forget profile creation. AuthLayout will handle the redirect.
-        handleUserProfileUpdate(firestore, user, {
+        await handleUserProfileUpdate(firestore, user, {
             name: user.displayName,
             email: user.email,
             phoneNumber: user.phoneNumber,

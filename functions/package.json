@@ -1,3 +1,4 @@
+
 {
   "main": "lib/index.js",
   "scripts": {
@@ -13,14 +14,14 @@
   },
   "name": "functions",
   "engines": {
-    "node": "24"
+    "node": "20"
   },
   "dependencies": {
     "@genkit-ai/firebase": "^1.28.0",
     "@genkit-ai/google-genai": "^1.28.0",
     "express": "^5.2.1",
-    "firebase-admin": "^13.6.0",
-    "firebase-functions": "^7.0.0",
+    "firebase-admin": "^12.0.0",
+    "firebase-functions": "^5.0.0",
     "genkit": "^1.28.0"
   },
   "devDependencies": {

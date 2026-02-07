@@ -18,6 +18,7 @@ import {
   orderBy,
   arrayUnion,
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
   Avatar,
@@ -43,6 +44,7 @@ import {
   useMemoFirebase,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
+  useFirebaseApp,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -68,7 +70,6 @@ import type { Message, ChatMetadata } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
 
 function getChatId(uid1: string, uid2: string) {
@@ -92,6 +93,7 @@ const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null) => 
 export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
+  const app = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -265,6 +267,20 @@ export default function ChatPage() {
     }
   };
 
+  const triggerNotification = (body: string, recipientId: string, senderName: string) => {
+    if (!recipientId || !senderName) return;
+
+    const functions = getFunctions(app);
+    const sendNotification = httpsCallable(functions, 'sendChatMessageNotification');
+    
+    sendNotification({
+      recipientId: recipientId,
+      senderName: senderName,
+      messageText: body
+    }).catch(err => console.error("Failed to trigger notification function:", err));
+  }
+
+
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !selectedChat || !user || !messagesCollection || !chatId) return;
@@ -286,17 +302,8 @@ export default function ChatPage() {
 
     const metadataText = isLink ? '🔗 Link' : messageText;
     await updateChatMetadata(metadataText);
-
-    const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
-    if (recipientTokens.length > 0) {
-      sendFcmNotification({
-        tokens: recipientTokens,
-        title: user.displayName || 'New Message',
-        body: metadataText,
-        url: `/chat?chatWith=${user.uid}`,
-        icon: user.photoURL || undefined,
-      }).catch(err => console.error("[ConnectSphere Chat] Failed to send text message notification:", err));
-    }
+    
+    triggerNotification(metadataText, selectedChat.id, user.displayName || "New Message");
   };
 
   const handleAttachmentClick = () => {
@@ -327,16 +334,7 @@ export default function ChatPage() {
       if (type === 'audio') body = '🎤 Voice Message';
       await updateChatMetadata(body);
       
-      const recipientTokens = selectedChat.fcmTokens?.filter(Boolean) ?? [];
-      if (recipientTokens.length > 0) {
-        sendFcmNotification({
-          tokens: recipientTokens,
-          title: user.displayName || 'New Message',
-          body: body,
-          url: `/chat?chatWith=${user.uid}`,
-          icon: user.photoURL || undefined,
-        }).catch(err => console.error("[ConnectSphere Chat] Failed to send media message notification:", err));
-      }
+      triggerNotification(body, selectedChat.id, user.displayName || "New Message");
 
     } catch (error) {
       console.error("File upload failed:", error);

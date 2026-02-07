@@ -30,12 +30,8 @@ export default function MainLayout({
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
-  useEffect(() => {
-    // If auth state is confirmed and there is NO user, redirect them to the login page.
-    if (!isUserLoading && !user) {
-      router.push("/login");
-    }
-  }, [user, isUserLoading, router]);
+  // The useUser hook now handles all redirection logic.
+  // This keeps the layout clean and focused on rendering.
 
   // The service worker (sw.js) now handles all push notifications,
   // ensuring a consistent experience whether the app is in the foreground or background.
