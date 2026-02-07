@@ -3,7 +3,6 @@ import type { GeoPoint } from 'firebase/firestore';
 
 export type UserProfile = {
     id: string; 
-    userId?: string;
     name: string;
     email: string;
     phoneNumber?: string;

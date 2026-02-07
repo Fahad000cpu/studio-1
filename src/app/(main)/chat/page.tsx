@@ -548,7 +548,7 @@ export default function ChatPage() {
 
             return (
               <div
-                key={contact.id}
+                key={metadata.id}
                 className={cn(
                   'group relative flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
                   selectedChatId === contact.id && 'bg-accent/80'
