@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone, Trash2 } from 'lucide-react';
+import { Shield, Send, BellRing, Info, Copy, Link, Image as ImageIcon, Smartphone, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection, doc, arrayRemove, updateDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
@@ -49,36 +50,37 @@ export default function AdminPage() {
   const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
   const [installationId, setInstallationId] = useState('');
   const [isDeletingToken, setIsDeletingToken] = useState(false);
+  const [isFetchingId, setIsFetchingId] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Function to check for the ID
-      const checkAndSetId = () => {
-        const id = sessionStorage.getItem('firebaseInstallationId');
-        if (id) {
-          setInstallationId(id);
-          // If we found it, no need to check again
-          if (intervalId) clearInterval(intervalId);
-        }
-      };
+  const handleFetchId = async () => {
+    setIsFetchingId(true);
+    setInstallationId(''); // Clear previous ID
+    try {
+        // Dynamically import to ensure client-side execution
+        const { getApp } = await import('firebase/app');
+        const { getInAppMessaging, getInstallationId } = await import('firebase/in-app-messaging');
+        
+        const app = getApp();
+        const inAppMessaging = getInAppMessaging(app);
+        const fid = await getInstallationId(inAppMessaging);
 
-      // Check immediately on mount
-      checkAndSetId();
+        setInstallationId(fid);
+        toast({
+            title: 'Installation ID Fetched!',
+            description: 'The ID has been retrieved and displayed below.',
+        });
 
-      // Set up an interval to check every second for a few seconds,
-      // in case the admin page loads before the ID is set.
-      const intervalId = setInterval(checkAndSetId, 1000);
-
-      // Clean up the interval after a certain time (e.g., 10 seconds)
-      // and when the component unmounts.
-      const timeoutId = setTimeout(() => clearInterval(intervalId), 10000);
-
-      return () => {
-        clearInterval(intervalId);
-        clearTimeout(timeoutId);
-      };
+    } catch (error: any) {
+        console.error('Failed to fetch Firebase Installation ID:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Fetch Failed',
+            description: 'Could not get the Installation ID. Check console for errors.',
+        });
+    } finally {
+        setIsFetchingId(false);
     }
-  }, []);
+  };
   
   const isLoading = isAdminLoading || usersLoading;
 
@@ -247,10 +249,23 @@ export default function AdminPage() {
                         Use this information to test features like In-App Messaging for your specific device.
                     </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    {installationId ? (
+                <CardContent className="space-y-4">
+                    <Button onClick={handleFetchId} disabled={isFetchingId}>
+                        {isFetchingId ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Fetching ID...
+                            </>
+                        ) : (
+                            <>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Fetch/Refresh Device ID
+                            </>
+                        )}
+                    </Button>
+                    {installationId && (
                         <div className="space-y-2">
-                            <Label htmlFor="installationId">In-App Messaging Installation ID</Label>
+                            <Label htmlFor="installationId">Your In-App Messaging Installation ID</Label>
                             <div className="flex items-center gap-2">
                                 <Input id="installationId" readOnly value={installationId} className="font-mono"/>
                                 <Button variant="outline" size="icon" onClick={() => {
@@ -260,15 +275,11 @@ export default function AdminPage() {
                                     <Copy className="h-4 w-4"/>
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, and start a new campaign. On the "Test on device" screen, enter this ID.
-                            </p>
                         </div>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            In-App Messaging Installation ID not found. It may still be loading. Please wait a moment and refresh.
-                        </p>
                     )}
+                    <p className="text-xs text-muted-foreground pt-2">
+                        Click the button to get the unique ID for this browser. To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, start a campaign, and use this ID on the "Test on device" screen.
+                    </p>
                 </CardContent>
             </Card>
              <Card>
@@ -412,4 +423,5 @@ export default function AdminPage() {
       </div>
     </div>
   );
-}
+
+    
