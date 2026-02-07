@@ -89,21 +89,14 @@ service cloud.firestore {
     /**
      * @description Secures chat metadata. A user can only query for chats they are a part of.
      * @path /chat_metadata/{chatId}
-     * @allow (get, write) A user can read or write to a chat's metadata if their UID is in the participants list.
-     * @allow (list) A user can list chats they are a part of via a query.
-     * @principle Enforces participant-based access for chat metadata, secured by client-side queries.
+     * @allow (read) A user can read a chat's metadata if their UID is in the participants list. This supports get and list (query) operations.
+     * @allow (write) A user can write to a chat's metadata if their UID is in the participants list.
+     * @principle Enforces participant-based access for chat metadata. The client-side query must include `where('participants', 'array-contains', request.auth.uid)`.
      */
     match /chat_metadata/{chatId} {
-      // The client-side query MUST include `where('participants', 'array-contains', request.auth.uid)`.
-      // This rule allows that query to execute.
-      allow list: if isSignedIn();
-      
-      // These rules handle direct access to a single chat metadata document.
-      allow get: if isSignedIn() && request.auth.uid in resource.data.participants;
+      allow read: if isSignedIn() && request.auth.uid in resource.data.participants;
       allow create: if isSignedIn() && request.auth.uid in request.resource.data.participants;
       allow update: if isSignedIn() && request.auth.uid in resource.data.participants;
-
-      // Disallow deleting metadata to prevent losing chat history context.
       allow delete: if false;
     }
 
