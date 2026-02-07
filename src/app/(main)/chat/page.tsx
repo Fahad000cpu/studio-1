@@ -385,13 +385,29 @@ export default function ChatPage() {
       audioChunksRef.current = [];
 
       mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        await uploadMedia(audioBlob, 'audio');
+        // Stop the media stream tracks to turn off the recording indicator immediately
         stream.getTracks().forEach(track => track.stop());
+
+        if (audioChunksRef.current.length === 0) {
+            console.warn("No audio chunks recorded, skipping upload.");
+            return;
+        }
+
+        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+
+        if (audioBlob.size === 0) {
+            console.warn("Recorded audio blob is empty, skipping upload.");
+            return;
+        }
+
+        await uploadMedia(audioBlob, 'audio');
       };
 
       mediaRecorderRef.current.start();
@@ -792,5 +808,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
