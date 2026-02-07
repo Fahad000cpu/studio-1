@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -254,13 +255,17 @@ export default function LoginPage() {
     } catch (error: any) {
         console.error("Error sending OTP:", error);
         // Reset reCAPTCHA on most errors to allow for a retry
-        recaptchaVerifierRef.current?.clear();
+        recaptchaVerifierRef.current?.render().then(widgetId => {
+            // @ts-ignore
+            window.grecaptcha.reset(widgetId);
+        });
+
 
         if (error.code === 'auth/invalid-phone-number') {
             toast({
                 variant: "destructive",
                 title: "Invalid Phone Number",
-                description: `The number format is incorrect. Please ensure it is a valid number for the selected country (${selectedCountry.name}).`,
+                description: `The number format is incorrect. Please include the country code (e.g., ${selectedCountry.dial_code}) and check the number.`,
                 duration: 10000,
             });
         } else if (error.code === 'auth/too-many-requests') {
@@ -556,3 +561,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    
