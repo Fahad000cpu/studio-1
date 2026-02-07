@@ -11,19 +11,22 @@ export const InstallPwaAlert = () => {
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
+      // Prevent the mini-infobar from appearing on mobile
       event.preventDefault();
+      // Stash the event so it can be triggered later.
       setInstallPrompt(event);
     };
 
     const handleAppInstalled = () => {
+      // Hide the install button
       setInstallPrompt(null);
       setIsAppInstalled(true);
     };
 
-    // Check if running in standalone mode (already installed)
+    // Check if the app is already installed
     if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
       setIsAppInstalled(true);
-      return;
+      return; // No need to add listeners if already installed
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -36,25 +39,29 @@ export const InstallPwaAlert = () => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!installPrompt) return;
+    if (!installPrompt) {
+      // This should not happen if button is disabled, but as a fallback.
+      return;
+    }
     
+    // Show the install prompt
     await installPrompt.prompt();
     
     // Wait for the user to respond to the prompt
     const { outcome } = await installPrompt.userChoice;
     
-    // We can handle the outcome if needed (e.g., for analytics)
     if (outcome === 'accepted') {
-      // The 'appinstalled' event will hide the button.
-      console.log('User accepted the A2HS prompt');
+      console.log('User accepted the PWA installation prompt');
     } else {
-      console.log('User dismissed the A2HS prompt');
+      console.log('User dismissed the PWA installation prompt');
     }
-    // We can only use the prompt once. Clear it regardless.
+
+    // We can only use the prompt once. Clear it.
     setInstallPrompt(null);
   };
 
-  if (!installPrompt || isAppInstalled) {
+  // If the app is installed, don't show the banner
+  if (isAppInstalled) {
     return null;
   }
 
@@ -64,9 +71,14 @@ export const InstallPwaAlert = () => {
         <AlertTitle className="font-bold font-headline">Get the Full Experience!</AlertTitle>
         <AlertDescription className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <span>Install ConnectSphere on your device for faster access and a better experience.</span>
-            <Button onClick={handleInstallClick} size="sm" className="w-full sm:w-auto flex-shrink-0">
+            <Button 
+                onClick={handleInstallClick} 
+                size="sm" 
+                className="w-full sm:w-auto flex-shrink-0" 
+                disabled={!installPrompt}
+            >
                 <Download className="mr-2 h-4 w-4" />
-                Install App
+                {installPrompt ? 'Install App' : 'Ready to Install...'}
             </Button>
         </AlertDescription>
     </Alert>
