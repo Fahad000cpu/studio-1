@@ -247,7 +247,14 @@ export default function LoginPage() {
         toast({ title: "OTP Sent", description: "Please check your phone for the verification code." });
     } catch (error: any) {
         console.error("Error sending OTP:", error);
-        if (error.code === 'auth/operation-not-allowed') {
+        if (error.code === 'auth/invalid-phone-number') {
+            toast({
+                variant: "destructive",
+                title: "Invalid Phone Number",
+                description: "Please enter the number in international format, including the country code (e.g., +919876543210).",
+                duration: 10000,
+            });
+        } else if (error.code === 'auth/operation-not-allowed') {
             toast({
                 variant: "destructive",
                 title: "Phone Sign-In Disabled",
