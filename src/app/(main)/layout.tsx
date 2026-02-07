@@ -3,7 +3,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useUser, useFirestore, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useFirestore, useFirebaseApp } from "@/firebase";
 import { doc, arrayUnion } from 'firebase/firestore';
 import { useToast } from "@/hooks/use-toast";
 import { MainNav } from "@/components/main-nav";
@@ -24,6 +24,7 @@ import { Flame, Bell } from "lucide-react";
 import Link from "next/link";
 import { getMessaging, onMessage, isSupported } from 'firebase/messaging';
 import { InstallPwaButton } from "@/components/install-pwa-button";
+import { initializeInAppMessaging } from "@/firebase/init-in-app-messaging";
 
 export default function MainLayout({
   children,
@@ -32,6 +33,7 @@ export default function MainLayout({
 }) {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
   const router = useRouter();
   const { toast } = useToast();
 
@@ -67,6 +69,13 @@ export default function MainLayout({
         });
     }
   }, [user, firestore, toast]);
+
+  // New Effect for In-App Messaging Initialization
+  useEffect(() => {
+    if (user && firebaseApp) {
+      initializeInAppMessaging(firebaseApp);
+    }
+  }, [user, firebaseApp]);
 
   // If we are checking auth, or if there's no user and we are about to redirect, show a loader.
   if (isUserLoading || !user) {

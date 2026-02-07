@@ -3,37 +3,18 @@
 
 import type { FirebaseApp } from 'firebase/app';
 
-// This function is now async as it uses a dynamic import.
+// This function initializes the In-App Messaging service.
+// It needs to be called once when the app loads for an authenticated user.
 export async function initializeInAppMessaging(app: FirebaseApp) {
   try {
-    // This is a trick to prevent Next.js's server-side bundler from statically analyzing
-    // the import path, which would cause a "Module not found" error since 'firebase/in-app-messaging'
-    // is a client-only module.
-    const path = ['firebase', 'in-app-messaging'].join('/');
-    const { getInAppMessaging, getInstallationId } = await import(path);
+    // Dynamically import the In-App Messaging module only on the client side.
+    const { getInAppMessaging } = await import('firebase/in-app-messaging');
 
-    const inAppMessaging = getInAppMessaging(app);
-    console.log('Firebase In-App Messaging initialized.');
+    // Initialize the service. This starts the SDK, which will then listen for
+    // campaigns from the Firebase backend.
+    getInAppMessaging(app);
 
-    // Get and log the installation ID for testing purposes
-    getInstallationId(inAppMessaging)
-      .then(installationId => {
-        console.log(
-          '%c FIREBASE IN-APP MESSAGING INSTALLATION ID: ',
-          'color: #FFCA28; background: #333; font-size: 1.2em; font-weight: bold; padding: 4px;',
-          installationId
-        );
-        console.log(
-          'Copy this ID and use it to test In-App Messages from the Firebase Console.'
-        );
-        // Store the ID in sessionStorage so it can be accessed by the UI
-        if (typeof window !== 'undefined') {
-            sessionStorage.setItem('firebaseInstallationId', installationId);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to get In-App Messaging Installation ID:', err);
-      });
+    console.log('Firebase In-App Messaging SDK initialized successfully.');
   } catch (err) {
     console.error('Firebase In-App Messaging failed to initialize:', err);
   }
