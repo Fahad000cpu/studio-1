@@ -237,51 +237,53 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
+        {/* This card is now visible to all logged-in users to facilitate testing */}
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Info className="h-5 w-5"/>
+                    Device & Testing Information
+                </CardTitle>
+                <CardDescription>
+                    Use this information to test features like In-App Messaging for your specific device.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <Button onClick={handleFetchId} disabled={isFetchingId}>
+                    {isFetchingId ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Fetching ID...
+                        </>
+                    ) : (
+                        <>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Fetch/Refresh Device ID
+                        </>
+                    )}
+                </Button>
+                {installationId && (
+                    <div className="space-y-2">
+                        <Label htmlFor="installationId">Your In-App Messaging Installation ID</Label>
+                        <div className="flex items-center gap-2">
+                            <Input id="installationId" readOnly value={installationId} className="font-mono"/>
+                            <Button variant="outline" size="icon" onClick={() => {
+                                navigator.clipboard.writeText(installationId);
+                                toast({ title: 'Installation ID Copied!' });
+                            }}>
+                                <Copy className="h-4 w-4"/>
+                            </Button>
+                        </div>
+                    </div>
+                )}
+                <p className="text-xs text-muted-foreground pt-2">
+                    Click the button to get the unique ID for this browser. To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, start a campaign, and use this ID on the "Test on device" screen.
+                </p>
+            </CardContent>
+        </Card>
+
         {isAdmin && (
           <>
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Info className="h-5 w-5"/>
-                        Device & Testing Information
-                    </CardTitle>
-                    <CardDescription>
-                        Use this information to test features like In-App Messaging for your specific device.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Button onClick={handleFetchId} disabled={isFetchingId}>
-                        {isFetchingId ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Fetching ID...
-                            </>
-                        ) : (
-                            <>
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Fetch/Refresh Device ID
-                            </>
-                        )}
-                    </Button>
-                    {installationId && (
-                        <div className="space-y-2">
-                            <Label htmlFor="installationId">Your In-App Messaging Installation ID</Label>
-                            <div className="flex items-center gap-2">
-                                <Input id="installationId" readOnly value={installationId} className="font-mono"/>
-                                <Button variant="outline" size="icon" onClick={() => {
-                                    navigator.clipboard.writeText(installationId);
-                                    toast({ title: 'Installation ID Copied!' });
-                                }}>
-                                    <Copy className="h-4 w-4"/>
-                                </Button>
-                            </div>
-                        </div>
-                    )}
-                    <p className="text-xs text-muted-foreground pt-2">
-                        Click the button to get the unique ID for this browser. To test an In-App Message, go to the Firebase Console, navigate to In-App Messaging, start a campaign, and use this ID on the "Test on device" screen.
-                    </p>
-                </CardContent>
-            </Card>
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -423,5 +425,7 @@ export default function AdminPage() {
       </div>
     </div>
   );
+
+    
 
     
