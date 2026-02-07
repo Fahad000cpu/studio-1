@@ -21,7 +21,6 @@ import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
-import { NotificationPermissionAlert } from '@/components/notification-permission-alert';
 import { DeviceIdFetcher } from '@/components/device-id-fetcher';
 import {
     AlertDialog,
@@ -279,8 +278,6 @@ export default function AdminPage() {
                 </Button>
               </CardContent>
             </Card>
-            
-            <NotificationPermissionAlert />
 
             <Card>
               <CardHeader>
