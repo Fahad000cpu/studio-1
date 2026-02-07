@@ -43,31 +43,9 @@ export default function MainLayout({
     }
   }, [user, isUserLoading, router]);
 
-  useEffect(() => {
-    // This effect sets up Firebase messaging listeners for foreground messages.
-    if (typeof window !== 'undefined' && user) {
-        isSupported().then(supported => {
-            if (supported) {
-                const messaging = getMessaging();
-
-                // Handle messages that arrive while the app is in the foreground
-                const unsubscribeOnMessage = onMessage(messaging, (payload) => {
-                    console.log('Foreground message received.', payload);
-                    if (payload.data) {
-                        toast({
-                            title: payload.data.title,
-                            description: payload.data.body,
-                        });
-                    }
-                });
-
-                return () => {
-                    unsubscribeOnMessage();
-                };
-            }
-        });
-    }
-  }, [user, firestore, toast]);
+  // The foreground message handler (onMessage) has been removed.
+  // The service worker (sw.js) now handles all push notifications,
+  // ensuring a consistent experience whether the app is in the foreground or background.
 
   // If we are checking auth, or if there's no user and we are about to redirect, show a loader.
   if (isUserLoading || !user) {

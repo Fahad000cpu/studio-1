@@ -4,14 +4,20 @@
   "description": "A modern chat application.",
   "icons": [
     {
-      "src": "/logo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": "/discover",
+  "start_url": "/",
   "display": "standalone",
-  "scope": "/",
-  "background_color": "#18181b",
-  "theme_color": "#8A2BE2"
+  "theme_color": "#8A2BE2",
+  "background_color": "#F5F5F5"
 }

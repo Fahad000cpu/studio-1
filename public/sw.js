@@ -1,66 +1,72 @@
+// This is the service worker script for the PWA.
 
+// On install, the service worker will be installed.
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Install event');
+  console.log('Service Worker: Installing...');
+  // Skip waiting to activate the new service worker immediately.
+  self.skipWaiting();
 });
 
+// On activate, take control of all clients.
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activate event');
+  console.log('Service Worker: Activating...');
+  // This claims control over all uncontrolled clients.
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', function(event) {
-  // A basic fetch handler to satisfy the PWA installability criteria.
-  // This strategy is network-first. For offline capabilities, this would need to be expanded.
-  event.respondWith(
-    fetch(event.request).catch(function() {
-      // This is a very basic offline fallback. 
-      // A real app would have a cached offline page.
-      return new Response(
-        '<h1>You are offline</h1><p>Please check your internet connection.</p>',
-        { headers: { 'Content-Type': 'text/html' } }
-      );
-    })
-  );
+// The fetch event is required for a PWA to be considered installable.
+// This basic handler just passes the request through to the network.
+self.addEventListener('fetch', (event) => {
+  // We are not implementing any caching strategy here,
+  // just fulfilling the PWA requirement.
+  event.respondWith(fetch(event.request));
 });
 
-self.addEventListener('push', function(event) {
-  console.log('[Service Worker] Push Received.');
-  if (!event.data) {
-    console.log('[Service Worker] Push event but no data');
-    return;
+// Listen for push notifications. This is triggered by a data-only FCM message.
+self.addEventListener('push', (event) => {
+  console.log('Service Worker: Push Received.');
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    console.error('Failed to parse push data:', e);
   }
-  const data = event.data.json();
-  console.log('[Service Worker] Push data: ', data);
 
-  const title = data.title || 'New Message';
+  const title = data.title || 'ConnectSphere';
   const options = {
     body: data.body || 'You have a new message.',
-    icon: data.icon || '/logo.svg',
-    badge: data.badge || '/logo.svg',
+    icon: data.icon || '/logo192.png',
+    badge: data.badge || '/logo192.png',
+    image: data.image,
+    tag: data.tag || 'connectsphere-notification',
+    renotify: true,
     data: {
-      url: data.url || '/'
-    }
+      url: data.url || '/',
+    },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-self.addEventListener('notificationclick', function(event) {
-  console.log('[Service Worker] Notification click Received.');
-
+// Handle notification click event.
+self.addEventListener('notificationclick', (event) => {
+  console.log('Service Worker: Notification click Received.');
   event.notification.close();
 
-  const urlToOpen = event.notification.data.url || '/';
+  const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({
-      type: 'window'
-    }).then(function(clientList) {
-      for (let i = 0; i < clientList.length; i++) {
-        const client = clientList[i];
-        if (client.url === '/' && 'focus' in client) {
+      type: 'window',
+      includeUncontrolled: true,
+    }).then((clientList) => {
+      // Check if a window is already open with the target URL.
+      for (const client of clientList) {
+        if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
+      // If not, open a new window.
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }

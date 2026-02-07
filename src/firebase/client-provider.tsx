@@ -7,7 +7,6 @@ import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
-import dynamic from 'next/dynamic';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -38,13 +37,6 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   return instances;
 };
 
-// Dynamically import the initializer component to ensure it only runs on the client.
-// This prevents the 'firebase/in-app-messaging' module from being bundled on the server.
-const FiamInitializer = dynamic(
-    () => import('@/components/fiam-initializer').then(mod => mod.FiamInitializer),
-    { ssr: false }
-);
-
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const instances = useMemo(() => {
@@ -67,7 +59,6 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       auth={instances.auth}
       firestore={instances.firestore}
     >
-      <FiamInitializer />
       {children}
     </FirebaseProvider>
   );

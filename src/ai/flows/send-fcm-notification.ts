@@ -34,38 +34,36 @@ export async function sendFcmNotification(
     
     const message: admin.messaging.MulticastMessage = {
         tokens: validTokens,
-        notification: {
+        data: {
             title: title,
             body: body,
-            ...(image && { imageUrl: image }),
-        },
-        data: {
-            url: url || '/', // Fallback data for SW and other platforms
+            icon: icon || '/logo192.png',
+            badge: '/logo192.png',
+            image: image || '',
+            url: url || '/discover',
+            tag: 'connectsphere-chat',
         },
         webpush: {
-            notification: {
-                icon: icon || '/logo.svg',
-                badge: '/logo.svg',
-                tag: 'connectsphere-chat', // To stack notifications
-            },
-            fcmOptions: {
-                link: url || '/', // This is key for click actions on web
-            },
-        },
-        apns: {
-            payload: {
-                aps: { 'content-available': 1 },
+            headers: {
+              Urgency: 'high',
             },
         },
         android: {
             priority: 'high',
-            notification: {
-                color: '#8A2BE2',
+        },
+        apns: {
+            payload: {
+                aps: {
+                    'content-available': 1,
+                },
+            },
+            headers: {
+                'apns-priority': '10',
             },
         },
     };
 
-    console.log(`[FCM Action] Sending robust push notification to ${validTokens.length} token(s).`);
+    console.log(`[FCM Action] Sending data-only push notification to ${validTokens.length} token(s).`);
 
     try {
         const response = await admin.messaging().sendEachForMulticast(message);
