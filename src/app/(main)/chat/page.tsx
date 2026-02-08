@@ -99,6 +99,7 @@ export default function ChatPage() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const searchParams = useSearchParams();
+  const prevMessagesRef = useRef<Message[]>();
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
@@ -199,6 +200,47 @@ export default function ChatPage() {
       }
     }
   }, [messages]);
+
+  // Effect to handle client-side notifications
+  useEffect(() => {
+    if (!messages || messages.length === 0 || !user || !usersMap.size) {
+        prevMessagesRef.current = messages;
+        return;
+    }
+
+    const latestMessage = messages[messages.length - 1];
+    const lastKnownMessageId = prevMessagesRef.current?.[prevMessagesRef.current.length - 1]?.id;
+    
+    if (latestMessage && latestMessage.id !== lastKnownMessageId && !latestMessage.own) {
+        if (document.hidden) {
+            const sender = usersMap.get(latestMessage.senderId);
+            const senderName = sender?.name || 'New Message';
+            
+            let messageBody = "Sent a file";
+            if (latestMessage.messageType === 'text') messageBody = latestMessage.text;
+            if (latestMessage.messageType === 'link') messageBody = '🔗 Link';
+            if (latestMessage.messageType === 'image') messageBody = '📷 Photo';
+            if (latestMessage.messageType === 'video') messageBody = '🎥 Video';
+            if (latestMessage.messageType === 'audio') messageBody = '🎤 Voice Message';
+
+            if (Notification.permission === 'granted') {
+                const notification = new Notification(senderName, {
+                    body: messageBody,
+                    icon: sender?.profilePictureUrl || '/logo192.png',
+                    badge: '/logo192.png',
+                    tag: latestMessage.chatId,
+                    renotify: true,
+                });
+                
+                notification.onclick = () => {
+                    window.focus();
+                };
+            }
+        }
+    }
+
+    prevMessagesRef.current = messages;
+  }, [messages, user, usersMap]);
 
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;

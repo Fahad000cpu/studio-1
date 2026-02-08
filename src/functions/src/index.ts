@@ -23,8 +23,7 @@ if (admin.apps.length === 0) {
 }
 
 // The onDocumentCreated Cloud Function for sending chat notifications has been removed.
-// Notifications are now sent via a client-triggered server action to provide a more direct
-// and debuggable notification flow, bypassing potential issues with Firestore triggers
-// and environment configurations (like the Blaze plan requirement for external network access).
-
-
+// Notifications are now handled client-side in `src/app/(main)/chat/page.tsx`
+// to avoid the Blaze plan requirement for server-side push notifications.
+// This new approach shows a local browser notification when a new message is received
+// while the user is on a different browser tab.
