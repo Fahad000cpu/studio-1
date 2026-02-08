@@ -110,13 +110,22 @@ export default function ChatPage() {
 
   const chatMetadataQuery = useMemoFirebase(() => {
     if (!user) return null;
-    return query(
-        collection(firestore, 'users', user.uid, 'chats'),
-        orderBy('lastMessageTimestamp', 'desc')
-    );
+    // Simplified query: Removed orderBy to prevent index-related permission issues.
+    // Sorting is now handled on the client-side.
+    return collection(firestore, 'users', user.uid, 'chats');
   }, [user, firestore]);
   
-  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataQuery);
+  const { data: unsortedChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataQuery);
+
+  // Client-side sorting of chats
+  const chatMetadatas = useMemo(() => {
+    if (!unsortedChatMetadatas) return [];
+    return [...unsortedChatMetadatas].sort((a, b) => {
+        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
+        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
+        return timeB - timeA; // Descending order
+    });
+  }, [unsortedChatMetadatas]);
 
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
@@ -816,5 +825,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
