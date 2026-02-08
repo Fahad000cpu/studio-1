@@ -3,16 +3,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // This rule allows a user to read and write to their own document
-    // and any subcollections within it (like 'chats').
-    // It also allows any authenticated user to read the top-level user profile
-    // for discovery purposes, but not the subcollections.
+    // This rule allows a user to get their own document or any other user's document for discovery.
+    // It also allows a user to write ONLY to their own document.
     match /users/{userId} {
-      allow get: if request.auth != null; // Anyone can get a user's profile for discovery.
-      allow read, write: if request.auth.uid == userId; // User can read/write their own document and all subcollections.
+      allow get: if request.auth != null; 
+      allow write: if request.auth.uid == userId; 
     }
 
-    // Any authenticated user can read/write messages in the top-level `chats` collection.
+    // NEW, EXPLICIT RULE:
+    // This rule allows a user to read and write documents within their OWN 'chats' subcollection.
+    // This is required for fetching the chat list and fixes the permission denied error.
+    match /users/{userId}/chats/{chatId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
     // This collection holds the actual messages for all 1-on-1 chats.
     match /chats/{chatId}/messages/{messageId} {
         allow read, write: if request.auth != null;
