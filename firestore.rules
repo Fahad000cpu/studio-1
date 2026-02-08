@@ -14,11 +14,15 @@ service cloud.firestore {
       // A user can create a message if they are the sender.
       allow create: if request.auth.uid == request.resource.data.senderId;
 
-      // Participants can read or update messages (e.g., for "delete for me").
-      // We check against the {chatId} wildcard from the path itself.
-      allow read, update: if request.auth.uid in chatId.split('_');
+      // Reading (list or get) is allowed if the user is a participant in the chat.
+      // We rely on the chatId for this, as `resource` isn't available for `list`.
+      allow read: if request.auth.uid in chatId.split('_');
+      
+      // Updating (like "delete for me") is allowed if the user is a participant.
+      // This is a more reliable check using the document's actual data.
+      allow update: if request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.recipientId;
 
-      // Only the original sender can delete a message for everyone.
+      // Deleting (for everyone) is only allowed for the original sender.
       allow delete: if request.auth.uid == resource.data.senderId;
     }
 
