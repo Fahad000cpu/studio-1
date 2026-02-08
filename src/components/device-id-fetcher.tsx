@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Info, Loader2, RefreshCw, Copy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getApp } from 'firebase/app';
+import { getInstallations, getId } from 'firebase/installations';
 
 export function DeviceIdFetcher() {
   const { toast } = useToast();
@@ -18,10 +19,6 @@ export function DeviceIdFetcher() {
     setIsFetchingId(true);
     setInstallationId(''); // Clear previous ID
     try {
-        // Dynamically import to ensure client-side execution.
-        const { getApp } = await import('firebase/app');
-        const { getInstallations, getId } = await import('firebase/installations');
-        
         const app = getApp();
         const installations = getInstallations(app);
         const fid = await getId(installations);
