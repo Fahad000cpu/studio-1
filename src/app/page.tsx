@@ -7,30 +7,28 @@ import { FullScreenLoader } from '@/components/full-screen-loader';
 
 /**
  * The root page of the application, acting as a gatekeeper.
- * This client component waits for the authentication state to be resolved
- * and then redirects the user to the appropriate page (/discover or /login).
- * This prevents race conditions between server-side and client-side redirects.
+ * It waits for the Firebase authentication state to be determined and then
+ * redirects the user to the appropriate part of the app.
+ * This prevents race conditions between different layouts trying to redirect.
  */
-export default function RootPage() {
+export default function GatekeeperPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    // Don't do anything until the auth state is resolved
-    if (isUserLoading) {
-      return;
-    }
-
-    if (user) {
-      // If user is logged in, go to the main app
-      router.replace('/discover');
-    } else {
-      // If user is not logged in, go to the login page
-      router.replace('/login');
+    // Wait until the authentication state is resolved
+    if (!isUserLoading) {
+      if (user) {
+        // If user is logged in, redirect to the main app
+        router.replace('/discover');
+      } else {
+        // If no user is logged in, redirect to the login page
+        router.replace('/login');
+      }
     }
   }, [user, isUserLoading, router]);
 
   // While checking the auth state, show a full-screen loader.
-  // This is the only thing rendered until the redirect happens.
+  // This page will never render anything else, as it will always redirect.
   return <FullScreenLoader message="Initializing..." />;
 }
