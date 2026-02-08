@@ -1,8 +1,6 @@
 
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useUser } from "@/firebase";
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
@@ -28,14 +26,6 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    // Failsafe redirect if an unauthenticated user somehow lands here.
-    if (!isUserLoading && !user) {
-      router.replace('/login');
-    }
-  }, [isUserLoading, user, router]);
 
   // While checking auth or if user is not authenticated, show a loader.
   // This prevents flashing the main layout to unauthenticated users.

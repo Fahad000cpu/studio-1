@@ -107,9 +107,8 @@ service cloud.firestore {
        */
 
       match /chats/{otherUserId} {
-
-        allow read, write: if isOwner();
-
+        allow get, write: if isOwner();
+        allow list: if isOwner();
       }
 
     }

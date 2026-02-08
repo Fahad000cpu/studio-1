@@ -1,8 +1,6 @@
 
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useUser } from "@/firebase";
 import { FullScreenLoader } from "@/components/full-screen-loader";
 
@@ -12,14 +10,6 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    // Failsafe redirect if an authenticated user somehow lands here.
-    if (!isUserLoading && user) {
-      router.replace('/discover');
-    }
-  }, [isUserLoading, user, router]);
 
   // While checking auth or if user is already logged in, show a loader.
   // This prevents flashing the auth form to authenticated users during redirect.
