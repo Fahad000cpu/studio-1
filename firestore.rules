@@ -4,17 +4,16 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Rule for user profiles (/users)
+    // Any authenticated user can list and read user profiles (for Discover page)
+    // Only the owner can create, update, or delete their own profile
     match /users/{userId} {
-      // Any authenticated user can list and read user profiles (for Discover page)
       allow list, get: if request.auth != null;
-
-      // Only the owner can create, update, or delete their own profile
       allow write: if request.auth.uid == userId;
     }
 
     // Rule for a user's private chat list subcollection
+    // A user can only read and write documents in their OWN chat list.
     match /users/{userId}/chats/{chatId} {
-        // A user can only read and write documents in their OWN chat list.
         allow read, write: if request.auth.uid == userId;
     }
 
@@ -64,7 +63,7 @@ service cloud.firestore {
       }
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow create: if request.auth.uid != null && request.resource.data.creatorId == request.auth.uid;
       allow update: if isMember();
       allow delete: if isGroupCreator();
     }

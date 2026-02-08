@@ -113,16 +113,11 @@ export default function ChatPage() {
     return collection(firestore, 'users', user.uid, 'chats');
   }, [user, firestore]);
 
-  const { data: rawChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
+  const chatMetadataOptions = useMemoFirebase<CollectionOptions>(() => ({
+    orderBy: ['lastMessageTimestamp', 'desc']
+  }), []);
 
-  const chatMetadatas = useMemo(() => {
-    if (!rawChatMetadatas) return null;
-    return [...rawChatMetadatas].sort((a, b) => {
-        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
-        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
-        return timeB - timeA;
-    });
-  }, [rawChatMetadatas]);
+  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection, chatMetadataOptions);
 
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);

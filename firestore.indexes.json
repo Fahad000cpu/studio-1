@@ -1,0 +1,15 @@
+
+{
+  "indexes": [
+    {
+      "collectionGroup": "chats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "lastMessageTimestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ]
+}
