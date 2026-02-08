@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from 'react';
@@ -7,21 +8,21 @@ import { FullScreenLoader } from '@/components/full-screen-loader';
 
 /**
  * The root page of the application, acting as a "gatekeeper" for routing.
- * This client component waits for the authentication state to resolve and then
- * performs a single, definitive client-side redirect. This prevents race
- * conditions between different layouts trying to redirect simultaneously.
+ * This client component is the *single source of truth* for initial redirection.
+ * It waits for the authentication state to resolve and then performs a
+ * definitive client-side redirect, preventing race conditions from other layouts.
  */
 export default function RootPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    // Wait until the authentication state is resolved.
+    // Wait until the authentication state is fully resolved.
     if (isUserLoading) {
-      return; // Do nothing while loading.
+      return; // Show the loader while we wait.
     }
 
-    // Once loading is complete, decide where to go.
+    // Once resolved, perform the one and only initial redirect.
     if (user) {
       router.replace('/discover');
     } else {
@@ -29,8 +30,6 @@ export default function RootPage() {
     }
   }, [user, isUserLoading, router]);
 
-  // While waiting for the auth state to resolve, show a loader.
-  // This is crucial to prevent other layouts from rendering and attempting
-  // their own redirects, which causes the race condition.
+  // Render a loader while the redirection logic is determining the destination.
   return <FullScreenLoader message="Initializing..." />;
 }

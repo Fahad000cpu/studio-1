@@ -63,7 +63,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setName(user.displayName || "");
-      setBio(user.bio || "Loves hiking and photography.");
+      setBio(user.bio || "");
     }
   }, [user]);
 

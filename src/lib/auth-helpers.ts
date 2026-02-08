@@ -37,6 +37,7 @@ export const handleUserProfileUpdate = (
                 email: details.email,
                 phoneNumber: details.phoneNumber || user.phoneNumber || null,
                 profilePictureUrl: details.photoURL || `https://picsum.photos/seed/${user.uid}/200`,
+                bio: "",
                 coordinates: null,
                 fcmTokens: [],
                 createdAt: new Date(),

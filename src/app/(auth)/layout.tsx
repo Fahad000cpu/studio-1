@@ -11,15 +11,16 @@ export default function AuthLayout({
 }) {
   const { user, isUserLoading } = useUser();
 
-  // While loading auth state, or if a user is found (and redirect from RootPage is in progress), show a loader.
-  // This prevents the login form from flashing for an already logged-in user.
+  // This layout now only acts as a guard.
+  // If the user is being checked or is already logged in, show a loader.
+  // The actual redirection away from this page is handled by the root page.tsx.
   if (isUserLoading || user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading Session..." : "Redirecting..."} />
     );
   }
 
-  // If loading is complete and there's no user, show the children (Login/Signup page).
+  // If we get here, it means there's no authenticated user, so show the login/signup page.
   return (
     <main className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from "react";
@@ -127,7 +126,7 @@ export default function ProductsPage() {
                     <div className="absolute top-2 right-2 z-10">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="secondary" size="icon" className="h-8 w-8 bg-black/30 hover:bg-black/50 border-white/20 text-white">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-black/50 focus-visible:ring-white/50">
                                     <MoreVertical className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>

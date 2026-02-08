@@ -43,6 +43,7 @@ import {
   useMemoFirebase,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
+  setDocumentNonBlocking,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -76,7 +77,7 @@ function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
 }
 
-const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null) => {
+const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null): string => {
   if (!timestamp) return '';
   const date = timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
   
@@ -111,6 +112,18 @@ export default function ChatPage() {
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
+  // Fetch all chat metadata for the current user
+  const chatMetadataCollection = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, 'users', user.uid, 'chats');
+  }, [firestore, user]);
+  const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection);
+
+  const chatMetadataMap = useMemo(() => {
+    if (!chatMetadata) return new Map<string, ChatMetadata>();
+    return new Map(chatMetadata.map(cm => [cm.id, cm]));
+  }, [chatMetadata]);
+
   const usersMap = useMemo(() => {
     if (!allUsers) return new Map<string, UserProfile>();
     return new Map(allUsers.map(u => [u.id, u]));
@@ -120,7 +133,7 @@ export default function ChatPage() {
   const filteredUsers = useMemo(() => {
     if (!allUsers || !user) return [];
     
-    return allUsers.filter(u => {
+    const users = allUsers.filter(u => {
         if (u.id === user.uid) return false; // Exclude self
 
         if (!searchTerm) return true;
@@ -130,7 +143,16 @@ export default function ChatPage() {
         const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
         return nameMatch || emailMatch;
     });
-  }, [allUsers, user, searchTerm]);
+
+    // Sort users: those with recent chats come first
+    return users.sort((a, b) => {
+      const metaA = chatMetadataMap.get(a.id);
+      const metaB = chatMetadataMap.get(b.id);
+      const timeA = metaA?.lastMessageTimestamp?.toMillis() || 0;
+      const timeB = metaB?.lastMessageTimestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
+  }, [allUsers, user, searchTerm, chatMetadataMap]);
 
 
   const selectedChat = useMemo(() => {
@@ -140,9 +162,20 @@ export default function ChatPage() {
   
   const handleSelectChat = useCallback((contact: UserProfile) => {
     setSelectedChatId(contact.id);
-  }, []);
+    if (!user || !firestore) return;
 
-  const isLoading = allUsersLoading;
+    // Reset unread count if there is one
+    const chatMeta = chatMetadataMap.get(contact.id);
+    if (chatMeta && chatMeta.unreadCount && chatMeta.unreadCount > 0) {
+      const chatMetaRef = doc(firestore, 'users', user.uid, 'chats', contact.id);
+      // Use updateDoc because we know the doc exists if there's an unread count
+      updateDocumentNonBlocking(chatMetaRef, {
+          unreadCount: 0
+      });
+    }
+  }, [user, firestore, chatMetadataMap]);
+
+  const isLoading = allUsersLoading || chatMetadataLoading;
 
   useEffect(() => {
     if (isLoading || selectedChatId || !usersMap.size) return;
@@ -205,7 +238,7 @@ export default function ChatPage() {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
   const updateChatMetadata = (text: string) => {
-    if (!user || !selectedChat) return;
+    if (!user || !selectedChat || !firestore) return;
 
     const recipientId = selectedChat.id;
     const senderId = user.uid;
@@ -218,14 +251,13 @@ export default function ChatPage() {
         id: recipientId,
         lastMessageText: text,
         lastMessageTimestamp: timestamp,
+        // We don't increment our own unread count
     };
-    setDoc(senderChatRef, senderPayload, { merge: true }).catch(error => {
-        console.error("Failed to update sender's chat metadata:", error);
-    });
+    setDocumentNonBlocking(senderChatRef, senderPayload, { merge: true });
 
-    // Attempt to update recipient's metadata. This will fail due to security rules,
-    // which is expected. We will move this logic to a Cloud Function in the future.
-    // For now, we catch the error to prevent the "Upload Failed" toast.
+    // Attempt to update recipient's metadata. 
+    // This now uses a non-blocking update that will fail silently on permission-denied,
+    // which is expected. This logic should eventually be a Cloud Function.
     const recipientChatRef = doc(firestore, 'users', recipientId, 'chats', senderId);
     const recipientPayload = {
         id: senderId,
@@ -233,13 +265,7 @@ export default function ChatPage() {
         lastMessageTimestamp: timestamp,
         unreadCount: increment(1),
     };
-    setDoc(recipientChatRef, recipientPayload, { merge: true }).catch(error => {
-        if (error.code === 'permission-denied') {
-            console.log("Note: Recipient unread count update failed as expected on client. This should be a Cloud Function.");
-        } else {
-            console.error("Failed to update recipient's chat metadata:", error);
-        }
-    });
+    setDocumentNonBlocking(recipientChatRef, recipientPayload, { merge: true });
   };
 
 
@@ -488,6 +514,8 @@ export default function ChatPage() {
         ) : filteredUsers.length > 0 ? (
           filteredUsers.map((contact) => {
             if (!user || !contact) return null;
+            const metadata = chatMetadataMap.get(contact.id);
+            const unreadCount = metadata?.unreadCount || 0;
             
             return (
               <div
@@ -506,10 +534,19 @@ export default function ChatPage() {
                 </Avatar>
                 <div className="flex-grow overflow-hidden">
                   <p className="font-semibold truncate">{contact.name || contact.email}</p>
-                  <p className="text-sm truncate text-muted-foreground">
-                    Start a conversation
+                  <p className={cn(
+                    "text-sm truncate",
+                    unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground"
+                    )}>
+                    {metadata?.lastMessageText || 'Start a conversation'}
                   </p>
                 </div>
+                 <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                    <span>{getMessageTimestamp(metadata?.lastMessageTimestamp)}</span>
+                    {unreadCount > 0 && (
+                        <Badge className="h-5 w-5 flex items-center justify-center p-0">{unreadCount}</Badge>
+                    )}
+                 </div>
               </div>
             );
         })

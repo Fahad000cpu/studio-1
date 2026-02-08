@@ -27,15 +27,16 @@ export default function MainLayout({
 }) {
   const { user, isUserLoading } = useUser();
 
-  // While loading auth state, or if there's no user (and redirect from RootPage is in progress), show a loader.
-  // This prevents the main app from flashing before the user is authenticated or redirected.
+  // This layout now only acts as a guard.
+  // If the user isn't loaded or doesn't exist, show a loader.
+  // The actual redirection is handled by the root page.tsx.
   if (isUserLoading || !user) {
     return (
-      <FullScreenLoader message={isUserLoading ? "Loading your sphere..." : "Accessing your account..."} />
+      <FullScreenLoader message="Loading your sphere..." />
     );
   }
 
-  // If loading is complete and a user is found, render the main app layout.
+  // If we get here, it means the user is authenticated, so we can render the app.
   return (
       <div className="relative min-h-screen">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
