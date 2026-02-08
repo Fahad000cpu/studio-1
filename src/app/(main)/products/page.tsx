@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { EditProductDialog } from "@/components/edit-product-dialog";
+import { Badge } from "@/components/ui/badge";
 
 export default function ProductsPage() {
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
@@ -30,7 +31,7 @@ export default function ProductsPage() {
 
   const categories = useMemo(() => {
     if (!products) return [];
-    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
     if (uniqueCategories.length > 0) {
         return ["All", ...uniqueCategories];
     }
@@ -56,48 +57,51 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="container mx-auto">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-3xl font-bold font-headline tracking-tight">Affiliate Products</h1>
-          <p className="text-muted-foreground">
-            Check out these recommended products.
-          </p>
-        </div>
-        {!isLoading && isAdmin && (
-          <AddProductDialog>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-            </Button>
-          </AddProductDialog>
-        )}
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="relative flex-grow">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search for products..."
-            className="pl-10"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        {categories.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                {categories.map(category => (
-                    <Button 
-                        key={category}
-                        variant={selectedCategory === category || (selectedCategory === null && category === "All") ? "default" : "outline"}
-                        onClick={() => setSelectedCategory(category === "All" ? null : category)}
-                        className="whitespace-nowrap"
-                    >
-                        {category}
-                    </Button>
-                ))}
-            </div>
-        )}
-      </div>
+    <div className="container mx-auto space-y-8">
+      <Card className="bg-card/80 backdrop-blur-sm">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+              <div>
+                  <CardTitle className="text-3xl font-bold font-headline tracking-tight">Affiliate Products</CardTitle>
+                  <CardDescription className="mt-1">
+                      Check out these recommended products.
+                  </CardDescription>
+              </div>
+              {!isLoading && isAdmin && (
+                  <AddProductDialog>
+                      <Button>
+                          <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                      </Button>
+                  </AddProductDialog>
+              )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                  placeholder="Search for products..."
+                  className="pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+              />
+          </div>
+          {categories.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                  {categories.map(category => (
+                      <Button 
+                          key={category}
+                          variant={selectedCategory === category || (selectedCategory === null && category === "All") ? "default" : "outline"}
+                          onClick={() => setSelectedCategory(category === "All" ? null : category)}
+                          className="whitespace-nowrap"
+                      >
+                          {category}
+                      </Button>
+                  ))}
+              </div>
+          )}
+        </CardContent>
+      </Card>
 
        {isLoading ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -126,7 +130,7 @@ export default function ProductsPage() {
                     <div className="absolute top-2 right-2 z-10">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-black/50 focus-visible:ring-white/50">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/30 text-white hover:bg-black/50 focus-visible:ring-white/50">
                                     <MoreVertical className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -139,9 +143,9 @@ export default function ProductsPage() {
                                 </EditProductDialog>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                            <Trash2 className="mr-2 h-4 w-4 text-destructive"/>
-                                            <span className="text-destructive">Delete</span>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                            <Trash2 className="mr-2 h-4 w-4"/>
+                                            <span>Delete</span>
                                         </DropdownMenuItem>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
@@ -169,11 +173,13 @@ export default function ProductsPage() {
                   src={product.imageUrl}
                   alt={product.name}
                   fill
-                  className="object-cover"
+                  className="object-cover transition-transform group-hover:scale-105"
                 />
+                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                 <CardTitle className="font-headline text-2xl absolute bottom-4 left-4 text-white z-10">{product.name}</CardTitle>
+                 {product.category && <Badge variant="secondary" className="absolute top-3 left-3 z-10">{product.category}</Badge>}
               </CardHeader>
               <CardContent className="p-6 flex-grow">
-                <CardTitle className="font-headline text-2xl mb-2">{product.name}</CardTitle>
                 <CardDescription>
                   {product.description}
                 </CardDescription>
@@ -182,7 +188,7 @@ export default function ProductsPage() {
                 <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
                   <a href={product.affiliateLink} target="_blank" rel="noopener noreferrer">
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    view product
+                    View Product
                   </a>
                 </Button>
               </CardFooter>
@@ -191,9 +197,10 @@ export default function ProductsPage() {
         </div>
        )}
        {!isLoading && filteredProducts.length === 0 && (
-         <div className="text-center py-16">
-            <h2 className="text-2xl font-bold font-headline">No Products Found</h2>
-            <p className="text-muted-foreground mt-2">Try adjusting your search or category filters.</p>
+         <div className="text-center py-16 text-muted-foreground">
+            <Search className="mx-auto h-12 w-12 mb-4" />
+            <h2 className="text-2xl font-bold font-headline text-foreground">No Products Found</h2>
+            <p className="mt-2">Try adjusting your search or category filters.</p>
          </div>
        )}
     </div>

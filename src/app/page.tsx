@@ -1,35 +1,35 @@
-"use client";
+'use client';
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from "@/firebase";
-import { FullScreenLoader } from "@/components/full-screen-loader";
+import { useUser } from '@/firebase';
+import { FullScreenLoader } from '@/components/full-screen-loader';
 
 /**
  * The root page of the application, acting as the primary gatekeeper for routing.
- * This client component waits for the authentication state to be resolved
- * and then performs a single, definitive redirect to the appropriate section
- * of the app ('/discover' for logged-in users, '/login' for logged-out users).
- * It shows a loader during the initial auth check to prevent content flashes.
+ * This client component waits for the authentication status to be resolved and then
+ * executes a single, decisive redirect. This prevents race conditions between different
+ * layouts trying to handle routing.
  */
 export default function RootPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    // Wait until the authentication state is resolved.
+    // Wait until the authentication status is fully resolved.
     if (!isUserLoading) {
       if (user) {
-        // If user is logged in, redirect to the main app.
+        // If a user is logged in, go to the main content.
         router.replace('/discover');
       } else {
-        // If user is not logged in, redirect to the login page.
+        // If no user is logged in, go to the login page.
         router.replace('/login');
       }
     }
+    // This effect should run whenever the user's auth state or loading status changes.
   }, [user, isUserLoading, router]);
 
-  // While we wait for the auth state and the redirect to happen,
-  // show a full-screen loader. This is the default state.
-  return <FullScreenLoader message="Initializing your experience..." />;
+  // While waiting for the authentication check to complete, show a loader.
+  // This prevents any flickering and ensures a smooth transition.
+  return <FullScreenLoader message="Initializing ConnectSphere..." />;
 }

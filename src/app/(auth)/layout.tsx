@@ -3,6 +3,9 @@
 
 import { useUser } from "@/firebase";
 import { FullScreenLoader } from "@/components/full-screen-loader";
+// We no longer need useRouter or useEffect for redirection here.
+// import { useRouter } from "next/navigation";
+// import { useEffect } from "react";
 
 export default function AuthLayout({
   children,
@@ -10,9 +13,20 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
+  // const router = useRouter(); // REMOVED
 
-  // While checking auth or if user is already logged in, show a loader.
-  // This prevents flashing the auth form to authenticated users during redirect.
+  // This redirection logic is now handled exclusively by the root page.tsx.
+  // This layout's only responsibility is to show a loader if an authenticated
+  // user lands here, while the main router redirects them away.
+  // useEffect(() => {
+  //   if (!isUserLoading && user) {
+  //     router.replace('/discover');
+  //   }
+  // }, [user, isUserLoading, router]); // REMOVED
+
+  // While checking auth or if a user exists (and we are about to be redirected),
+  // show a full-screen loader. This prevents flashing the auth form to
+  // authenticated users.
   if (isUserLoading || user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading Session..." : "Redirecting..."} />
