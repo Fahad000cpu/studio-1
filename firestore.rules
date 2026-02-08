@@ -10,11 +10,10 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId;
     }
 
-    // This is the new master rule.
-    // It grants a user full read/write access to all sub-collections 
-    // within their own user document (e.g., /users/{userId}/chats/{chatId}).
-    match /users/{userId}/{documents=**} {
-      allow read, write: if request.auth.uid == userId;
+    // Rule for the 'chats' subcollection within each user document.
+    // A user can list, read, and write to their own chat metadata.
+    match /users/{userId}/chats/{chatId} {
+        allow read, write: if request.auth.uid == userId;
     }
 
     // Rule for messages within a one-to-one chat
