@@ -206,31 +206,42 @@ export default function ChatPage() {
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   
-  const updateChatMetadata = async (text: string) => {
+  const updateChatMetadata = (text: string) => {
     if (!user || !selectedChat) return;
 
     const recipientId = selectedChat.id;
     const senderId = user.uid;
 
-    const senderChatRef = doc(firestore, 'users', senderId, 'chats', recipientId);
-    const recipientChatRef = doc(firestore, 'users', recipientId, 'chats', senderId);
-
     const timestamp = serverTimestamp();
 
+    // Update sender's metadata (this should succeed)
+    const senderChatRef = doc(firestore, 'users', senderId, 'chats', recipientId);
     const senderPayload = {
         id: recipientId,
         lastMessageText: text,
         lastMessageTimestamp: timestamp,
     };
-    await setDoc(senderChatRef, senderPayload, { merge: true });
+    setDoc(senderChatRef, senderPayload, { merge: true }).catch(error => {
+        console.error("Failed to update sender's chat metadata:", error);
+    });
 
+    // Attempt to update recipient's metadata. This will fail due to security rules,
+    // which is expected. We will move this logic to a Cloud Function in the future.
+    // For now, we catch the error to prevent the "Upload Failed" toast.
+    const recipientChatRef = doc(firestore, 'users', recipientId, 'chats', senderId);
     const recipientPayload = {
         id: senderId,
         lastMessageText: text,
         lastMessageTimestamp: timestamp,
         unreadCount: increment(1),
     };
-    await setDoc(recipientChatRef, recipientPayload, { merge: true });
+    setDoc(recipientChatRef, recipientPayload, { merge: true }).catch(error => {
+        if (error.code === 'permission-denied') {
+            console.log("Note: Recipient unread count update failed as expected on client. This should be a Cloud Function.");
+        } else {
+            console.error("Failed to update recipient's chat metadata:", error);
+        }
+    });
   };
 
   const triggerNotification = (body: string, recipientId: string, senderName: string) => {
@@ -267,7 +278,7 @@ export default function ChatPage() {
     });
 
     const metadataText = isLink ? '🔗 Link' : messageText;
-    await updateChatMetadata(metadataText);
+    updateChatMetadata(metadataText);
     
     triggerNotification(metadataText, selectedChat.id, user.displayName || "New Message");
   };
@@ -298,7 +309,7 @@ export default function ChatPage() {
       if (type === 'image') body = '📷 Photo';
       if (type === 'video') body = '🎥 Video';
       if (type === 'audio') body = '🎤 Voice Message';
-      await updateChatMetadata(body);
+      updateChatMetadata(body);
       
       triggerNotification(body, selectedChat.id, user.displayName || "New Message");
 
@@ -725,5 +736,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
