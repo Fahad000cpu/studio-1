@@ -8,26 +8,16 @@ service cloud.firestore {
       allow get, list: if request.auth != null;
       // Allow a user to write only to their own profile.
       allow write: if request.auth.uid == userId;
-
-      // Nested rule for the chats sub-collection that stores metadata
-      match /chats/{chatId} {
-        // A user can read/write the chat metadata within their own user document.
-        allow read, write: if request.auth.uid == userId;
-      }
     }
 
-    // Rules for top-level chat messages
     match /chats/{chatId}/messages/{messageId} {
-      // Participants can read messages.
-      allow read: if request.auth.uid in chatId.split('_');
-
       // A user can create a message if they are the sender.
       allow create: if request.auth.uid == request.resource.data.senderId;
 
-      // A participant can update a message (e.g., for "delete for me").
-      allow update: if request.auth.uid in chatId.split('_');
+      // Participants can read messages or update them (e.g., for "delete for me").
+      allow read, update: if request.auth.uid in resource.data.chatId.split('_');
 
-      // Only the sender can delete a message for everyone.
+      // Only the original sender can delete a message for everyone.
       allow delete: if request.auth.uid == resource.data.senderId;
     }
 
@@ -44,9 +34,13 @@ service cloud.firestore {
       allow write: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // Admin roles can only be read/written by other admins.
+    // Admin roles rules
     match /roles_admin/{userId} {
-      allow read, write: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // Allow any user to check their own admin status.
+      allow get: if request.auth.uid == userId;
+      
+      // Allow admins to list all admins and add/remove other admins.
+      allow list, write: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
   }
 }
