@@ -3,19 +3,32 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can read/write their own profile, anyone can list/read profiles.
     match /users/{userId} {
       // Allow reading/listing of profiles for discovery by any authenticated user.
       allow get, list: if request.auth != null;
       // Allow a user to write only to their own profile.
       allow write: if request.auth.uid == userId;
+
+      // Nested rule for the chats sub-collection that stores metadata
+      match /chats/{chatId} {
+        // A user can read/write the chat metadata within their own user document.
+        allow read, write: if request.auth.uid == userId;
+      }
     }
 
-    // Messages can be read/written by participants of the chat.
-    // The chatId is assumed to be a concatenation of two user UIDs, sorted.
+    // Rules for top-level chat messages
     match /chats/{chatId}/messages/{messageId} {
+      // Participants can read messages.
+      allow read: if request.auth.uid in chatId.split('_');
+
+      // A user can create a message if they are the sender.
       allow create: if request.auth.uid == request.resource.data.senderId;
-      allow read, update, delete: if request.auth.uid in chatId.split('_');
+
+      // A participant can update a message (e.g., for "delete for me").
+      allow update: if request.auth.uid in chatId.split('_');
+
+      // Only the sender can delete a message for everyone.
+      allow delete: if request.auth.uid == resource.data.senderId;
     }
 
     // Statuses can be read by anyone, but only written/deleted by the owner.
