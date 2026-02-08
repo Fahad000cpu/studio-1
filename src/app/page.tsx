@@ -1,36 +1,33 @@
+
 "use client";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useUser } from '@/firebase';
-import { FullScreenLoader } from '@/components/full-screen-loader';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useUser } from "@/firebase";
+import { FullScreenLoader } from "@/components/full-screen-loader";
 
-/**
- * The root page now acts as a "gatekeeper" on the client side.
- * It waits for the authentication state to be resolved and then redirects
- * the user to the appropriate page ('/discover' or '/login').
- * This centralized approach prevents the race conditions that were causing
- * the "404 Not Found" errors during app startup, where multiple layouts
- * were attempting to redirect simultaneously.
- */
+// The root page is now a client component that acts as a gatekeeper.
+// It waits for the Firebase auth state to be determined before routing,
+// which prevents the race condition that caused intermittent 404 errors.
 export default function RootPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    // Wait until the user's auth state is known.
+    // Don't do anything until the auth state is resolved.
     if (isUserLoading) {
-      return; // Do nothing while loading.
+      return;
     }
 
-    // Once loading is complete, decide where to redirect.
+    // Once loading is complete, decide where to go.
     if (user) {
-      router.replace('/discover'); // User is logged in.
+      router.replace('/discover');
     } else {
-      router.replace('/login'); // User is not logged in.
+      router.replace('/login');
     }
   }, [user, isUserLoading, router]);
 
-  // Show a loader while determining the auth state and redirecting.
+  // While checking the auth state, show a generic loader.
+  // This is what the user will see on initial app load.
   return <FullScreenLoader message="Initializing..." />;
 }
