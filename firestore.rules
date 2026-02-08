@@ -2,17 +2,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Rule for user profiles (/users)
     match /users/{userId} {
-      allow list: if request.auth != null;
-      allow get, write: if request.auth.uid == userId;
+      // Any authenticated user can list and read user profiles (for Discover page)
+      allow list, get: if request.auth != null;
+
+      // Only the owner can create, update, or delete their own profile
+      allow write: if request.auth.uid == userId;
     }
-    
-    // Explicitly allow a user to read/write to their own 'chats' sub-collection.
-    // This is CRITICAL for fetching the chat list.
+
+    // Rule for a user's private chat list subcollection
     match /users/{userId}/chats/{chatId} {
+        // A user can only read and write documents in their OWN chat list.
         allow read, write: if request.auth.uid == userId;
     }
 
+    // Rule for messages within a one-to-one chat
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
         return request.auth != null && request.auth.uid in chatId.split('_');
@@ -25,6 +30,7 @@ service cloud.firestore {
       allow update: if false; 
     }
 
+    // Rule for status updates
     match /status_updates/{statusId} {
         function isOwner() {
           return request.auth != null && request.auth.uid == resource.data.userId;
@@ -44,6 +50,7 @@ service cloud.firestore {
         allow delete: if isOwner();
     }
 
+    // Rule for chat group metadata
     match /groups/{groupId} {
       function isSignedIn() {
         return request.auth != null;
@@ -61,6 +68,7 @@ service cloud.firestore {
       allow delete: if isGroupCreator();
     }
 
+    // Rule for messages within a group chat
     match /groups/{groupId}/messages/{messageId} {
       function isMemberInGroup() {
           return request.auth != null && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
@@ -69,6 +77,7 @@ service cloud.firestore {
       allow update, delete: if false; // Messages are immutable
     }
 
+    // Rule for affiliate products
     match /affiliate_products/{productId} {
       function isAdmin() {
           return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
@@ -77,6 +86,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Rule for admin role documents
     match /roles_admin/{userId} {
        function isAdmin() {
          return request.auth.token.email == 'fahadkhanamrohivi@gmail.com';

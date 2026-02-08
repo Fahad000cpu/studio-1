@@ -2,7 +2,7 @@
   "indexes": [
     {
       "collectionGroup": "chats",
-      "queryScope": "COLLECTION_GROUP",
+      "queryScope": "COLLECTION",
       "fields": [
         {
           "fieldPath": "lastMessageTimestamp",
