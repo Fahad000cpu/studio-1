@@ -3,22 +3,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Rule for user profile documents
-    match /users/{userId} {
-      // A user can write to their own profile.
-      allow write: if request.auth.uid == userId;
-      
-      // Any authenticated user can read profiles for the Discover page, chat lookups etc.
-      allow get, list: if request.auth != null;
-    }
-
-    // Rule for a user's chat metadata subcollection.
-    // This explicitly grants permission for a user to read/write their own chat list.
-    match /users/{userId}/chats/{chatId} {
+    // This single rule grants a user full access to their own document and all sub-collections within it.
+    // It covers the user's profile, their chat list, and any other data stored under their user ID.
+    match /users/{userId}/{documents=**} {
       allow read, write: if request.auth.uid == userId;
     }
+    
+    // Any authenticated user can list the main user collection to discover other users.
+    match /users/{userId} {
+      allow list: if request.auth != null;
+    }
 
-    // Rule for messages within a one-to-one chat
+    // Rule for messages within a one-to-one chat. These are in a top-level collection.
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
         return request.auth != null && request.auth.uid in chatId.split('_');
