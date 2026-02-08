@@ -71,6 +71,7 @@ import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Badge } from '@/components/ui/badge';
+import { getInitials } from '@/lib/utils';
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -108,24 +109,7 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const chatMetadataCollection = useMemoFirebase(() => {
-    if (!user) return null;
-    return collection(firestore, 'users', user.uid, 'chats');
-  }, [user, firestore]);
-
-  const { data: rawChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
-
-  const chatMetadatas = useMemo(() => {
-    if (!rawChatMetadatas) return null;
-    // Sort on the client side to avoid complex Firestore indexes
-    return [...rawChatMetadatas].sort((a, b) => {
-      const timeA = a.lastMessageTimestamp?.toMillis() || 0;
-      const timeB = b.lastMessageTimestamp?.toMillis() || 0;
-      return timeB - timeA;
-    });
-  }, [rawChatMetadatas]);
-
-
+  // Fetch all users to display in the chat list
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
@@ -133,6 +117,23 @@ export default function ChatPage() {
     if (!allUsers) return new Map<string, UserProfile>();
     return new Map(allUsers.map(u => [u.id, u]));
   }, [allUsers]);
+
+  // The chat list now shows all users except the current one, filterable by search
+  const filteredUsers = useMemo(() => {
+    if (!allUsers || !user) return [];
+    
+    return allUsers.filter(u => {
+        if (u.id === user.uid) return false; // Exclude self
+
+        if (!searchTerm) return true;
+
+        const searchTermLower = searchTerm.toLowerCase();
+        const nameMatch = (u.name || '').toLowerCase().includes(searchTermLower);
+        const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
+        return nameMatch || emailMatch;
+    });
+  }, [allUsers, user, searchTerm]);
+
 
   const selectedChat = useMemo(() => {
     if (!selectedChatId || !usersMap) return null;
@@ -143,7 +144,7 @@ export default function ChatPage() {
     setSelectedChatId(contact.id);
   }, []);
 
-  const isLoading = metadataLoading || allUsersLoading;
+  const isLoading = allUsersLoading;
 
   useEffect(() => {
     if (isLoading || selectedChatId || !usersMap.size) return;
@@ -157,34 +158,13 @@ export default function ChatPage() {
         }
     }
     
-    if (!isMobile && chatMetadatas && chatMetadatas.length > 0 && user) {
-        const firstChat = chatMetadatas[0];
-        const otherUserId = firstChat.id;
-        const firstContact = otherUserId ? usersMap.get(otherUserId) : null;
+    if (!isMobile && filteredUsers && filteredUsers.length > 0) {
+        const firstContact = filteredUsers[0];
         if (firstContact) {
             handleSelectChat(firstContact);
         }
     }
-  }, [chatMetadatas, usersMap, selectedChatId, searchParams, isMobile, user, handleSelectChat, isLoading]);
-
-  const filteredChats = useMemo(() => {
-    if (!chatMetadatas || !user) return [];
-    
-    return chatMetadatas.filter(metadata => {
-        const otherUserId = metadata.id;
-        if (!otherUserId) return false;
-        
-        const contact = usersMap.get(otherUserId);
-        if (!contact) return false;
-
-        if (!searchTerm) return true;
-
-        const searchTermLower = searchTerm.toLowerCase();
-        const nameMatch = (contact.name || '').toLowerCase().includes(searchTermLower);
-        const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
-        return nameMatch || emailMatch;
-    });
-  }, [chatMetadatas, user, searchTerm, usersMap]);
+  }, [filteredUsers, usersMap, selectedChatId, searchParams, isMobile, handleSelectChat, isLoading]);
 
 
   const chatId = useMemo(() => {
@@ -213,25 +193,7 @@ export default function ChatPage() {
         .filter(msg => !msg.deletedFor?.includes(user.uid!));
   }, [messagesData, user?.uid]);
 
-  const currentChatMetadata = useMemo(() => {
-    if (!selectedChatId || !chatMetadatas) return null;
-    return chatMetadatas.find(m => m.id === selectedChatId) ?? null;
-  }, [selectedChatId, chatMetadatas]);
-
-  useEffect(() => {
-    if (!user || !selectedChatId || !currentChatMetadata) return;
-
-    if (currentChatMetadata.unreadCount && currentChatMetadata.unreadCount > 0) {
-        const metadataRef = doc(firestore, 'users', user.uid, 'chats', selectedChatId);
-        updateDoc(metadataRef, {
-            unreadCount: 0,
-        }).catch((err) => {
-             console.error("Failed to mark chat as read:", err);
-        });
-    }
-  }, [selectedChatId, user, firestore, messages, currentChatMetadata]); 
-
-
+  // This logic is now simplified as we don't have chat metadata from the problematic query
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('div:first-child');
@@ -395,7 +357,6 @@ export default function ChatPage() {
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        // Stop the media stream tracks to turn off the recording indicator immediately
         stream.getTracks().forEach(track => track.stop());
 
         if (audioChunksRef.current.length === 0) {
@@ -446,21 +407,6 @@ export default function ChatPage() {
     const messageRef = doc(firestore, 'chats', chatId, 'messages', messageId);
     deleteDocumentNonBlocking(messageRef);
   };
-  
-  const handleMarkAsUnread = async (chatIdForUnread: string) => {
-    if (!user) return;
-    const metadataRef = doc(firestore, 'users', user.uid, 'chats', chatIdForUnread);
-    try {
-        await updateDoc(metadataRef, {
-            unreadCount: 1,
-        });
-        toast({ title: "Chat marked as unread." });
-    } catch (error) {
-        console.error("Failed to mark as unread:", error);
-        toast({ variant: "destructive", title: "Error", description: "Could not mark chat as unread."});
-    }
-  };
-
 
   const renderMessageContent = (msg: Message) => {
     switch (msg.messageType) {
@@ -510,7 +456,7 @@ export default function ChatPage() {
         <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search chats..." 
+            placeholder="Search users..." 
             className="pl-10" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -531,29 +477,13 @@ export default function ChatPage() {
               </div>
             ))}
           </div>
-        ) : error ? (
-            <div className="p-4 text-center text-sm text-destructive">
-                <p>Could not load chats.</p>
-                <p className="text-xs">{error.message}</p>
-            </div>
-        ) : filteredChats.length > 0 ? (
-          filteredChats.map((metadata) => {
-            if (!user || !metadata) return null;
-            const otherUserId = metadata.id;
-            if (!otherUserId) return null;
-    
-            const contact = usersMap.get(otherUserId);
-            if (!contact) {
-              return null;
-            }
-
-            const unreadCount = metadata.unreadCount || 0;
-            const lastMessageText = metadata.lastMessageText || 'Click to start chatting!';
-            const lastMessageTime = getMessageTimestamp(metadata.lastMessageTimestamp);
+        ) : filteredUsers.length > 0 ? (
+          filteredUsers.map((contact) => {
+            if (!user || !contact) return null;
             
             return (
               <div
-                key={metadata.id}
+                key={contact.id}
                 className={cn(
                   'group relative flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
                   selectedChatId === contact.id && 'bg-accent/80'
@@ -564,39 +494,13 @@ export default function ChatPage() {
                   <AvatarImage
                     src={contact.profilePictureUrl || `https://picsum.photos/seed/${contact.id}/200`}
                   />
-                  <AvatarFallback>{(contact.name || contact.email || '?').charAt(0)}</AvatarFallback>
+                  <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-grow overflow-hidden">
                   <p className="font-semibold truncate">{contact.name || contact.email}</p>
-                  <p className={cn(
-                      "text-sm truncate",
-                      unreadCount > 0 ? "text-foreground font-semibold" : "text-muted-foreground"
-                    )}>
-                    {lastMessageText}
+                  <p className="text-sm truncate text-muted-foreground">
+                    Start a conversation
                   </p>
-                </div>
-                <div className="text-xs text-muted-foreground whitespace-nowrap flex flex-col items-end gap-1.5 self-start">
-                    <span className={cn(unreadCount > 0 && "text-accent-foreground font-bold")}>{lastMessageTime}</span>
-                    {unreadCount > 0 && (
-                        <Badge className="h-5 min-w-[1.25rem] p-1 flex items-center justify-center rounded-full bg-accent text-accent-foreground">
-                          {unreadCount}
-                        </Badge>
-                    )}
-                </div>
-                 <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMarkAsUnread(contact.id); }}>
-                                <Undo2 className="mr-2 h-4 w-4" />
-                                <span>Mark as Unread</span>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
                 </div>
               </div>
             );
@@ -604,7 +508,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground">
             <MessageSquare className="w-10 h-10 mb-4" />
-            <h3 className="font-semibold text-lg text-foreground">No chats yet</h3>
+            <h3 className="font-semibold text-lg text-foreground">No users found</h3>
             <p className="text-sm mt-1">
               Find someone in Discover to start a conversation.
             </p>
@@ -632,7 +536,7 @@ export default function ChatPage() {
           <AvatarImage
              src={selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`}
           />
-          <AvatarFallback>{(selectedChat.name || selectedChat.email || '?').charAt(0)}</AvatarFallback>
+          <AvatarFallback>{getInitials(selectedChat.name)}</AvatarFallback>
         </Avatar>
         <div className="ml-4">
           <p className="font-semibold text-lg font-headline">
@@ -650,11 +554,9 @@ export default function ChatPage() {
                 ? user.photoURL || `https://picsum.photos/seed/${user?.uid}/200`
                 : selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`;
             const avatarFallback = msg.own
-                ? (user.displayName || '?').charAt(0)
-                : (selectedChat.name || '?').charAt(0);
+                ? getInitials(user.displayName)
+                : getInitials(selectedChat.name);
             
-            // This logic is complex with the new data model, and needs a proper solution.
-            // For now, we will optimistically show read receipts.
             const isRead = true; 
 
             return (
@@ -733,7 +635,7 @@ export default function ChatPage() {
              <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50">
                <Avatar className="w-8 h-8">
                  <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200`} />
-                 <AvatarFallback>{(user?.displayName || '?').charAt(0)}</AvatarFallback>
+                 <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
                </Avatar>
                <div className="flex flex-col">
                  <div className="rounded-lg p-3 text-sm bg-primary text-primary-foreground rounded-br-none">
@@ -813,7 +715,7 @@ export default function ChatPage() {
                   Welcome to ConnectSphere Chat
                 </h2>
                 <p className="text-muted-foreground mt-2">
-                  Select a conversation from the list to start messaging.
+                  Select a user from the list to start messaging.
                 </p>
               </div>
             )}
