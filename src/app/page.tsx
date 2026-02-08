@@ -19,7 +19,7 @@ export default function RootPage() {
   useEffect(() => {
     // Wait until the authentication state is fully resolved.
     if (isUserLoading) {
-      return; // Show the loader while we wait.
+      return; // Do nothing while we wait.
     }
 
     // Once resolved, perform the one and only initial redirect.

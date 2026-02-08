@@ -22,8 +22,9 @@ if (admin.apps.length === 0) {
     admin.initializeApp();
 }
 
-// The onDocumentCreated Cloud Function for sending chat notifications has been removed.
-// Notifications are now handled client-side in `src/app/(main)/chat/page.tsx`
-// to avoid the Blaze plan requirement for server-side push notifications.
-// This new approach shows a local browser notification when a new message is received
-// while the user is on a different browser tab.
+// This file is available for Cloud Functions triggers.
+// The original onDocumentCreated trigger for chat notifications was removed
+// to avoid requiring the Blaze plan for deployment.
+// Chat notifications are now sent via a Next.js Server Action 
+// defined in src/lib/chat-notifications.ts, which is called
+// directly from the chat component.
