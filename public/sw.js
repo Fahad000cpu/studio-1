@@ -1,86 +1,55 @@
-// This is a basic service worker for PWA capabilities and handling push notifications.
+// Scripts for Firebase App and Messaging
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
-// Listen for the 'install' event, which fires when the service worker is installing.
-self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
-  // event.waitUntil(caches.open(CACHE_NAME).then(...)); // Optional: Caching assets
-  self.skipWaiting(); // Force the waiting service worker to become the active service worker.
-});
+// Your web app's Firebase configuration
+const firebaseConfig = {
+    "projectId": "studio-6505166944-ae18f",
+    "appId": "1:954303139735:web:1cb50131d512627c9d3ed2",
+    "storageBucket": "studio-6505166944-ae18f.appspot.com",
+    "apiKey": "AIzaSyB8ADt_BHfhhcIwDax82s13GVYJAefjA0g",
+    "authDomain": "studio-6505166944-ae18f.firebaseapp.com",
+    "measurementId": "G-1TC3B2RSWT",
+    "messagingSenderId": "954303139735"
+};
 
-// Listen for the 'activate' event, which fires when the service worker becomes active.
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
-  event.waitUntil(self.clients.claim()); // Become the controller for all clients within its scope.
-});
+// Initialize Firebase
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 
-// Listen for 'fetch' events to handle network requests.
-self.addEventListener('fetch', (event) => {
-  // This is a basic pass-through fetch handler.
-  // For offline capabilities, you would implement a cache-first strategy here.
-  event.respondWith(fetch(event.request));
-});
+// Retrieve an instance of Firebase Messaging so that it can handle background messages.
+const messaging = firebase.messaging();
 
-// Listen for 'push' events to handle incoming push notifications.
-self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push Received.');
-
-  if (!event.data) {
-    console.error('Service Worker: Push event but no data');
-    return;
-  }
-
-  try {
-    const data = event.data.json();
-    console.log('Service Worker: Push data', data);
-
-    const title = data.title || 'ConnectSphere';
-    const options = {
-      body: data.body || 'You have a new message.',
-      icon: data.icon || '/logo192.png',
-      badge: data.badge || '/logo192.png',
-      image: data.image,
-      data: {
-        url: data.url, // The URL to open when the notification is clicked
-      },
-    };
-
-    event.waitUntil(self.registration.showNotification(title, options));
-  } catch (e) {
-    console.error('Error parsing push data:', e);
-    // Fallback for plain text notifications
-    const title = 'ConnectSphere';
-    const options = {
-        body: event.data.text(),
-        icon: '/logo192.png',
-        badge: '/logo192.png',
-    };
-    event.waitUntil(self.registration.showNotification(title, options));
-  }
-});
-
-// Listen for 'notificationclick' events.
+// This listener handles the click event on the notification.
 self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification clicked.');
-  event.notification.close(); // Close the notification
+    console.log('[Service Worker] Notification click Received.', event.notification);
+    
+    event.notification.close();
 
-  const urlToOpen = event.notification.data.url || '/';
+    // This looks to see if the current is already open and
+    // focuses, otherwise opens a new tab
+    const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
 
-  // This looks for an existing window/tab with the same URL and focuses it.
-  // If not found, it opens a new one.
-  event.waitUntil(
-    self.clients.matchAll({
+    event.waitUntil(clients.matchAll({
       type: 'window',
       includeUncontrolled: true,
     }).then((clientList) => {
       for (let i = 0; i < clientList.length; i++) {
         const client = clientList[i];
-        if (client.url === urlToOpen && 'focus' in client) {
+        // Check if the client's URL matches the notification's URL
+        const clientUrl = new URL(client.url);
+        const notificationUrl = new URL(urlToOpen);
+        
+        if (clientUrl.pathname === notificationUrl.pathname && 'focus' in client) {
+          // If a tab with the same path is open, focus it.
+          // This is useful to avoid opening duplicate chat windows.
           return client.focus();
         }
       }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen);
+      // If no matching tab is found, open a new one.
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
       }
-    })
-  );
+    }));
 });

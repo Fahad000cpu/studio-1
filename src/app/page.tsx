@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -7,30 +6,31 @@ import { useUser } from '@/firebase';
 import { FullScreenLoader } from '@/components/full-screen-loader';
 
 /**
- * This is the root page of the application. It acts as a gatekeeper.
- * 1. It shows a loader while Firebase auth state is being determined.
- * 2. Once the state is known, it redirects the user to the appropriate page:
- *    - `/login` if the user is not authenticated.
- *    - `/discover` if the user is authenticated.
- * This centralized client-side approach prevents race conditions between different layouts.
+ * The root page now acts as a "gatekeeper" on the client side.
+ * It waits for the authentication state to be resolved and then redirects
+ * the user to the appropriate page ('/discover' or '/login').
+ * This centralized approach prevents the race conditions that were causing
+ * the "404 Not Found" errors during app startup, where multiple layouts
+ * were attempting to redirect simultaneously.
  */
 export default function RootPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
-    // Wait until the authentication status is fully determined.
-    if (!isUserLoading) {
-      if (user) {
-        // If user is logged in, redirect to the main app.
-        router.replace('/discover');
-      } else {
-        // If user is not logged in, redirect to the login page.
-        router.replace('/login');
-      }
+    // Wait until the user's auth state is known.
+    if (isUserLoading) {
+      return; // Do nothing while loading.
+    }
+
+    // Once loading is complete, decide where to redirect.
+    if (user) {
+      router.replace('/discover'); // User is logged in.
+    } else {
+      router.replace('/login'); // User is not logged in.
     }
   }, [user, isUserLoading, router]);
 
-  // Show a loader while we determine the user's auth state and redirect.
+  // Show a loader while determining the auth state and redirecting.
   return <FullScreenLoader message="Initializing..." />;
 }

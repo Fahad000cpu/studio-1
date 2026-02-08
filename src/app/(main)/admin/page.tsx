@@ -14,14 +14,13 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Copy, Link, Image as ImageIcon, Smartphone, Trash2 } from 'lucide-react';
+import { Shield, Send, BellRing, Copy, Link, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection, doc, arrayRemove, updateDoc } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
 import { Badge } from '@/components/ui/badge';
-import { DeviceIdFetcher } from '@/components/device-id-fetcher';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -206,29 +205,6 @@ export default function AdminPage() {
 
         {isAdmin && (
           <>
-            <DeviceIdFetcher />
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Smartphone className="h-5 w-5"/>
-                        In-App Messaging (Pop-ups & Banners)
-                    </CardTitle>
-                    <CardDescription>
-                       Bhejein aise messages jo users ko **app ke andar** dikhein, jab woh app use kar rahe hon. Iske liye app ka "Device ID" test karne ke liye istemaal hota hai.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="pt-2">
-                        <h4 className="font-semibold text-md mb-2">Isko Kab Use Karein? (Example Ideas)</h4>
-                        <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-                            <li><b>Naye Features Promote Karna:</b> "Dekhiye hamara naya Status feature!"</li>
-                            <li><b>Special Offers Dena:</b> "Affiliate products par is hafte 20% ki chhoot!"</li>
-                            <li><b>Users ko Guide Karna:</b> "Welcome! Yahan se aap naye dost dhoondh sakte hain."</li>
-                        </ul>
-                    </div>
-                </CardContent>
-            </Card>
-
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">

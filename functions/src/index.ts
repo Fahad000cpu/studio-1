@@ -47,26 +47,38 @@ export const sendChatMessageNotification = onCall(async (request) => {
       console.log(`No valid FCM tokens for recipient ${recipientId}.`);
       return { success: true, reason: 'No tokens to send to' };
     }
+    
+    const url = `/chat?chatWith=${request.auth.uid}`;
 
     // Construct the notification payload
     const message: admin.messaging.MulticastMessage = {
       tokens: validTokens,
-      data: {
+      notification: {
         title: senderName,
         body: messageText,
-        icon: '/logo192.png',
-        badge: '/logo192.png',
-        url: `/chat?chatWith=${request.auth.uid}`, // URL to open on click
+      },
+      data: {
+        url: url,
       },
       webpush: {
-        headers: { Urgency: 'high' },
+        notification: {
+            icon: '/logo192.png',
+            badge: '/logo192.png',
+        },
+        fcmOptions: {
+            link: url,
+        },
+      },
+      apns: {
+        payload: {
+            aps: {
+                'content-available': 1,
+                'sound': 'default',
+            },
+        },
       },
       android: {
         priority: 'high',
-      },
-      apns: {
-        payload: { aps: { 'content-available': 1 } },
-        headers: { 'apns-priority': '10' },
       },
     };
 
