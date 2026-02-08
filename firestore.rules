@@ -40,11 +40,13 @@ service cloud.firestore {
 
     // Admin roles rules
     match /roles_admin/{userId} {
-      // Allow a user to read their own role document.
-      // Also, allow an existing admin to read (get/list) any role document.
-      allow read: if request.auth.uid == userId || exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // A user can get their own role doc, and an admin can get any role doc.
+      allow get: if request.auth.uid == userId || exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
       
-      // Only allow existing admins to write to the roles collection.
+      // An existing admin can list all roles.
+      allow list: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      
+      // Only allow existing admins to create, update, or delete admin roles.
       allow write: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
   }
