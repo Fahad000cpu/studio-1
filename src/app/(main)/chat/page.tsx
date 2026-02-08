@@ -108,25 +108,16 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const chatMetadataQuery = useMemoFirebase(() => {
+  const chatMetadataCollection = useMemoFirebase(() => {
     if (!user) return null;
-    // Simplified query: Removed orderBy to prevent index-related permission issues.
-    // Sorting is now handled on the client-side.
     return collection(firestore, 'users', user.uid, 'chats');
   }, [user, firestore]);
   
-  const { data: unsortedChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataQuery);
+  const chatMetadataOptions = useMemoFirebase<CollectionOptions>(() => ({
+    orderBy: ['lastMessageTimestamp', 'desc']
+  }), []);
 
-  // Client-side sorting of chats
-  const chatMetadatas = useMemo(() => {
-    if (!unsortedChatMetadatas) return [];
-    return [...unsortedChatMetadatas].sort((a, b) => {
-        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
-        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
-        return timeB - timeA; // Descending order
-    });
-  }, [unsortedChatMetadatas]);
-
+  const { data: chatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection, chatMetadataOptions);
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
