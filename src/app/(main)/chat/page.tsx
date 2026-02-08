@@ -680,7 +680,7 @@ export default function ChatPage() {
             </Button>
             <Button
               size="icon"
-              className="bg-accent hover:bg-accent/90"
+              className="bg-primary hover:bg-primary/90"
               type="submit"
               disabled={!selectedChat || !newMessage.trim() || isUploading || isRecording}
             >
