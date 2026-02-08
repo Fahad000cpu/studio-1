@@ -338,7 +338,7 @@ service cloud.firestore {
 
        }
 
-       allow get: if isAdmin();
+       allow get: if (request.auth != null && request.auth.uid == userId) || isAdmin();
 
        allow list: if isAdmin();
 

@@ -31,17 +31,14 @@ export default function MainLayout({
   const router = useRouter();
 
   useEffect(() => {
-    // This is a failsafe guard. If auth is resolved and there's NO user,
-    // it means a logged-out user has somehow navigated to the main app area.
-    // Redirect them to the login page.
+    // Failsafe redirect if an unauthenticated user somehow lands here.
     if (!isUserLoading && !user) {
       router.replace('/login');
     }
-  }, [user, isUserLoading, router]);
+  }, [isUserLoading, user, router]);
 
-  // Show a loader while auth state is resolving, or if there's no user
-  // (which means a redirect is about to happen). This prevents rendering
-  // the main layout for a split second before redirecting.
+  // While checking auth or if user is not authenticated, show a loader.
+  // This prevents flashing the main layout to unauthenticated users.
   if (isUserLoading || !user) {
     return <FullScreenLoader message="Loading your sphere..." />;
   }

@@ -15,17 +15,14 @@ export default function AuthLayout({
   const router = useRouter();
 
   useEffect(() => {
-    // This is a failsafe guard. If auth is resolved and a user EXISTS,
-    // it means a logged-in user has somehow navigated to the login/signup page.
-    // Redirect them to the main app.
+    // Failsafe redirect if an authenticated user somehow lands here.
     if (!isUserLoading && user) {
       router.replace('/discover');
     }
-  }, [user, isUserLoading, router]);
+  }, [isUserLoading, user, router]);
 
-  // Show a loader while auth state is resolving, or if a user exists
-  // (which means a redirect is about to happen). This prevents rendering
-  // the login form for a split second before redirecting.
+  // While checking auth or if user is already logged in, show a loader.
+  // This prevents flashing the auth form to authenticated users during redirect.
   if (isUserLoading || user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading Session..." : "Redirecting..."} />
