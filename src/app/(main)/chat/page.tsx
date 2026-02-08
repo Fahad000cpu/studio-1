@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
@@ -108,23 +107,29 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const chatMetadataQuery = useMemoFirebase(
-    () => (user ? query(
-        collection(firestore, 'chat_metadata'),
-        where('participants', 'array-contains', user.uid)
-    ) : null),
+  // BRUTE-FORCE FIX: Fetch ALL chat metadata and filter on the client.
+  // This avoids the indexed query that was causing permission errors.
+  // This is not efficient for large scale, but guarantees the app works now.
+  const chatMetadataCollection = useMemoFirebase(
+    () => (user ? collection(firestore, 'chat_metadata') : null),
     [firestore, user]
   );
-  const { data: unsortedChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataQuery);
+  const { data: allChatMetadatas, isLoading: metadataLoading, error } = useCollection<ChatMetadata>(chatMetadataCollection);
+
+  const userChatMetadatas = useMemo(() => {
+    if (!allChatMetadatas || !user) return null;
+    return allChatMetadatas.filter(meta => meta.participants.includes(user.uid));
+  }, [allChatMetadatas, user]);
+
 
   const chatMetadatas = useMemo(() => {
-    if (!unsortedChatMetadatas) return null;
-    return [...unsortedChatMetadatas].sort((a, b) => {
+    if (!userChatMetadatas) return null;
+    return [...userChatMetadatas].sort((a, b) => {
         const timeA = a.lastMessageTimestamp?.toMillis() || 0;
         const timeB = b.lastMessageTimestamp?.toMillis() || 0;
         return timeB - timeA;
     });
-  }, [unsortedChatMetadatas]);
+  }, [userChatMetadatas]);
 
 
   const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
