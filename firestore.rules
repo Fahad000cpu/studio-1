@@ -3,36 +3,35 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Allow reading of all user profiles for discover page, 
-    // but only allow a user to write to their own profile.
+    // Users can read anyone's profile for discovery, but only write to their own.
     match /users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth.uid == userId;
     }
 
-    // Allow a user to read and write to their own chats subcollection
+    // A user can read and write to the chat metadata documents in their own 'chats' subcollection.
+    // This rule is crucial for listing the chats.
     match /users/{userId}/chats/{chatId} {
       allow read, write: if request.auth.uid == userId;
     }
 
-    // Allow any authenticated user to read/write messages in any chat.
-    // More specific rules can be added later (e.g., only participants can read/write).
+    // Any authenticated user can read/write messages in any chat's message subcollection.
+    // This is broad for simplicity. In a real app, you'd restrict this to participants.
     match /chats/{chatId}/messages/{messageId} {
         allow read, write: if request.auth != null;
     }
 
-    // Allow any authenticated user to read/write status updates.
+    // Any authenticated user can interact with status updates.
     match /status_updates/{statusId} {
       allow read, write: if request.auth != null;
     }
 
-    // Allow any authenticated user to read affiliate products.
-    // Write access should be limited to admins in production.
+    // Any authenticated user can read affiliate products. Writes should be admin-only.
     match /affiliate_products/{productId} {
       allow read, write: if request.auth != null;
     }
 
-    // Allow any authenticated user to check for admin roles.
+    // Any authenticated user can check for admin roles.
     match /roles_admin/{userId} {
       allow read: if request.auth != null;
     }
