@@ -1,7 +1,6 @@
+
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
@@ -27,19 +26,13 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
 
-  useEffect(() => {
-    // If auth is checked and there's no user, redirect to login.
-    if (!isUserLoading && !user) {
-      router.replace('/login');
-    }
-  }, [user, isUserLoading, router]);
-
-  // Show a loader while auth state is being determined or if there's no user (and redirect is in progress).
+  // Show a loader while auth state is being determined or if there's no user.
+  // The root page.tsx handles the actual redirection to /login. This layout just
+  // prevents the main app UI from rendering for a non-authenticated user.
   if (isUserLoading || !user) {
     return (
-      <FullScreenLoader message={isUserLoading ? "Loading your sphere..." : "Redirecting..."} />
+      <FullScreenLoader message={isUserLoading ? "Loading your sphere..." : "Accessing your account..."} />
     );
   }
 

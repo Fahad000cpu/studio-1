@@ -1,7 +1,6 @@
+
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/firebase";
 import { FullScreenLoader } from "@/components/full-screen-loader";
 
@@ -11,16 +10,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  const router = useRouter();
-
-  useEffect(() => {
-    // If the user is loaded and exists, redirect from auth pages to the main app.
-    if (!isUserLoading && user) {
-      router.replace('/discover');
-    }
-  }, [user, isUserLoading, router]);
 
   // Show a loader while checking auth state or if a user is found (and redirect is in progress).
+  // This prevents the login form from flashing for an already logged-in user while the root page.tsx handles redirection.
   if (isUserLoading || user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading Session..." : "Redirecting..."} />

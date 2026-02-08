@@ -58,10 +58,6 @@ export async function sendChatNotification({ recipientId, senderId, senderName, 
         body: body,
       },
       webpush: {
-        notification: {
-          icon: '/logo192.png',
-          badge: '/logo192.png',
-        },
         fcmOptions: {
           // This link is what the browser uses if the app is already open
           link: `/chat?chatWith=${senderId}`,
