@@ -31,21 +31,22 @@ export default function MainLayout({
   const router = useRouter();
 
   useEffect(() => {
-    // If auth is done loading and there's NO user, it means a logged-out
-    // user has tried to access a protected page. Redirect them to login.
+    // This is a failsafe guard. If auth is resolved and there's NO user,
+    // it means a logged-out user has somehow navigated to the main app area.
+    // Redirect them to the login page.
     if (!isUserLoading && !user) {
       router.replace('/login');
     }
   }, [user, isUserLoading, router]);
 
-  // While authentication is loading, or if there's no user (which means a
-  // redirect is about to happen), show a full-screen loader. This prevents
-  // the main app from flashing for logged-out users.
+  // Show a loader while auth state is resolving, or if there's no user
+  // (which means a redirect is about to happen). This prevents rendering
+  // the main layout for a split second before redirecting.
   if (isUserLoading || !user) {
     return <FullScreenLoader message="Loading your sphere..." />;
   }
 
-  // If the user is loaded and exists, render the main application layout.
+  // If we get here, the user is authenticated and we can render the app.
   return (
       <div className="relative min-h-screen">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />

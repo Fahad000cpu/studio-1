@@ -18,6 +18,8 @@
 
  * - /users/{userId}: User profile information. Only the user can read/write their own profile.
 
+ * - /users/{userId}/chats/{otherUserId}: Metadata about each chat a user is in. Only the user can read/write this.
+
  * - /chats/{chatId}/messages/{messageId}: Chat messages between two users. Read/write access is based on sender/recipient IDs.
 
  * - /groups/{groupId}: Group chat metadata, including a 'members' map (userId: role).
@@ -34,7 +36,7 @@
 
  * Key Security Decisions:
 
- * - User profiles are private and only accessible to the owner.
+ * - User profiles and their subcollections are private and only accessible to the owner.
 
  * - Group chat access is determined by membership, enforced through denormalized data.
 
@@ -60,7 +62,7 @@ service cloud.firestore {
 
     /**
 
-     * @description Protects user profiles. Only the user can read/write their own profile.
+     * @description Protects user profiles and their subcollections. Only the user can read/write their own profile and associated data.
 
      * @path /users/{userId}
 
@@ -93,6 +95,22 @@ service cloud.firestore {
       allow update: if request.auth != null && request.auth.uid == userId;
 
       allow delete: if request.auth != null && request.auth.uid == userId;
+
+      /**
+
+       * @description Secures chat metadata within a user's profile. Only the owner can manage their chat list.
+
+       * @path /users/{userId}/chats/{otherUserId}
+
+       * @principle A user has full control over their own subcollections.
+
+       */
+
+      match /chats/{otherUserId} {
+
+        allow read, write: if isOwner();
+
+      }
 
     }
 
