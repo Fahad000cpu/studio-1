@@ -51,7 +51,7 @@ service cloud.firestore {
     }
 
     // Rule for chat group metadata
-    match /groups/{groupId} {
+    match /chat_groups/{groupId} {
       function isSignedIn() {
         return request.auth != null;
       }
@@ -69,9 +69,9 @@ service cloud.firestore {
     }
 
     // Rule for messages within a group chat
-    match /groups/{groupId}/messages/{messageId} {
+    match /chat_groups/{groupId}/messages/{messageId} {
       function isMemberInGroup() {
-          return request.auth != null && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+          return request.auth != null && get(/databases/$(database)/documents/chat_groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
       }
       allow read, create: if isMemberInGroup();
       allow update, delete: if false; // Messages are immutable
