@@ -75,6 +75,7 @@ const GoogleIcon = () => (
 export default function LoginPage() {
   const auth = useAuth();
   const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
@@ -93,6 +94,7 @@ export default function LoginPage() {
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
+      router.push('/discover');
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
@@ -132,6 +134,8 @@ export default function LoginPage() {
             phoneNumber: user.phoneNumber,
             photoURL: user.photoURL,
         });
+        
+        router.push('/discover');
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {

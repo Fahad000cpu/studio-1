@@ -69,6 +69,7 @@ const GoogleIcon = () => (
 export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
+  const router = useRouter();
   const { toast } = useToast();
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
@@ -103,8 +104,10 @@ export default function SignupPage() {
       await sendEmailVerification(user);
       toast({
           title: "Verification Email Sent",
-          description: "Please check your inbox to verify your email address.",
+          description: "Please check your inbox to verify your email address. Redirecting to the app...",
       });
+
+      router.push('/discover');
       
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -136,6 +139,8 @@ export default function SignupPage() {
             phoneNumber: user.phoneNumber,
             photoURL: user.photoURL,
         });
+
+        router.push('/discover');
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
