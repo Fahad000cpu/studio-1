@@ -5,14 +5,15 @@ service cloud.firestore {
 
     // Rule for user profile documents
     match /users/{userId} {
-      // A user can get and write their own profile.
-      allow get, write: if request.auth.uid == userId;
-      // Any authenticated user can list profiles for the Discover page.
-      allow list: if request.auth != null;
+      // A user can write to their own profile.
+      allow write: if request.auth.uid == userId;
+      
+      // Any authenticated user can read profiles for the Discover page, chat lookups etc.
+      allow get, list: if request.auth != null;
     }
 
     // Rule for a user's chat metadata subcollection.
-    // This explicitly grants permission to list the documents in the 'chats' subcollection.
+    // This explicitly grants permission for a user to read/write their own chat list.
     match /users/{userId}/chats/{chatId} {
       allow read, write: if request.auth.uid == userId;
     }
