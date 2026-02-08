@@ -22,11 +22,11 @@ export type Message = {
   deletedFor?: string[];
 };
 
+// Represents the metadata for a chat from the perspective of a single user.
+// Stored in /users/{userId}/chats/{otherUserId}
 export type ChatMetadata = {
-  id: string;
-  participants: string[];
+  id: string; // The ID of the other user in the chat.
   lastMessageText?: string;
   lastMessageTimestamp?: Timestamp;
-  unreadCount?: { [key: string]: number };
-  lastRead?: { [key: string]: Timestamp };
+  unreadCount?: number; // Unread count for the owner of this document.
 };
