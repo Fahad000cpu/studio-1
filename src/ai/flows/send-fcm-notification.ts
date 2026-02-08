@@ -41,8 +41,7 @@ export async function sendFcmNotification(input: SendFcmNotificationInput): Prom
     },
     webpush: {
       notification: {
-        icon: icon || '/logo192.png',
-        badge: '/logo192.png',
+        icon: icon || '/favicon.ico',
       },
       fcmOptions: {
         link: url || '/',
@@ -63,7 +62,7 @@ export async function sendFcmNotification(input: SendFcmNotificationInput): Prom
   };
 
   try {
-    const multicastResponse = await admin.messaging().sendMulticast(message);
+    const multicastResponse = await admin.messaging().sendEachForMulticast(message);
 
     const invalidTokens: string[] = [];
     if (multicastResponse.failureCount > 0) {
