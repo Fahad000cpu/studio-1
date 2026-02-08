@@ -2,7 +2,7 @@
 {
   "indexes": [
     {
-      "collectionGroup": "chat_metadata",
+      "collectionId": "chat_metadata",
       "queryScope": "COLLECTION",
       "fields": [
         {
