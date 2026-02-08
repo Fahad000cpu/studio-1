@@ -94,7 +94,6 @@ export default function LoginPage() {
   async function onEmailSubmit(values: z.infer<typeof formSchema>) {
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      router.push('/discover');
     } catch (error: any) {
         if (error.code === 'auth/operation-not-allowed') {
             toast({
@@ -135,8 +134,6 @@ export default function LoginPage() {
             photoURL: user.photoURL,
         });
         
-        router.push('/discover');
-
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
             return;
@@ -311,3 +308,5 @@ export default function LoginPage() {
     </Card>
   );
 }
+
+    

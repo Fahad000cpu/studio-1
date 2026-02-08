@@ -106,8 +106,6 @@ export default function SignupPage() {
           title: "Verification Email Sent",
           description: "Please check your inbox to verify your email address. Redirecting to the app...",
       });
-
-      router.push('/discover');
       
     } catch (error: any) {
       if (error.code === 'auth/email-already-in-use') {
@@ -139,8 +137,6 @@ export default function SignupPage() {
             phoneNumber: user.phoneNumber,
             photoURL: user.photoURL,
         });
-
-        router.push('/discover');
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user') {
@@ -311,3 +307,5 @@ export default function SignupPage() {
     </Card>
   );
 }
+
+    

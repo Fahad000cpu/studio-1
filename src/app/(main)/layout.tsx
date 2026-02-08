@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect } from "react";
@@ -33,7 +32,7 @@ export default function MainLayout({
   useEffect(() => {
     // If auth is checked and there's no user, redirect to login.
     if (!isUserLoading && !user) {
-      router.push('/login');
+      router.replace('/login');
     }
   }, [user, isUserLoading, router]);
 

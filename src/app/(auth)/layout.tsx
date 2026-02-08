@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect } from "react";
@@ -17,7 +16,7 @@ export default function AuthLayout({
   useEffect(() => {
     // If the user is loaded and exists, redirect from auth pages to the main app.
     if (!isUserLoading && user) {
-      router.push('/discover');
+      router.replace('/discover');
     }
   }, [user, isUserLoading, router]);
 
