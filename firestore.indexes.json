@@ -8,6 +8,10 @@
         {
           "fieldPath": "participants",
           "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "lastMessageTimestamp",
+          "order": "DESCENDING"
         }
       ]
     }
