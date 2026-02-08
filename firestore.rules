@@ -1,41 +1,144 @@
-
+/**
+ * @fileoverview Firestore Security Rules for ConnectSphere
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model for user-specific data,
+ * role-based access control for administrative functions,
+ * and shared access for collaborative content like group chats.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // This rule allows a user to get their own document or any other user's document for discovery.
-    // It also allows a user to write ONLY to their own document.
+
+    /**
+     * Users can view any profile (for discovery) but can only write to their own.
+     */
     match /users/{userId} {
-      allow get: if request.auth != null; 
-      allow write: if request.auth.uid == userId; 
+      allow get, list: if request.auth != null;
+      allow write: if request.auth.uid == userId;
     }
 
-    // NEW, EXPLICIT RULE:
-    // This rule allows a user to read and write documents within their OWN 'chats' subcollection.
-    // This is required for fetching the chat list and fixes the permission denied error.
+    /**
+     * CRITICAL FIX: This rule explicitly allows a user to read their own chat list (subcollection).
+     * The rule on the parent '/users/{userId}' does NOT grant this permission automatically.
+     */
     match /users/{userId}/chats/{chatId} {
       allow read, write: if request.auth.uid == userId;
     }
-
-    // This collection holds the actual messages for all 1-on-1 chats.
-    match /chats/{chatId}/messages/{messageId} {
-        allow read, write: if request.auth != null;
-    }
-
-    // Any authenticated user can interact with status updates.
+    
+    /**
+     * @description Secures status updates. Any authenticated user can read statuses.
+     * Users can only create status updates for themselves.
+     * Users can delete their own status updates.
+     * Users can update likes and views on any status.
+     * @path /status_updates/{statusId}
+     */
     match /status_updates/{statusId} {
-      allow read, write: if request.auth != null;
+        function isOwner() {
+          return request.auth != null && request.auth.uid == resource.data.userId;
+        }
+        function isCreatingOwnStatus() {
+           return request.auth != null && request.auth.uid == request.resource.data.userId;
+        }
+        
+        function isUpdatingLikesOrViews() {
+          let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+          // Allow updates if the *only* keys being changed are 'likes' or 'views'.
+          return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
+        }
+
+        allow read: if request.auth != null;
+        allow create: if isCreatingOwnStatus();
+        allow update: if request.auth != null && isUpdatingLikesOrViews();
+        allow delete: if isOwner();
     }
 
-    // Any authenticated user can read affiliate products. Writes should be admin-only.
-    // For simplicity now, allowing any authenticated user to write.
+
+    /**
+     * @description Secures one-on-one chat messages.
+     * @path /chats/{chatId}/messages/{messageId}
+     * @allow (read, create) A user can read or write messages in a chat if their UID is part of the chatId.
+     * @allow (delete) A user can delete their own messages.
+     * @deny (update) Messages are immutable.
+     */
+    match /chats/{chatId}/messages/{messageId} {
+      function isChatParticipant() {
+        return request.auth != null && request.auth.uid in chatId.split('_');
+      }
+      function isSender() {
+        return request.auth != null && request.auth.uid == resource.data.senderId;
+      }
+      allow read, create: if isChatParticipant();
+      allow delete: if isSender();
+      allow update: if false;
+    }
+
+
+    /**
+     * @description Secures chat groups. Access is managed through the 'members' map.
+     * @path /groups/{groupId}
+     */
+    match /groups/{groupId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isMember() {
+        return isSignedIn() && request.auth.uid in resource.data.memberIds;
+      }
+      function isGroupCreator() {
+        return isSignedIn() && resource.data.creatorId == request.auth.uid;
+      }
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+      allow update: if isMember();
+      allow delete: if isGroupCreator();
+    }
+
+    /**
+     * @description Secures group chat messages.  Membership is enforced via the denormalized 'members' map.
+     * @path /groups/{groupId}/messages/{messageId}
+     */
+    match /groups/{groupId}/messages/{messageId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isMember() {
+          return isSignedIn() && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
+      }
+      allow get: if isMember();
+      allow list: if isMember();
+      allow create: if request.auth != null && isMember() && request.resource.data.groupId == groupId;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Secures affiliate products. Only admins can create, update, or delete products.
+     * @path /affiliate_products/{productId}
+     */
     match /affiliate_products/{productId} {
-      allow read, write: if request.auth != null;
+      function isAdmin() {
+          return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
+      }
+      allow read: if request.auth != null;
+      allow create, update, delete: if isAdmin();
     }
 
-    // Admin role check.
+     /**
+      * @description Secures admin roles. Only admins can grant admin roles.
+      * @path /roles_admin/{userId}
+      */
     match /roles_admin/{userId} {
-      allow read: if request.auth != null;
+       function isAdmin() {
+           return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
+       }
+
+       allow get: if isAdmin();
+       allow list: if isAdmin();
+       allow create: if isAdmin();
+       allow update: if false;
+       allow delete: if isAdmin();
     }
   }
 }
