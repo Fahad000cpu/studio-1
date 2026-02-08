@@ -18,7 +18,6 @@ import {
   orderBy,
   arrayUnion,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
   Avatar,
@@ -44,7 +43,6 @@ import {
   useMemoFirebase,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
-  useFirebaseApp,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -94,7 +92,6 @@ const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null) => 
 export default function ChatPage() {
   const isMobile = useIsMobile();
   const firestore = useFirestore();
-  const app = useFirebaseApp();
   const { user } = useUser();
   const { toast } = useToast();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -244,19 +241,6 @@ export default function ChatPage() {
     });
   };
 
-  const triggerNotification = (body: string, recipientId: string, senderName: string) => {
-    if (!recipientId || !senderName) return;
-
-    const functions = getFunctions(app);
-    const sendNotification = httpsCallable(functions, 'sendChatMessageNotification');
-    
-    sendNotification({
-      recipientId: recipientId,
-      senderName: senderName,
-      messageText: body
-    }).catch(err => console.error("Failed to trigger notification function:", err));
-  }
-
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -279,8 +263,6 @@ export default function ChatPage() {
 
     const metadataText = isLink ? '🔗 Link' : messageText;
     updateChatMetadata(metadataText);
-    
-    triggerNotification(metadataText, selectedChat.id, user.displayName || "New Message");
   };
 
   const handleAttachmentClick = () => {
@@ -310,8 +292,6 @@ export default function ChatPage() {
       if (type === 'video') body = '🎥 Video';
       if (type === 'audio') body = '🎤 Voice Message';
       updateChatMetadata(body);
-      
-      triggerNotification(body, selectedChat.id, user.displayName || "New Message");
 
     } catch (error) {
       console.error("File upload failed:", error);

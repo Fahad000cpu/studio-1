@@ -1,116 +1,31 @@
 
-import * as functions from "firebase-functions";
+/**
+ * Import function triggers from their respective submodules:
+ *
+ * import {onCall} from "firebase-functions/v2/https";
+ * import {onDocumentWritten} from "firebase-functions/v2/firestore";
+ *
+ * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ */
+
+import {setGlobalOptions} from "firebase-functions";
 import * as admin from "firebase-admin";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+
+// Start writing functions
+// https://firebase.google.com/docs/functions/typescript
+
+setGlobalOptions({ maxInstances: 10 });
+
 
 // Initialize Firebase Admin SDK
 if (admin.apps.length === 0) {
-  admin.initializeApp();
+    admin.initializeApp();
 }
 
-const db = admin.firestore();
-
-// Set global options for all functions
-functions.setGlobalOptions({ maxInstances: 10 });
-
-/**
- * A callable function to send a push notification for a new chat message.
- * This is the secure, server-side way to handle notifications.
- */
-export const sendChatMessageNotification = onCall(async (request) => {
-  // Check authentication
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'The function must be called while authenticated.');
-  }
-
-  const { recipientId, senderName, messageText } = request.data;
-
-  if (!recipientId || !senderName || !messageText) {
-    throw new HttpsError('invalid-argument', 'The function must be called with recipientId, senderName, and messageText.');
-  }
-
-  try {
-    // Get the recipient's user document
-    const userDoc = await db.collection('users').doc(recipientId).get();
-    if (!userDoc.exists) {
-      console.log(`User document for recipient ${recipientId} not found.`);
-      return { success: false, reason: 'Recipient not found' };
-    }
-
-    const userData = userDoc.data();
-    const tokens = userData?.fcmTokens;
-
-    // Check if the user has any valid FCM tokens
-    const validTokens = Array.isArray(tokens) ? tokens.filter(t => typeof t === 'string' && t.length > 0) : [];
-
-    if (validTokens.length === 0) {
-      console.log(`No valid FCM tokens for recipient ${recipientId}.`);
-      return { success: true, reason: 'No tokens to send to' };
-    }
-    
-    const url = `/chat?chatWith=${request.auth.uid}`;
-
-    // Construct the notification payload
-    const message: admin.messaging.MulticastMessage = {
-      tokens: validTokens,
-      notification: {
-        title: senderName,
-        body: messageText,
-      },
-      data: {
-        url: url,
-      },
-      webpush: {
-        notification: {
-            icon: '/logo192.png',
-            badge: '/logo192.png',
-        },
-        fcmOptions: {
-            link: url,
-        },
-      },
-      apns: {
-        payload: {
-            aps: {
-                'content-available': 1,
-                'sound': 'default',
-            },
-        },
-      },
-      android: {
-        priority: 'high',
-      },
-    };
-
-    // Send the notification
-    const response = await admin.messaging().sendEachForMulticast(message);
-    console.log(`[FCM Function] Sent notification to ${recipientId}. Success: ${response.successCount}, Failure: ${response.failureCount}`);
-
-    // Optional: Clean up invalid tokens if any failures occurred
-    if (response.failureCount > 0) {
-        const tokensToRemove: string[] = [];
-        response.responses.forEach((resp, idx) => {
-            if (!resp.success) {
-                const errorCode = resp.error?.code;
-                if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
-                    tokensToRemove.push(validTokens[idx]);
-                }
-            }
-        });
-
-        if (tokensToRemove.length > 0) {
-            await userDoc.ref.update({
-                fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove)
-            });
-            console.log(`Cleaned up ${tokensToRemove.length} invalid tokens for user ${recipientId}.`);
-        }
-    }
-
-
-    return { success: true, messageCount: response.successCount };
-
-  } catch (error) {
-    console.error('Error sending chat notification:', error);
-    throw new HttpsError('internal', 'An error occurred while sending the notification.');
-  }
-});
+// The onCall function for sending chat notifications has been temporarily removed.
+// Deploying any v2 Cloud Function (like onCall) requires the project to be on the Blaze (pay-as-you-go) plan,
+// as it needs to enable certain Google Cloud APIs that are not available on the free Spark plan.
+//
+// To re-enable chat push notifications:
+// 1. Upgrade your Firebase project to the Blaze plan from the Firebase Console.
+// 2. Ask the assistant to "re-implement the chat notification Cloud Function".

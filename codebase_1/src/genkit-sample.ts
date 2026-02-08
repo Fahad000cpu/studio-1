@@ -61,16 +61,6 @@ const menuSuggestionFlow = ai.defineFlow({
   }
 );
 
-
-// The onCallGenkit function below has been temporarily removed.
-// Deploying any v2 Cloud Function (like onCallGenkit) requires the project to be on the Blaze (pay-as-you-go) plan,
-// as it needs to enable certain Google Cloud APIs that are not available on the free Spark plan.
-//
-// To re-enable this function:
-// 1. Upgrade your Firebase project to the Blaze plan from the Firebase Console.
-// 2. Uncomment the code block below.
-
-/*
 export const menuSuggestion = onCallGenkit({
   // Uncomment to enable AppCheck. This can reduce costs by ensuring only your Verified
   // app users can use your API. Read more at https://firebase.google.com/docs/app-check/cloud-functions
@@ -84,4 +74,3 @@ export const menuSuggestion = onCallGenkit({
   // Grant access to the API key to this function:
   secrets: [apiKey],
 }, menuSuggestionFlow);
-*/
