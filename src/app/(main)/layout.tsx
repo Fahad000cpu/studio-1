@@ -28,13 +28,23 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
+  const router = useRouter();
 
+  useEffect(() => {
+    // If auth is checked and there's no user, redirect to login.
+    if (!isUserLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isUserLoading, router]);
+
+  // Show a loader while auth state is being determined or if there's no user (and redirect is in progress).
   if (isUserLoading || !user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading your sphere..." : "Redirecting..."} />
     );
   }
 
+  // If a user is found, render the main app layout.
   return (
       <div className="relative min-h-screen">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />

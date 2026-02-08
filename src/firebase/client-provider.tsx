@@ -5,6 +5,7 @@ import React, { useMemo, type ReactNode, useEffect } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getAnalytics, type Analytics } from 'firebase/analytics';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getFunctions, type Functions } from 'firebase/functions';
@@ -18,6 +19,7 @@ interface FirebaseInstances {
   auth: Auth;
   firestore: Firestore;
   functions: Functions;
+  analytics: Analytics;
 }
 
 const initializeFirebaseClient = (): FirebaseInstances => {
@@ -31,8 +33,9 @@ const initializeFirebaseClient = (): FirebaseInstances => {
   const auth = getAuth(app);
   const firestore = getFirestore(app);
   const functions = getFunctions(app);
+  const analytics = getAnalytics(app);
 
-  const instances: FirebaseInstances = { app, auth, firestore, functions };
+  const instances: FirebaseInstances = { app, auth, firestore, functions, analytics };
   if (typeof window !== 'undefined') {
       (window as any)[F_INSTANCES_KEY] = instances;
   }
@@ -61,6 +64,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       auth={instances.auth}
       firestore={instances.firestore}
       functions={instances.functions}
+      analytics={instances.analytics}
     >
       {children}
     </FirebaseProvider>

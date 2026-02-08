@@ -1,7 +1,10 @@
+
 import { redirect } from 'next/navigation';
 
+/**
+ * This is the root page of the application.
+ * It immediately redirects to the /discover page, which then handles auth checks.
+ */
 export default function RootPage() {
-  // Redirect to the discover page, which is the main entry point for authenticated users.
-  // The (main) layout will handle redirecting to /login if the user is not authenticated.
   redirect('/discover');
 }
