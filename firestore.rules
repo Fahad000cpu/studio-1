@@ -3,21 +3,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can only write to their own doc, but anyone can read profiles for discovery
+    // Users can read/write their own profile, anyone can list/read profiles.
     match /users/{userId} {
-      allow read: if request.auth != null;
+      // Allow reading/listing of profiles for discovery by any authenticated user.
+      allow get, list: if request.auth != null;
+      // Allow a user to write only to their own profile.
       allow write: if request.auth.uid == userId;
-
-      // Users can read and write their own chat metadata subcollection
-      match /chats/{chatId} {
-        allow read, write: if request.auth.uid == userId;
-      }
     }
 
-    // Messages can be read/written by authenticated users.
-    // A more secure rule would check if the user is a participant in the chat.
+    // Messages can be read/written by participants of the chat.
+    // The chatId is assumed to be a concatenation of two user UIDs, sorted.
     match /chats/{chatId}/messages/{messageId} {
-      allow read, write: if request.auth != null;
+      allow create: if request.auth.uid == request.resource.data.senderId;
+      allow read, update, delete: if request.auth.uid in chatId.split('_');
     }
 
     // Statuses can be read by anyone, but only written/deleted by the owner.
@@ -39,5 +37,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
