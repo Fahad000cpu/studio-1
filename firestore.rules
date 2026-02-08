@@ -3,18 +3,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Rule for user profiles (/users)
-    // Any authenticated user can list and read user profiles (for Discover page)
-    // Only the owner can write to their own profile
+    // Rule for the top-level user profile documents
+    // Allows any authenticated user to read profiles for the Discover page.
     match /users/{userId} {
       allow list, get: if request.auth != null;
       allow write: if request.auth.uid == userId;
+    }
 
-      // Rule for a user's private chat list subcollection
-      // A user can only read and write documents in their OWN chat list.
-      match /chats/{chatId} {
-        allow read, write: if request.auth.uid == userId;
-      }
+    // This is the new master rule.
+    // It grants a user full read/write access to all sub-collections 
+    // within their own user document (e.g., /users/{userId}/chats/{chatId}).
+    match /users/{userId}/{documents=**} {
+      allow read, write: if request.auth.uid == userId;
     }
 
     // Rule for messages within a one-to-one chat
