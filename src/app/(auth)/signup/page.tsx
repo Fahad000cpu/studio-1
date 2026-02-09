@@ -136,8 +136,6 @@ export default function SignupPage() {
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
     if (isMobile) {
-      // On mobile, use redirect which is more reliable than popups.
-      // The result is handled by the AuthLayout effect.
       await signInWithRedirect(auth, provider);
       return;
     }
@@ -154,7 +152,7 @@ export default function SignupPage() {
 
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-            return; // Silently ignore when the user closes the popup.
+            return;
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
              toast({
@@ -167,7 +165,7 @@ export default function SignupPage() {
             toast({
                 variant: "destructive",
                 title: "Domain Not Authorized",
-                description: `The domain '${domain}' is not authorized. Go to Firebase Console > Authentication > Sign-in method > Authorized domains to add it.`,
+                description: `The domain '${domain}' is not authorized. You must add it to the 'Authorized domains' list in BOTH the Firebase Console (Authentication -> Sign-in method) AND your Google Cloud Console's OAuth client settings.`,
                 duration: 15000,
             });
         } else {
@@ -184,8 +182,6 @@ export default function SignupPage() {
   const handleFacebookSignIn = async () => {
     const provider = new FacebookAuthProvider();
     if (isMobile) {
-      // On mobile, use redirect which is more reliable than popups.
-      // The result is handled by the AuthLayout effect.
       await signInWithRedirect(auth, provider);
       return;
     }
@@ -202,7 +198,7 @@ export default function SignupPage() {
         
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
-            return; // Silently ignore when the user closes the popup.
+            return;
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
             toast({
@@ -216,7 +212,7 @@ export default function SignupPage() {
             toast({
                 variant: "destructive",
                 title: "Domain Not Authorized",
-                description: `The domain '${domain}' is not authorized. Go to Firebase Console > Authentication > Sign-in method > Authorized domains to add it.`,
+                description: `The domain '${domain}' is not authorized. You must add it to the 'Authorized domains' list in BOTH the Firebase Console (Authentication -> Sign-in method) AND your Facebook For Developers app settings.`,
                 duration: 15000,
             });
         } else {
@@ -377,3 +373,5 @@ export default function SignupPage() {
     </Card>
   );
 }
+
+    
