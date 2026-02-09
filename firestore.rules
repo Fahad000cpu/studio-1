@@ -58,12 +58,14 @@ service cloud.firestore {
 
     /**
 
-     * @description Protects user profiles and their subcollections. Any authenticated user can read profiles for discovery,
-     * but only the owner can write to their own profile or related subcollections.
+     * @description Protects user profiles and their subcollections.
      * @path /users/{userId}
      */
     match /users/{userId} {
+      // Allow any authenticated user to get or list user profiles for discovery.
       allow get, list: if request.auth != null;
+      
+      // Allow a user to create, update, or delete their own profile document.
       allow create, update, delete: if request.auth.uid == userId;
 
       /**
@@ -71,8 +73,7 @@ service cloud.firestore {
        * @path /users/{userId}/chats/{chatId}
        */
       match /chats/{chatId} {
-        allow list, get: if request.auth.uid == userId;
-        allow write: if request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId;
       }
     }
     
