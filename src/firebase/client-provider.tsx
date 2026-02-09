@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { type ReactNode, useEffect, useState } from 'react';
@@ -25,11 +26,18 @@ interface FirebaseInstances {
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const [instances, setInstances] = useState<FirebaseInstances | null>(null);
+  const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    // This check ensures we only initialize once, even with React StrictMode or HMR.
-    if (instances) {
+    if (instances || initError) {
         return;
+    }
+
+    if (!firebaseConfig.apiKey) {
+      const errorMessage = "Firebase API Key is missing. Please get your key from the Firebase console (Project settings > General) and add it to the .env file as NEXT_PUBLIC_FIREBASE_API_KEY.";
+      console.error(errorMessage);
+      setInitError(errorMessage);
+      return;
     }
 
     const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
@@ -52,9 +60,21 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
           .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
           .catch((error) => console.error('Service Worker registration failed:', error));
     }
-  // We want this to run only once on mount. The `instances` check handles re-runs.
+  // We want this to run only once on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [instances, initError]);
+  
+  if (initError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background p-4">
+        <div className="max-w-lg text-center bg-card p-8 rounded-lg shadow-lg">
+          <h1 className="text-2xl font-bold text-destructive mb-4">Firebase Configuration Error</h1>
+          <p className="text-card-foreground">{initError}</p>
+        </div>
+      </div>
+    );
+  }
+
 
   if (!instances) {
     return <FullScreenLoader message="Initializing Connection..." />;
