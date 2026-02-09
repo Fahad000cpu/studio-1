@@ -64,7 +64,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile } from '@/types';
 import type { Message, ChatMetadata } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
