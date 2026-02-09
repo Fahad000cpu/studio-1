@@ -45,7 +45,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     const firestore = getFirestore(app);
     const functions = getFunctions(app);
 
-    // Explicitly initialize Installations
+    // Explicitly initialize Installations which will in turn initialize In-App Messaging
     getInstallations(app);
 
     isSupported().then(supported => {
