@@ -76,7 +76,10 @@ service cloud.firestore {
         return request.auth != null && request.auth.uid == userId;
       }
 
-      allow get: if isOwner();
+      // Allow any authenticated user to view profiles to enable user discovery and chat.
+      // NOTE: This makes all fields in a user's document public to other users.
+      // For better security, sensitive data like fcmTokens should be in a private subcollection.
+      allow get: if request.auth != null;
       allow list: if request.auth != null; 
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
