@@ -81,15 +81,15 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
+    }
 
-      /**
-       * @description Secures chat metadata within a user's profile.
-       * A user can only read or write to their own chat list.
-       * @path /users/{userId}/chats/{otherUserId}
-       */
-      match /chats/{otherUserId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+    /**
+     * @description Secures chat metadata within a user's profile.
+     * A user can only read or write to their own chat list.
+     * @path /users/{userId}/chats/{otherUserId}
+     */
+    match /users/{userId}/chats/{otherUserId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
     /**
