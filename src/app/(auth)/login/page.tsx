@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,12 @@ const GoogleIcon = () => (
       <path d="M1 1h22v22H1z" fill="none" />
     </svg>
   );
+
+const FacebookIcon = () => (
+    <svg className="h-5 w-5" viewBox="0 0 24 24">
+        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3l-.5 3h-2.5v6.95c5.05-.5 9-4.76 9-9.95z" fill="#1877F2"/>
+    </svg>
+);
 
 
 export default function LoginPage() {
@@ -164,6 +170,50 @@ export default function LoginPage() {
             description: error.message || "Could not sign in with Google. Please try again later.",
             duration: 10000,
         });
+    }
+  };
+
+  const handleFacebookSignIn = async () => {
+    const provider = new FacebookAuthProvider();
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        
+        await handleUserProfileUpdate(firestore, user, {
+            name: user.displayName,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            photoURL: user.photoURL,
+        });
+        
+    } catch (error: any) {
+        if (error.code === 'auth/popup-closed-by-user') {
+            return;
+        }
+        if (error.code === 'auth/account-exists-with-different-credential') {
+            toast({
+                variant: "destructive",
+                title: "Account Exists",
+                description: "An account with this email already exists using a different sign-in method. Please log in with your original method.",
+                duration: 10000,
+            });
+        } else if (error.code === 'auth/unauthorized-domain') {
+            const domain = window.location.hostname;
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: `The domain '${domain}' is not authorized. Go to Firebase Console > Authentication > Sign-in method > Authorized domains to add it.`,
+                duration: 15000,
+            });
+        } else {
+            console.error("Facebook Sign-In Error:", error);
+            toast({
+                variant: "destructive",
+                title: "Facebook Sign-In Failed",
+                description: error.message || "Could not sign in with Facebook. Ensure it is configured correctly in the Firebase Console.",
+                duration: 10000,
+            });
+        }
     }
   };
   
@@ -265,12 +315,18 @@ export default function LoginPage() {
         </div>
         </div>
 
-        <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
-        <GoogleIcon />
-        <span className="ml-2">Sign in with Google</span>
-        </Button>
+        <div className="grid grid-cols-2 gap-4">
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn}>
+                <GoogleIcon />
+                <span className="ml-2">Google</span>
+            </Button>
+            <Button variant="outline" className="w-full" onClick={handleFacebookSignIn}>
+                <FacebookIcon />
+                <span className="ml-2">Facebook</span>
+            </Button>
+        </div>
 
-        <div className="mt-4 text-center text-sm">
+        <div className="mt-6 text-center text-sm">
           Don&apos;t have an account?{" "}
           <Link href="/signup" className="underline">
             Sign up
