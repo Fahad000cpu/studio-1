@@ -6,7 +6,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { updateProfile, createUserWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, sendEmailVerification } from "firebase/auth";
+import { updateProfile, createUserWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, sendEmailVerification, signInWithRedirect } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -77,6 +78,7 @@ export default function SignupPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
@@ -133,6 +135,12 @@ export default function SignupPage() {
   
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    if (isMobile) {
+      // On mobile, use redirect which is more reliable than popups.
+      // The result is handled by the AuthLayout effect.
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -145,8 +153,8 @@ export default function SignupPage() {
         });
 
     } catch (error: any) {
-        if (error.code === 'auth/popup-closed-by-user') {
-            return;
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return; // Silently ignore when the user closes the popup.
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
              toast({
@@ -175,6 +183,12 @@ export default function SignupPage() {
 
   const handleFacebookSignIn = async () => {
     const provider = new FacebookAuthProvider();
+    if (isMobile) {
+      // On mobile, use redirect which is more reliable than popups.
+      // The result is handled by the AuthLayout effect.
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -187,8 +201,8 @@ export default function SignupPage() {
         });
         
     } catch (error: any) {
-        if (error.code === 'auth/popup-closed-by-user') {
-            return;
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return; // Silently ignore when the user closes the popup.
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
             toast({
@@ -363,5 +377,3 @@ export default function SignupPage() {
     </Card>
   );
 }
-
-    

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import React, { useState } from "react";
-import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, GoogleAuthProvider, FacebookAuthProvider, signInWithPopup, sendPasswordResetEmail, signInWithRedirect } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const formSchema = z.object({
@@ -83,6 +84,7 @@ export default function LoginPage() {
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -129,6 +131,12 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
+    if (isMobile) {
+      // On mobile, use redirect which is more reliable than popups.
+      // The result is handled by the AuthLayout effect.
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -141,8 +149,8 @@ export default function LoginPage() {
         });
         
     } catch (error: any) {
-        if (error.code === 'auth/popup-closed-by-user') {
-            return;
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return; // Silently ignore when the user closes the popup.
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
             toast({
@@ -175,6 +183,12 @@ export default function LoginPage() {
 
   const handleFacebookSignIn = async () => {
     const provider = new FacebookAuthProvider();
+    if (isMobile) {
+      // On mobile, use redirect which is more reliable than popups.
+      // The result is handled by the AuthLayout effect.
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     try {
         const result = await signInWithPopup(auth, provider);
         const user = result.user;
@@ -187,8 +201,8 @@ export default function LoginPage() {
         });
         
     } catch (error: any) {
-        if (error.code === 'auth/popup-closed-by-user') {
-            return;
+        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return; // Silently ignore when the user closes the popup.
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
             toast({
@@ -364,5 +378,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    
