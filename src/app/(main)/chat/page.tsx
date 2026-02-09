@@ -64,7 +64,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import type { UserProfile } from '@/types';
 import type { Message, ChatMetadata } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
@@ -111,14 +111,12 @@ export default function ChatPage() {
   
   const chatWithId = searchParams.get('chatWith');
 
-  // Fetch chat metadata for the current user, sorted by recency.
+  // Fetch chat metadata for the current user.
   const chatMetadataCollection = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return collection(firestore, 'users', user.uid, 'chats');
   }, [firestore, user]);
-  const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection, {
-    orderBy: ['lastMessageTimestamp', 'desc']
-  });
+  const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection);
 
   // From the metadata, get the IDs of users we've chatted with.
   const chattedUserIds = useMemo(() => {
@@ -173,12 +171,9 @@ export default function ChatPage() {
         });
     }
 
-    if (!searchTerm) {
-        return combinedMetas;
-    }
-
-    // Filter the list based on the search term.
-    return combinedMetas.filter(meta => {
+    const filteredMetas = !searchTerm
+    ? combinedMetas
+    : combinedMetas.filter(meta => {
         const contact = usersMap.get(meta.id);
         if (!contact) return false;
         const searchTermLower = searchTerm.toLowerCase();
@@ -186,6 +181,15 @@ export default function ChatPage() {
         const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
         return nameMatch || emailMatch;
     });
+
+    // Sort chats by the most recent message timestamp on the client.
+    filteredMetas.sort((a, b) => {
+        const timeA = a.lastMessageTimestamp instanceof Timestamp ? a.lastMessageTimestamp.toMillis() : 0;
+        const timeB = b.lastMessageTimestamp instanceof Timestamp ? b.lastMessageTimestamp.toMillis() : 0;
+        return timeB - timeA;
+    });
+
+    return filteredMetas;
   }, [chatMetadata, newContact, searchTerm, usersMap, chatMetadataMap]);
 
 
