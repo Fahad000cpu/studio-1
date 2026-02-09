@@ -20,30 +20,16 @@ import { Flame } from "lucide-react";
 import { InstallPwaButton } from "@/components/install-pwa-button";
 import { FullScreenLoader } from "@/components/full-screen-loader";
 
-// We no longer need useRouter or useEffect for redirection here.
-// import { useRouter } from "next/navigation";
-// import { useEffect } from "react";
-
 export default function MainLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
-  // const router = useRouter(); // REMOVED
 
-  // This redirection logic is now handled exclusively by the root page.tsx.
-  // This layout's only responsibility is to show a loader if the user is not yet authenticated
-  // or if they don't have access, while the main router makes the decision.
-  // useEffect(() => {
-  //   if (!isUserLoading && !user) {
-  //     router.replace('/login');
-  //   }
-  // }, [user, isUserLoading, router]); // REMOVED
-
-  // While checking auth or if there's no user (and we are about to be redirected),
-  // show a full-screen loader. This prevents flashing the main layout to
-  // unauthenticated users.
+  // This layout now acts as a simple guard.
+  // If the user is not authenticated or the auth state is loading,
+  // it shows a loader. The redirection logic is centralized in `src/app/page.tsx`.
   if (isUserLoading || !user) {
     return <FullScreenLoader message="Loading your sphere..." />;
   }

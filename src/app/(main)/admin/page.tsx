@@ -30,7 +30,8 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-  } from "@/components/ui/alert-dialog"
+  } from "@/components/ui/alert-dialog";
+import { DeviceIdFetcher } from '@/components/device-id-fetcher';
 
 export default function AdminPage() {
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
@@ -254,6 +255,8 @@ export default function AdminPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            <DeviceIdFetcher />
 
             <Card>
               <CardHeader>
