@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { type ReactNode, useEffect, useState } from 'react';
@@ -26,9 +27,8 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   const [instances, setInstances] = useState<FirebaseInstances | null>(null);
 
   useEffect(() => {
-    const F_INSTANCES_KEY = Symbol.for("firebase_instances_for_studio_app");
-    if (typeof window !== 'undefined' && (window as any)[F_INSTANCES_KEY]) {
-        setInstances((window as any)[F_INSTANCES_KEY]);
+    // This check ensures we only initialize once, even with React StrictMode or HMR.
+    if (instances) {
         return;
     }
 
@@ -40,10 +40,6 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     isSupported().then(supported => {
         const analytics = supported ? getAnalytics(app) : null;
         const newInstances: FirebaseInstances = { app, auth, firestore, functions, analytics };
-        
-        if (typeof window !== 'undefined') {
-            (window as any)[F_INSTANCES_KEY] = newInstances;
-        }
         setInstances(newInstances);
     });
 
@@ -53,6 +49,8 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
           .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
           .catch((error) => console.error('Service Worker registration failed:', error));
     }
+  // We want this to run only once on mount. The `instances` check handles re-runs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!instances) {
