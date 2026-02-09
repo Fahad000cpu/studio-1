@@ -73,9 +73,9 @@ service cloud.firestore {
     /**
      * @description Secures the chat metadata subcollection and its documents.
      * A user can only read (get, list) and write their own chat metadata.
-     * @path /users/{userId}/chats/{chatDocs=**}
+     * @path /users/{userId}/chats/{chatId}
      */
-    match /users/{userId}/chats/{chatDoc=**} {
+    match /users/{userId}/chats/{chatId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
