@@ -15,7 +15,7 @@ interface FirebaseProviderProps {
   firestore: Firestore;
   auth: Auth;
   functions: Functions;
-  analytics: Analytics;
+  analytics: Analytics | null;
 }
 
 // Internal state for user authentication
@@ -45,7 +45,7 @@ export interface FirebaseServicesAndUser {
   firestore: Firestore;
   auth: Auth;
   functions: Functions;
-  analytics: Analytics;
+  analytics: Analytics | null;
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
@@ -100,14 +100,14 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
-    const servicesAvailable = !!(firebaseApp && firestore && auth && functions && analytics);
+    const servicesAvailable = !!(firebaseApp && firestore && auth && functions);
     return {
       areServicesAvailable: servicesAvailable,
       firebaseApp: servicesAvailable ? firebaseApp : null,
       firestore: servicesAvailable ? firestore : null,
       auth: servicesAvailable ? auth : null,
       functions: servicesAvailable ? functions : null,
-      analytics: servicesAvailable ? analytics : null,
+      analytics: analytics,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
@@ -133,7 +133,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.functions || !context.analytics) {
+  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.functions) {
     throw new Error('Firebase core services not available. Check FirebaseProvider props.');
   }
 
@@ -168,7 +168,7 @@ export const useFunctions = (): Functions => {
 }
 
 /** Hook to access Analytics instance. */
-export const useAnalytics = (): Analytics => {
+export const useAnalytics = (): Analytics | null => {
     const { analytics } = useFirebase();
     return analytics;
 };
