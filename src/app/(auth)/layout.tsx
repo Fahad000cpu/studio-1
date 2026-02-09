@@ -7,6 +7,7 @@ import { FullScreenLoader } from "@/components/full-screen-loader";
 import { getRedirectResult } from "firebase/auth";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 export default function AuthLayout({
   children,
@@ -17,15 +18,25 @@ export default function AuthLayout({
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const router = useRouter();
+
+  useEffect(() => {
+    // If auth state is resolved and a user exists, redirect to the main app.
+    if (!isUserLoading && user) {
+      router.replace("/discover");
+    }
+  }, [isUserLoading, user, router]);
 
   useEffect(() => {
     const handleRedirect = async () => {
-      if (user) return; // Don't run if user is already logged in
+      // Don't run if user is already logged in, the other effect will handle redirection.
+      if (user) return; 
 
       try {
         const result = await getRedirectResult(auth);
         if (result) {
           // This means the user has just come back from a redirect sign-in.
+          // The other useEffect will now detect the new `user` object and redirect.
           const user = result.user;
           await handleUserProfileUpdate(firestore, user, {
               name: user.displayName,
@@ -33,10 +44,18 @@ export default function AuthLayout({
               phoneNumber: user.phoneNumber,
               photoURL: user.photoURL,
           });
-          // No need to redirect here, the useUser hook will detect the new user
-          // and the RootPage or MainLayout will handle the redirection.
         }
       } catch (error: any) {
+        if (error.code === 'auth/unauthorized-domain') {
+            const domain = window.location.hostname;
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: `The domain '${domain}' is not authorized. You must add it to the 'Authorized domains' list in BOTH the Firebase Console (Authentication -> Sign-in method) AND your Google/Facebook OAuth client settings.`,
+                duration: 15000,
+            });
+            return;
+        }
         console.error("Redirect Sign-In Error:", error);
         toast({
             variant: "destructive",
@@ -47,17 +66,14 @@ export default function AuthLayout({
       }
     };
     
-    // isUserLoading is true on initial load, then false.
-    // We want to check for redirect result after the initial auth state is resolved but before user is set.
+    // Only check for redirect result after initial auth state is resolved.
     if (!isUserLoading) {
       handleRedirect();
     }
   }, [auth, firestore, toast, isUserLoading, user]);
 
 
-  // This layout now acts as a simple guard.
-  // If a user exists or auth state is loading, it shows a loader.
-  // The redirection logic is centralized in `src/app/page.tsx`.
+  // If auth is loading, or if a user exists (and is about to be redirected), show a loader.
   if (isUserLoading || user) {
     return (
       <FullScreenLoader message={isUserLoading ? "Loading Session..." : "Redirecting..."} />
