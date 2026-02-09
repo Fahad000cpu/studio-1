@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { type ReactNode, useEffect, useState } from 'react';
@@ -9,6 +8,7 @@ import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getFunctions, type Functions } from 'firebase/functions';
+import { getInstallations } from 'firebase/installations';
 import { FullScreenLoader } from '@/components/full-screen-loader';
 
 interface FirebaseClientProviderProps {
@@ -36,6 +36,9 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     const auth = getAuth(app);
     const firestore = getFirestore(app);
     const functions = getFunctions(app);
+
+    // Explicitly initialize Installations
+    getInstallations(app);
 
     isSupported().then(supported => {
         const analytics = supported ? getAnalytics(app) : null;
