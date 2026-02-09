@@ -44,6 +44,7 @@ import {
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
   setDocumentNonBlocking,
+  useDoc,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
 import {
@@ -107,52 +108,85 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const chatWithId = searchParams.get('chatWith');
 
-  // Fetch all users to display in the chat list
-  const usersCollection = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
-  const { data: allUsers, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
-
-  // Fetch all chat metadata for the current user
+  // Fetch chat metadata for the current user, sorted by recency.
   const chatMetadataCollection = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return collection(firestore, 'users', user.uid, 'chats');
   }, [firestore, user]);
-  const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection);
+  const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataCollection, {
+    orderBy: ['lastMessageTimestamp', 'desc']
+  });
 
+  // From the metadata, get the IDs of users we've chatted with.
+  const chattedUserIds = useMemo(() => {
+    if (!chatMetadata) return null;
+    if (chatMetadata.length === 0) return [];
+    return chatMetadata.map(cm => cm.id);
+  }, [chatMetadata]);
+
+  // Fetch profiles for only the users we have active chats with.
+  const chattedUsersCollectionRef = useMemoFirebase(() => {
+    if (!firestore || !chattedUserIds || chattedUserIds.length === 0) return null;
+    const idsToQuery = chattedUserIds.slice(0, 30);
+    return query(collection(firestore, 'users'), where('id', 'in', idsToQuery));
+  }, [firestore, chattedUserIds]);
+  const { data: chattedUsers, isLoading: chattedUsersLoading } = useCollection<UserProfile>(chattedUsersCollectionRef);
+  
+  // If navigating from Discover, fetch the profile for the new contact.
+  const newContactDocRef = useMemoFirebase(() => {
+    if (!firestore || !chatWithId) return null;
+    if (chattedUserIds?.includes(chatWithId)) return null;
+    return doc(firestore, 'users', chatWithId);
+  }, [firestore, chatWithId, chattedUserIds]);
+  const { data: newContact, isLoading: newContactLoading } = useDoc<UserProfile>(newContactDocRef);
+
+  // Create a map of all user profiles needed for the view (existing chats + new contact).
+  const usersMap = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    if (chattedUsers) {
+        chattedUsers.forEach(u => map.set(u.id, u));
+    }
+    if (newContact) {
+        map.set(newContact.id, newContact);
+    }
+    return map;
+  }, [chattedUsers, newContact]);
+  
   const chatMetadataMap = useMemo(() => {
     if (!chatMetadata) return new Map<string, ChatMetadata>();
     return new Map(chatMetadata.map(cm => [cm.id, cm]));
   }, [chatMetadata]);
 
-  const usersMap = useMemo(() => {
-    if (!allUsers) return new Map<string, UserProfile>();
-    return new Map(allUsers.map(u => [u.id, u]));
-  }, [allUsers]);
+  // Create the final list of chats to display, including any new potential chat.
+  const displayedChats = useMemo(() => {
+    let combinedMetas = chatMetadata ? [...chatMetadata] : [];
 
-  // The chat list now shows all users except the current one, filterable by search
-  const filteredUsers = useMemo(() => {
-    if (!allUsers || !user) return [];
-    
-    const users = allUsers.filter(u => {
-        if (u.id === user.uid) return false; // Exclude self
+    // Add a placeholder for a new chat initiated from the Discover page.
+    if (newContact && !chatMetadataMap.has(newContact.id)) {
+        combinedMetas.unshift({
+            id: newContact.id,
+            lastMessageText: 'Start a conversation',
+            lastMessageTimestamp: undefined,
+        });
+    }
 
-        if (!searchTerm) return true;
+    if (!searchTerm) {
+        return combinedMetas;
+    }
 
+    // Filter the list based on the search term.
+    return combinedMetas.filter(meta => {
+        const contact = usersMap.get(meta.id);
+        if (!contact) return false;
         const searchTermLower = searchTerm.toLowerCase();
-        const nameMatch = (u.name || '').toLowerCase().includes(searchTermLower);
-        const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
+        const nameMatch = (contact.name || '').toLowerCase().includes(searchTermLower);
+        const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
         return nameMatch || emailMatch;
     });
-
-    // Sort users: those with recent chats come first
-    return users.sort((a, b) => {
-      const metaA = chatMetadataMap.get(a.id);
-      const metaB = chatMetadataMap.get(b.id);
-      const timeA = metaA?.lastMessageTimestamp?.toMillis() || 0;
-      const timeB = metaB?.lastMessageTimestamp?.toMillis() || 0;
-      return timeB - timeA;
-    });
-  }, [allUsers, user, searchTerm, chatMetadataMap]);
+  }, [chatMetadata, newContact, searchTerm, usersMap, chatMetadataMap]);
 
 
   const selectedChat = useMemo(() => {
@@ -168,19 +202,17 @@ export default function ChatPage() {
     const chatMeta = chatMetadataMap.get(contact.id);
     if (chatMeta && chatMeta.unreadCount && chatMeta.unreadCount > 0) {
       const chatMetaRef = doc(firestore, 'users', user.uid, 'chats', contact.id);
-      // Use updateDoc because we know the doc exists if there's an unread count
       updateDocumentNonBlocking(chatMetaRef, {
           unreadCount: 0
       });
     }
   }, [user, firestore, chatMetadataMap]);
 
-  const isLoading = allUsersLoading || chatMetadataLoading;
+  const isLoading = chatMetadataLoading || (chattedUserIds != null && chattedUserIds.length > 0 && chattedUsersLoading) || newContactLoading;
 
   useEffect(() => {
-    if (isLoading || selectedChatId || !usersMap.size) return;
+    if (isLoading || selectedChatId) return;
 
-    const chatWithId = searchParams.get('chatWith');
     if (chatWithId) {
         const userToChatWith = usersMap.get(chatWithId);
         if (userToChatWith) {
@@ -189,13 +221,14 @@ export default function ChatPage() {
         }
     }
     
-    if (!isMobile && filteredUsers && filteredUsers.length > 0) {
-        const firstContact = filteredUsers[0];
+    if (!isMobile && displayedChats && displayedChats.length > 0) {
+        const firstChatMeta = displayedChats[0];
+        const firstContact = usersMap.get(firstChatMeta.id);
         if (firstContact) {
             handleSelectChat(firstContact);
         }
     }
-  }, [filteredUsers, usersMap, selectedChatId, searchParams, isMobile, handleSelectChat, isLoading]);
+  }, [displayedChats, usersMap, selectedChatId, chatWithId, isMobile, handleSelectChat, isLoading]);
 
 
   const chatId = useMemo(() => {
@@ -224,7 +257,6 @@ export default function ChatPage() {
         .filter(msg => !msg.deletedFor?.includes(user.uid!));
   }, [messagesData, user?.uid]);
 
-  // This logic is now simplified as we don't have chat metadata from the problematic query
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector('div:first-child');
@@ -245,19 +277,14 @@ export default function ChatPage() {
 
     const timestamp = serverTimestamp();
 
-    // Update sender's metadata (this should succeed)
     const senderChatRef = doc(firestore, 'users', senderId, 'chats', recipientId);
     const senderPayload = {
         id: recipientId,
         lastMessageText: text,
         lastMessageTimestamp: timestamp,
-        // We don't increment our own unread count
     };
     setDocumentNonBlocking(senderChatRef, senderPayload, { merge: true });
 
-    // Attempt to update recipient's metadata. 
-    // This now uses a non-blocking update that will fail silently on permission-denied,
-    // which is expected. This logic should eventually be a Cloud Function.
     const recipientChatRef = doc(firestore, 'users', recipientId, 'chats', senderId);
     const recipientPayload = {
         id: senderId,
@@ -288,7 +315,6 @@ export default function ChatPage() {
       chatId: chatId,
     });
     
-    // Fire-and-forget the push notification
     sendChatNotification({
         recipientId: selectedChat.id,
         senderId: user.uid,
@@ -328,7 +354,6 @@ export default function ChatPage() {
       if (type === 'audio') body = '🎤 Voice Message';
       updateChatMetadata(body);
 
-      // Fire-and-forget the push notification for media
       sendChatNotification({
         recipientId: selectedChat.id,
         senderId: user.uid,
@@ -490,7 +515,7 @@ export default function ChatPage() {
         <div className="relative mt-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search users..." 
+            placeholder="Search chats..." 
             className="pl-10" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -511,11 +536,11 @@ export default function ChatPage() {
               </div>
             ))}
           </div>
-        ) : filteredUsers.length > 0 ? (
-          filteredUsers.map((contact) => {
+        ) : displayedChats.length > 0 ? (
+          displayedChats.map((meta) => {
+            const contact = usersMap.get(meta.id);
             if (!user || !contact) return null;
-            const metadata = chatMetadataMap.get(contact.id);
-            const unreadCount = metadata?.unreadCount || 0;
+            const unreadCount = meta.unreadCount || 0;
             
             return (
               <div
@@ -538,11 +563,11 @@ export default function ChatPage() {
                     "text-sm truncate",
                     unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground"
                     )}>
-                    {metadata?.lastMessageText || 'Start a conversation'}
+                    {meta?.lastMessageText}
                   </p>
                 </div>
                  <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                    <span>{getMessageTimestamp(metadata?.lastMessageTimestamp)}</span>
+                    <span>{getMessageTimestamp(meta?.lastMessageTimestamp)}</span>
                     {unreadCount > 0 && (
                         <Badge className="h-5 w-5 flex items-center justify-center p-0">{unreadCount}</Badge>
                     )}
@@ -553,7 +578,7 @@ export default function ChatPage() {
         ) : (
           <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground">
             <MessageSquare className="w-10 h-10 mb-4" />
-            <h3 className="font-semibold text-lg text-foreground">No users found</h3>
+            <h3 className="font-semibold text-lg text-foreground">No chats found</h3>
             <p className="text-sm mt-1">
               Find someone in Discover to start a conversation.
             </p>
