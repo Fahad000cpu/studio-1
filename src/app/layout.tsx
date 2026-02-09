@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { cn } from '@/lib/utils';
+import { AnalyticsLogger } from '@/components/analytics-logger';
 
 export const metadata: Metadata = {
   title: 'ConnectSphere',
@@ -45,6 +46,7 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <AnalyticsLogger />
             {children}
             <Toaster />
           </ThemeProvider>
