@@ -60,18 +60,12 @@ service cloud.firestore {
 
     /**
 
-     * @description Protects user profiles. Only the user can read/write their own profile.
-
+     * @description Protects user profiles. Only the user can read/write their own profile. Also protects user-specific subcollections.
      * @path /users/{userId}
-
      * @allow (create) User 'user123' with id 'user123' can create their profile.
-
      * @allow (get, update, delete) User 'user123' can read, update, and delete their own profile.
-
      * @deny (create) User 'user456' cannot create a profile with id 'user123'.
-
      * @deny (get, update, delete) User 'user456' cannot read, update, or delete user 'user123's profile.
-
      * @principle Enforces document ownership for writes, restricting access to a user's own data tree.
 
      */
@@ -79,25 +73,25 @@ service cloud.firestore {
     match /users/{userId} {
 
       function isOwner() {
-
         return request.auth != null && request.auth.uid == userId;
-
       }
 
       allow get: if isOwner();
-
       allow list: if request.auth != null; 
-
       allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
-
       allow update: if request.auth != null && request.auth.uid == userId;
-
       allow delete: if request.auth != null && request.auth.uid == userId;
 
+      /**
+       * @description Secures chat metadata within a user's profile.
+       * A user can only read or write to their own chat list.
+       * @path /users/{userId}/chats/{otherUserId}
+       */
+      match /chats/{otherUserId} {
+        allow read, write: if isOwner();
+      }
     }
-
     
-
     /**
 
      * @description Secures status updates. Any authenticated user can read statuses.
