@@ -34,13 +34,11 @@
 
  * Key Security Decisions:
 
- * - User profiles are private and only accessible to the owner.
+ * - User profiles are public to other logged-in users for discovery, but writable only by the owner.
 
  * - Group chat access is determined by membership, enforced through denormalized data.
 
  * - Affiliate products are only manageable by admins.
-
- * - User listing is allowed, but can be refined in the future to restrict field visibility.
 
  *
 
@@ -60,42 +58,24 @@ service cloud.firestore {
 
     /**
 
-     * @description Protects user profiles. Only the user can read/write their own profile. Also protects user-specific subcollections.
+     * @description Protects user profiles. Any authenticated user can read profiles for discovery,
+     * but only the owner can write to their own profile.
      * @path /users/{userId}
-     * @allow (create) User 'user123' with id 'user123' can create their profile.
-     * @allow (get, update, delete) User 'user123' can read, update, and delete their own profile.
-     * @deny (create) User 'user456' cannot create a profile with id 'user123'.
-     * @deny (get, update, delete) User 'user456' cannot read, update, or delete user 'user123's profile.
-     * @principle Enforces document ownership for writes, restricting access to a user's own data tree.
-
+     * @allow (get, list) Any signed-in user can view profiles.
+     * @allow (create, update, delete) User 'user123' can write to their own profile.
+     * @deny (create, update, delete) User 'user456' cannot write to user 'user123's profile.
      */
-
     match /users/{userId} {
-
-      function isOwner() {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      // Allow any authenticated user to view profiles to enable user discovery and chat.
-      // NOTE: This makes all fields in a user's document public to other users.
-      // For better security, sensitive data like fcmTokens should be in a private subcollection.
-      allow get: if request.auth != null;
-      allow list: if request.auth != null; 
-      allow create: if request.auth != null && request.auth.uid == userId && request.resource.data.id == userId;
-      allow update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if request.auth != null && request.auth.uid == userId;
+      allow get, list: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
-
+    
     /**
-     * @description Secures the chat metadata subcollection.
-     * A user can only list their own chats, and read/write their own chat metadata documents.
-     * @path /users/{userId}/chats
+     * @description Secures the chat metadata subcollection and its documents.
+     * A user can only read (get, list) and write their own chat metadata.
+     * @path /users/{userId}/chats/{chatDocs=**}
      */
-    match /users/{userId}/chats {
-      allow list: if request.auth != null && request.auth.uid == userId;
-    }
-
-    match /users/{userId}/chats/{otherUserId} {
+    match /users/{userId}/chats/{chatDoc=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
