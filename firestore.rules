@@ -84,10 +84,14 @@ service cloud.firestore {
     }
 
     /**
-     * @description Secures chat metadata within a user's profile.
-     * A user can only read or write to their own chat list.
-     * @path /users/{userId}/chats/{otherUserId}
+     * @description Secures the chat metadata subcollection.
+     * A user can only list their own chats, and read/write their own chat metadata documents.
+     * @path /users/{userId}/chats
      */
+    match /users/{userId}/chats {
+      allow list: if request.auth != null && request.auth.uid == userId;
+    }
+
     match /users/{userId}/chats/{otherUserId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
