@@ -59,20 +59,20 @@ service cloud.firestore {
     /**
 
      * @description Protects user profiles. Any authenticated user can read profiles for discovery,
-     * but only the owner can write to their own profile.
+     * but only the owner can write to their own profile. This block also contains nested rules for subcollections.
      * @path /users/{userId}
      */
     match /users/{userId} {
       allow get, list: if request.auth != null;
       allow create, update, delete: if request.auth.uid == userId;
-    }
-    
-    /**
-     * @description Secures the chat metadata subcollection. A user can only read and write their own chat metadata.
-     * @path /users/{userId}/chats/{chatId}
-     */
-    match /users/{userId}/chats/{chatId} {
-      allow read, write: if request.auth != null;
+      
+      /**
+       * @description Secures the chat metadata subcollection. A user can only read and write their own chat metadata.
+       * @path /users/{userId}/chats/{chatId}
+       */
+      match /chats/{chatId} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
     
     /**
