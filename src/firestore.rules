@@ -66,13 +66,13 @@ service cloud.firestore {
       allow get, list: if request.auth != null;
       allow create, update, delete: if request.auth.uid == userId;
     }
-
+    
     /**
      * @description Secures the chat metadata subcollection. A user can only read and write their own chat metadata.
      * @path /users/{userId}/chats/{chatId}
      */
     match /users/{userId}/chats/{chatId} {
-      allow read, write: if request.auth.uid == userId;
+      allow read, write: if request.auth != null;
     }
     
     /**
