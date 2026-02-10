@@ -69,12 +69,11 @@ service cloud.firestore {
     }
     
     /**
-     * @description Secures all subcollections under a user's document, like 'chats'.
-     * A user can only read and write to subcollections under their own user document.
-     * This is a recursive rule that applies to any path below /users/{userId}/.
-     * @path /users/{userId}/{path=**}
+     * @description Secures the 'chats' subcollection under a user's document.
+     * A user can only read and write to the chat metadata docs under their own user document.
+     * @path /users/{userId}/chats/{chatId}
      */
-    match /users/{userId}/{path=**} {
+    match /users/{userId}/chats/{chatId} {
       allow read, write: if request.auth.uid == userId;
     }
     
