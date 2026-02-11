@@ -27,38 +27,28 @@ interface SendChatNotificationParams {
 
 /**
  * A server action to send a push notification for a new chat message
- * AND update chat metadata for both users.
+ * AND update chat metadata in the new top-level `chat_metadata` collection.
  * @param {SendChatNotificationParams} params - The notification details.
  */
 export async function sendChatNotification({ recipientId, senderId, senderName, messageText }: SendChatNotificationParams): Promise<void> {
   const db = getFirestore();
 
-  // --- Update Chat Metadata for both users ---
+  // --- Update Chat Metadata ---
   const metadataTimestamp = Timestamp.now();
-  
-  const senderChatRef = db.collection('users').doc(senderId).collection('chats').doc(recipientId);
-  const recipientChatRef = db.collection('users').doc(recipientId).collection('chats').doc(senderId);
+  const chatId = [senderId, recipientId].sort().join('_');
+  const chatMetadataRef = db.collection('chat_metadata').doc(chatId);
 
   const metadataText = messageText.length > 30 ? `${messageText.substring(0, 27)}...` : messageText;
 
-  const senderPayload = {
-    id: recipientId,
+  const metadataPayload = {
+    participants: [senderId, recipientId],
     lastMessageText: metadataText,
     lastMessageTimestamp: metadataTimestamp,
-  };
-
-  const recipientPayload = {
-    id: senderId,
-    lastMessageText: metadataText,
-    lastMessageTimestamp: metadataTimestamp,
-    unreadCount: FieldValue.increment(1),
   };
 
   try {
-    const batch = db.batch();
-    batch.set(senderChatRef, senderPayload, { merge: true });
-    batch.set(recipientChatRef, recipientPayload, { merge: true });
-    await batch.commit();
+    // This will create the document if it doesn't exist, or update it if it does.
+    await chatMetadataRef.set(metadataPayload, { merge: true });
   } catch (metadataError) {
     console.error('[Chat Action] Failed to update chat metadata:', metadataError);
     // Don't proceed if metadata fails, as it indicates a larger issue.

@@ -18,21 +18,13 @@ service cloud.firestore {
       // Allow a user to write to their own profile, or an admin to write to any profile.
       allow write: if request.auth.uid == userId || isAdmin();
     }
-
-    // --- USER CHAT METADATA RULES ---
-    // Rule for the 'chats' subcollection within each user document.
-    // This is the specific rule that fixes the "permission denied" error for listing chats.
-    match /users/{userId}/chats/{chatId} {
-        // A user can read (get, list) and write (create, update, delete)
-        // documents ONLY within their own 'chats' subcollection.
-        allow read, write: if request.auth.uid == userId;
-    }
     
     // --- TOP-LEVEL COLLECTION RULES ---
 
     // Rules for one-on-one chat messages stored in the top-level 'chats' collection.
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
+        // A user is a participant if their UID is part of the chatId string (e.g., "uid1_uid2").
         return request.auth != null && request.auth.uid in chatId.split('_');
       }
       function isSender() {
@@ -46,6 +38,14 @@ service cloud.firestore {
 
       // Only the original sender can delete the message for everyone.
       allow delete: if isSender();
+    }
+    
+    // Rule for the new top-level chat metadata collection
+    match /chat_metadata/{chatId} {
+        // A user can read a chat's metadata if their UID is in the `participants` array.
+        allow read: if request.auth != null && request.auth.uid in resource.data.participants;
+        // Deny all client-side writes. Metadata is only written by the server action.
+        allow write: if false;
     }
 
     // Rules for status updates.
