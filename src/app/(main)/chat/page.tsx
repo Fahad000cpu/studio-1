@@ -8,7 +8,7 @@ import {
   Timestamp,
   collection,
   doc,
-  query,
+  query as firestoreQuery,
   where,
   orderBy,
   arrayUnion,
@@ -36,7 +36,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile, ChatGroup } from '@/types';
 import type { Message, ChatMetadata, ChatListItem } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
-import type { CollectionOptions } from '@/firebase/firestore/use-collection';
 import { getInitials } from '@/lib/utils';
 import { sendChatNotification } from '@/lib/chat-notifications';
 import { CreateGroupDialog } from '@/components/create-group-dialog';
@@ -103,7 +102,7 @@ export default function ChatPage() {
   // 3. Fetch group chats
   const groupsQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
-      return query(collection(firestore, 'groups'), where('memberIds', 'array-contains', user.uid));
+      return firestoreQuery(collection(firestore, 'groups'), where('memberIds', 'array-contains', user.uid));
   }, [firestore, user]);
   const { data: groups, isLoading: groupsLoading } = useCollection<ChatGroup>(groupsQuery);
 
@@ -195,15 +194,31 @@ export default function ChatPage() {
   }, [displayedChats, selectedChat, chatWithId, isMobile, handleSelectChat, isLoading]);
 
 
-  const messagesCollection = useMemoFirebase(() => {
-    if (!firestore || !selectedChat) return null;
-    const path = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
-    return collection(firestore, path);
-  }, [firestore, selectedChat]);
+  const messagesQuery = useMemoFirebase(() => {
+    if (!firestore || !selectedChat || !user) return null;
+    
+    const path = selectedChat.type === 'user' 
+        ? `chats/${selectedChat.id}/messages` 
+        : `groups/${selectedChat.id}/messages`;
+    
+    const messagesCollectionRef = collection(firestore, path);
 
-  const messageCollectionOptions = useMemo<CollectionOptions>(() => ({ orderBy: ['timestamp', 'asc'] }), []);
+    if (selectedChat.type === 'group') {
+      // For groups, we must query securely by filtering for messages where the user is a member.
+      // This matches the security rule `allow read: if request.auth.uid in resource.data.memberIds;`
+      return firestoreQuery(
+        messagesCollectionRef,
+        where('memberIds', 'array-contains', user.uid),
+        orderBy('timestamp', 'asc')
+      );
+    }
+    
+    // For 1-on-1 chats, security is handled by the path, so a simple ordered query is fine.
+    return firestoreQuery(messagesCollectionRef, orderBy('timestamp', 'asc'));
+  }, [firestore, selectedChat, user]);
 
-  const { data: messagesData } = useCollection<Message>(messagesCollection, messageCollectionOptions);
+  const { data: messagesData } = useCollection<Message>(messagesQuery);
+
 
   const allUsersMap = useMemo(() => {
     if (!allUsersData) return new Map<string, UserProfile>();
@@ -233,7 +248,7 @@ export default function ChatPage() {
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
+    if (!newMessage.trim() || !selectedChat || !user || !firestore) return;
 
     const messageText = newMessage;
     setNewMessage('');
@@ -248,6 +263,9 @@ export default function ChatPage() {
     };
     
     let finalPayload: any = basePayload;
+    const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
+    const messagesCollection = collection(firestore, collectionPath);
+    
     if (selectedChat.type === 'user') {
       finalPayload = { ...basePayload, recipientId: selectedChat.contact?.id, chatId: selectedChat.id };
     } else {
@@ -269,7 +287,7 @@ export default function ChatPage() {
   const handleAttachmentClick = () => fileInputRef.current?.click();
 
   const uploadMedia = async (file: Blob, type: 'image' | 'video' | 'audio') => {
-    if (!user || !messagesCollection || !selectedChat) return;
+    if (!user || !firestore || !selectedChat) return;
     setIsUploading(true);
     try {
       const downloadURL = await uploadToCloudinary(file);
@@ -283,6 +301,9 @@ export default function ChatPage() {
       };
       
       let finalPayload: any = basePayload;
+      const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
+      const messagesCollection = collection(firestore, collectionPath);
+
       if (selectedChat.type === 'user') {
         finalPayload = { ...basePayload, recipientId: selectedChat.contact?.id, chatId: selectedChat.id };
       } else {
@@ -351,14 +372,14 @@ export default function ChatPage() {
   };
   
   const handleDeleteForMe = (messageId: string) => {
-    if (!selectedChat || !user) return;
+    if (!selectedChat || !user || !firestore) return;
     const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
     const messageRef = doc(firestore, collectionPath, messageId);
     updateDocumentNonBlocking(messageRef, { deletedFor: arrayUnion(user.uid) });
   };
 
   const handleDeleteForEveryone = (messageId: string) => {
-    if (!selectedChat) return;
+    if (!selectedChat || !firestore) return;
     const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
     const messageRef = doc(firestore, collectionPath, messageId);
     deleteDocumentNonBlocking(messageRef);

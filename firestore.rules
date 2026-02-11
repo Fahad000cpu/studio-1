@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -59,19 +60,28 @@ service cloud.firestore {
       
       // --- NESTED: GROUP MESSAGES ---
       match /messages/{messageId} {
-        // A user can read messages IF they are a member of the parent group.
+        // READ: User can read a message if they are in its memberIds list.
+        // This is enforced by the client query using `where('memberIds', 'array-contains', uid)`.
         allow read: if request.auth != null && 
-                     get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds is list &&
-                     request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
-        
-        // A user can create a message IF they are the sender AND a member of the group.
-        allow create: if request.auth != null && 
-                       request.resource.data.senderId == request.auth.uid &&
-                       get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds is list &&
-                       request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+                     request.auth.uid in resource.data.memberIds;
 
-        // Group messages are immutable for now.
-        allow update, delete: if false;
+        // CREATE: User can create a message if they are a group member.
+        // The new message must correctly denormalize the group's member list.
+        allow create: if request.auth != null &&
+                       request.resource.data.senderId == request.auth.uid &&
+                       request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds &&
+                       request.resource.data.memberIds == get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+
+        // UPDATE: User can "delete for me" by adding their UID to the deletedFor list.
+        // They must be a member of the group to do this.
+        allow update: if request.auth != null &&
+                       request.auth.uid in resource.data.memberIds &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
+                       request.resource.data.deletedFor == resource.data.deletedFor.insert(request.auth.uid);
+
+        // DELETE: The sender of the message can delete it for everyone.
+        allow delete: if request.auth != null && 
+                       request.auth.uid == resource.data.senderId;
       }
     }
 
