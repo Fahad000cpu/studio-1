@@ -20,7 +20,7 @@ service cloud.firestore {
     // This is NECESSARY to allow a 'list' operation on a subcollection.
     match /users/{userId}/{path=**} {
       // Allows read/write access ONLY if the requesting user's ID matches the
-      // {userId} in the path. This secures the subcollections.
+      // {userId} in the path. This secures all subcollections like 'chats'.
       allow read, write: if request.auth.uid == userId;
     }
 
