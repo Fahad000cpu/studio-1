@@ -93,7 +93,7 @@ export function useCollection<T = any>(
   const finalQuery = useMemo(() => {
     if (!targetRefOrQuery) return null;
 
-    // If it's already a query (e.g., from a subcollection), don't apply new options.
+    // If it's already a query with where clauses, use it directly.
     if (targetRefOrQuery.type === 'query') {
       return targetRefOrQuery;
     }

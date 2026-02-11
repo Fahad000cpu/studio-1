@@ -1,25 +1,7 @@
+
 {
   "indexes": [],
   "fieldOverrides": [
-    {
-      "collectionGroup": "chat_metadata",
-      "fieldPath": "participants",
-      "ttl": false,
-      "indexes": [
-        {
-          "order": "ASCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "order": "DESCENDING",
-          "queryScope": "COLLECTION"
-        },
-        {
-          "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION"
-        }
-      ]
-    },
     {
       "collectionGroup": "groups",
       "fieldPath": "memberIds",

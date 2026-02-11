@@ -28,7 +28,7 @@ interface SendChatNotificationParams {
 
 /**
  * A server action to send a push notification for a new chat message
- * AND update chat metadata in the new top-level `chat_metadata` collection or `groups` collection.
+ * AND update chat metadata in the user's private subcollection or the `groups` collection.
  * @param {SendChatNotificationParams} params - The notification details.
  */
 export async function sendChatNotification({ recipientId, groupId, senderId, senderName, messageText }: SendChatNotificationParams): Promise<void> {
@@ -56,16 +56,23 @@ export async function sendChatNotification({ recipientId, groupId, senderId, sen
   if (recipientId) {
     // --- One-on-One Chat Metadata & Notification ---
     const chatId = [senderId, recipientId].sort().join('_');
-    const chatMetadataRef = db.collection('chat_metadata').doc(chatId);
+    const senderChatRef = db.collection('users').doc(senderId).collection('chats').doc(chatId);
+    const recipientChatRef = db.collection('users').doc(recipientId).collection('chats').doc(chatId);
 
     const metadataPayload = {
+      id: chatId,
       participants: [senderId, recipientId],
       lastMessageText: metadataText,
       lastMessageTimestamp: metadataTimestamp,
     };
 
     try {
-      await chatMetadataRef.set(metadataPayload, { merge: true });
+      // Use a batch write to update metadata for both users atomically.
+      const batch = db.batch();
+      batch.set(senderChatRef, metadataPayload, { merge: true });
+      batch.set(recipientChatRef, metadataPayload, { merge: true });
+      await batch.commit();
+
     } catch (metadataError) {
       console.error('[Chat Action] Failed to update chat metadata:', metadataError);
       return;

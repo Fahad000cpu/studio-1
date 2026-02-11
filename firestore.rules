@@ -16,6 +16,13 @@ service cloud.firestore {
 
       // Only admins can delete user profiles.
       allow delete: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+
+      // --- NEW SUBCOLLECTION RULE for 1-on-1 Chat Metadata ---
+      match /chats/{chatId} {
+        // A user can only read and write to their own chat metadata subcollection.
+        // This is secure because the query path is already scoped to the user's UID.
+        allow read, write: if request.auth.uid == userId;
+      }
     }
 
     // --- ADMIN ROLE RULES ---
@@ -23,27 +30,6 @@ service cloud.firestore {
       // Only admins can read or write roles.
       allow read, write: if request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
-
-    // --- 1-on-1 CHAT METADATA ---
-    match /chat_metadata/{chatId} {
-      // This rule allows a user to read a chat's metadata (both get and list)
-      // if their UID is in the 'participants' array.
-      // This rule directly corresponds to the client-side `where('participants', 'array-contains', uid)` query.
-      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
-
-      // A user can create a chat metadata doc IF they are in the incoming participants list.
-      allow create: if request.auth != null && 
-                     'participants' in request.resource.data &&
-                     request.resource.data.participants is list &&
-                     request.auth.uid in request.resource.data.participants;
-      
-      // A user can update a chat's metadata (e.g., last message) IF they are a participant.
-      allow update: if request.auth != null && request.auth.uid in resource.data.participants;
-
-      // Deleting chat metadata is disallowed for data integrity.
-      allow delete: if false;
-    }
-
 
     // --- 1-on-1 CHAT MESSAGES ---
     match /chats/{chatId}/messages/{messageId} {

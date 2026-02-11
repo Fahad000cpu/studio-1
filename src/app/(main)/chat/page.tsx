@@ -93,10 +93,10 @@ export default function ChatPage() {
   const usersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
   const { data: allUsersData, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
 
-  // 2. Fetch 1-on-1 chat metadata
+  // 2. Fetch 1-on-1 chat metadata from the user's private subcollection
   const chatMetadataQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    return query(collection(firestore, 'chat_metadata'), where('participants', 'array-contains', user.uid));
+    return collection(firestore, 'users', user.uid, 'chats');
   }, [firestore, user]);
   const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataQuery);
 
