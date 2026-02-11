@@ -4,24 +4,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- USER PROFILE RULES ---
-    // A user can see other user profiles (for discover page).
-    // A user can only modify their own profile.
+    // --- USER PROFILE AND SUBCOLLECTION RULES ---
     match /users/{userId} {
+      // A user can see other user profiles (for discover page).
       allow get, list: if request.auth != null;
+      // A user can only modify their own profile.
       allow write: if request.auth.uid == userId;
-    }
 
-    // --- USER CHAT METADATA RULES ---
-    // This rule applies to documents inside the 'chats' subcollection.
-    // e.g., /users/USER_A/chats/USER_B
-    match /users/{userId}/chats/{chatId} {
-      // Allow a user to read (get, list) their own chat metadata.
-      // This is what allows the query on the 'chats' collection to succeed.
-      allow read: if request.auth.uid == userId;
-
-      // Allow a user to write (create, update, delete) their own chat metadata.
-      allow write: if request.auth.uid == userId;
+      // This rule applies to documents inside the 'chats' subcollection.
+      // e.g., /users/USER_A/chats/USER_B
+      // A user can read and write their own chat metadata.
+      // This allows the 'list' operation on the 'chats' collection.
+      match /chats/{chatId} {
+        allow read, write: if request.auth.uid == userId;
+      }
     }
 
     // --- OTHER TOP-LEVEL COLLECTIONS ---
