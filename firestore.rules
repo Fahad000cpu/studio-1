@@ -35,7 +35,7 @@ service cloud.firestore {
     }
 
     // =================================
-    //     1-on-1 CHAT METADATA
+    //     1-on-1 CHAT METADATA (TOP-LEVEL)
     // =================================
     match /chat_metadata/{chatId} {
       // A user can GET a specific chat's metadata if they are a participant.
@@ -49,7 +49,7 @@ service cloud.firestore {
       allow create: if isLoggedIn() && request.auth.uid in request.resource.data.participants;
 
       // A user can UPDATE metadata (e.g., last message) if they are already a participant in that chat.
-      allow update: if isLoggedIn() && request.auth.uid in get(/databases/$(database)/documents/chat_metadata/$(chatId)).data.participants;
+      allow update: if isLoggedIn() && get(/databases/$(database)/documents/chat_metadata/$(chatId)).data.participants.hasAny([request.auth.uid]);
     }
 
     // =================================
@@ -114,7 +114,7 @@ service cloud.firestore {
       }
       allow read: if isLoggedIn();
       allow create: if isLoggedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isLoggedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'views']);
+      allow update: if isLoggedIn() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'views']) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']));
       allow delete: if isOwner() || isAdmin();
     }
 
