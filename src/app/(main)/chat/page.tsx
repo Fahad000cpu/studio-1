@@ -520,7 +520,7 @@ export default function ChatPage() {
 
                 <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
-                  <div className={cn('rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
+                  <div className={cn('rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                     {renderMessageContent(msg)}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
