@@ -9,10 +9,6 @@
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "participats",
-          "order": "ASCENDING"
-        },
-        {
           "fieldPath": "__name__",
           "order": "ASCENDING"
         }

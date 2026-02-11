@@ -10,20 +10,18 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // --- USER PROFILE AND SUBCOLLECTION RULES ---
+    // --- USER PROFILE RULES ---
     match /users/{userId} {
       // A user can see other user profiles (for discover page).
       allow get, list: if request.auth != null;
       // A user can modify their own profile, or an admin can.
       allow write: if request.auth.uid == userId || isAdmin();
+    }
 
-      // This rule applies to documents inside the 'chats' subcollection.
-      // e.g., /users/USER_A/chats/USER_B
-      // A user can read and write their own chat metadata.
-      // This allows the 'list' operation on the 'chats' collection.
-      match /chats/{chatId} {
-        allow read, write: if request.auth.uid == userId;
-      }
+    // --- USER CHAT METADATA RULES ---
+    // This allows a user to read and write their own chat metadata, which enables listing chats.
+    match /users/{userId}/chats/{chatId} {
+      allow read, write: if request.auth.uid == userId;
     }
 
     // --- TOP-LEVEL COLLECTION RULES ---
