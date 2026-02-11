@@ -1,313 +1,101 @@
-/**
-
- * @fileoverview Firestore Security Rules for ConnectSphere
-
- *
-
- * Core Philosophy:
-
- * This ruleset enforces a strict user-ownership model for user-specific data,
-
- * role-based access control for administrative functions,
-
- * and shared access for collaborative content like group chats.
-
- *
-
- * Data Structure:
-
- * - /users/{userId}: User profile information. Only the user can read/write their own profile.
-
- * - /chats/{chatId}/messages/{messageId}: Chat messages between two users. Read/write access is based on sender/recipient IDs.
-
- * - /groups/{groupId}: Group chat metadata, including a 'members' map (userId: role).
-
- * - /groups/{groupId}/messages/{messageId}: Group chat messages, with a denormalized 'members' map for authorization.
-
- * - /status_updates/{statusUpdateId}: User status updates, owned by the user.
-
- * - /affiliate_products/{productId}: Affiliate product listings, managed by admins.
-
- * - /roles_admin/{userId}: Indicates admin privileges.
-
- *
-
- * Key Security Decisions:
-
- * - User profiles are public to other logged-in users for discovery, but writable only by the owner.
-
- * - Group chat access is determined by membership, enforced through denormalized data.
-
- * - Affiliate products are only manageable by admins.
-
- *
-
- * Denormalization for Authorization:
-
- * - Group chat messages contain a denormalized 'members' map from the parent group document
-
- *   to allow for fast, secure access checks without additional reads.
-
- */
-
 rules_version = '2';
 
 service cloud.firestore {
-
   match /databases/{database}/documents {
 
-    /**
-
-     * @description Protects user profile documents and all their subcollections (like 'chats').
-     * Any authenticated user can read profiles for discovery.
-     * Only the owner can write to their own profile document and any subcollections within it.
-     * @path /users/{userId}
-     */
-    match /users/{userId} {
-      allow get, list: if request.auth != null;
-      allow create, update, delete: if request.auth.uid == userId;
-
-      // This recursive rule secures all subcollections under a user's document.
-      // It grants read/write access to the user for their own subcollections (e.g., their 'chats' list).
-      match /{path=**} {
-        allow read, write: if request.auth.uid == userId;
-      }
+    // Rules for 'users' collection and all its subcollections
+    match /users/{userId}/{path=**} {
+      // A user can read and write to their own document and any subcollections within it.
+      allow read, write: if request.auth.uid == userId;
     }
-    
-    /**
 
-     * @description Secures status updates. Any authenticated user can read statuses.
+    // Allow any authenticated user to list the main 'users' collection for discovery purposes.
+    match /users/{userId} {
+      allow list, get: if request.auth != null;
+    }
 
-     * Users can only create status updates for themselves.
-
-     * Users can delete their own status updates.
-
-     * Users can update likes and views on any status.
-
-     * @path /status_updates/{statusId}
-
-     */
-
+    // Rules for 'status_updates' collection
     match /status_updates/{statusId} {
-
         function isOwner() {
-
           return request.auth != null && request.auth.uid == resource.data.userId;
-
         }
 
         function isCreatingOwnStatus() {
-
            return request.auth != null && request.auth.uid == request.resource.data.userId;
-
         }
 
-        
-
         function isUpdatingLikesOrViews() {
-
           let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-
-          // Allow updates if the *only* keys being changed are 'likes' or 'views'.
-
           return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
-
         }
 
         allow read: if request.auth != null;
-
         allow create: if isCreatingOwnStatus();
-
         allow update: if request.auth != null && isUpdatingLikesOrViews();
-
         allow delete: if isOwner();
-
     }
 
-    /**
-
-     * @description Secures one-on-one chat messages.
-
-     * @path /chats/{chatId}/messages/{messageId}
-
-     * @allow (read, create) A user can read or write messages in a chat if their UID is part of the chatId.
-
-     * @allow (delete) A user can delete their own messages.
-
-     * @deny (update) Messages are immutable.
-
-     */
-
+    // Rules for one-on-one 'chats' (the messages themselves)
     match /chats/{chatId}/messages/{messageId} {
-
       function isChatParticipant() {
-
         return request.auth != null && request.auth.uid in chatId.split('_');
-
       }
-
       function isSender() {
-
         return request.auth != null && request.auth.uid == resource.data.senderId;
-
       }
 
       allow read, create: if isChatParticipant();
-
       allow delete: if isSender();
-
-      allow update: if false;
-
+      allow update: if false; // Messages are immutable
     }
 
-    /**
-
-     * @description Secures chat groups. Access is managed through the 'members' map.
-
-     * @path /groups/{groupId}
-
-     * @allow (create) User 'user123' can create a group.
-
-     * @allow (get, list) Any authenticated user can read group info.
-
-     * @allow (update) Only group members can update the group details.
-
-     * @deny (delete) Only the group creator can delete the group.
-
-     * @principle Enforces group membership for updates, creator-only access for deletion.
-
-     */
-
+    // Rules for 'groups' collection and its subcollections
     match /groups/{groupId} {
-
       function isSignedIn() {
-
         return request.auth != null;
-
       }
-
       function isMember() {
-
         return isSignedIn() && request.auth.uid in resource.data.memberIds;
-
       }
-
       function isGroupCreator() {
-
         return isSignedIn() && resource.data.creatorId == request.auth.uid;
-
       }
 
-      allow get: if isSignedIn();
-
-      allow list: if isSignedIn();
-
+      allow get, list: if isSignedIn();
       allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
-
       allow update: if isMember();
-
       allow delete: if isGroupCreator();
-
     }
 
-    /**
-
-     * @description Secures group chat messages.  Membership is enforced via the denormalized 'members' map.
-
-     * @path /groups/{groupId}/messages/{messageId}
-
-     * @allow (create) User 'user123' can create a message if they are a member of the group.
-
-     * @allow (get, list) Any group member can read messages.
-
-     * @deny (update, delete) No one can update or delete a message once it's sent.
-
-     * @principle Enforces group membership for message creation; messages are immutable.
-
-     */
-
+    // Rules for group chat messages
     match /groups/{groupId}/messages/{messageId} {
-
-      function isSignedIn() {
-
-        return request.auth != null;
-
+      function isGroupMember() {
+          return request.auth != null && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
       }
 
-      function isMember() {
-
-          return isSignedIn() && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
-
-      }
-
-      allow get: if isMember();
-
-      allow list: if isMember();
-
-      allow create: if request.auth != null && isMember() && request.resource.data.groupId == groupId;
-
-      allow update: if false;
-
-      allow delete: if false;
-
+      allow get, list: if isGroupMember();
+      allow create: if isGroupMember() && request.resource.data.groupId == groupId;
+      allow update, delete: if false; // Group messages are immutable
     }
 
-    /**
-
-     * @description Secures affiliate products. Only admins can create, update, or delete products.
-
-     * @path /affiliate_products/{productId}
-
-     * @allow (get, list) Any authenticated user can read the affiliate products.
-
-     * @allow (create, update, delete) Only admins can manage affiliate products.
-
-     * @principle Enforces admin-only access for management operations.
-
-     */
-
+    // Rules for 'affiliate_products' collection
     match /affiliate_products/{productId} {
-
       function isAdmin() {
-
           return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
-
       }
 
       allow read: if request.auth != null;
-
       allow create, update, delete: if isAdmin();
-
     }
 
-     /**
-
-      * @description Secures admin roles. Only admins can grant admin roles.
-
-      * @path /roles_admin/{userId}
-
-      */
-
+    // Rules for 'roles_admin' collection
     match /roles_admin/{userId} {
-
        function isAdmin() {
-
            return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
-
        }
 
-       allow get: if isAdmin();
-
-       allow list: if isAdmin();
-
-       allow create: if isAdmin();
-
+       allow get, list, create, delete: if isAdmin();
        allow update: if false;
-
-       allow delete: if isAdmin();
-
     }
-
   }
-
 }
