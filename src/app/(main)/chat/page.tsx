@@ -53,7 +53,6 @@ import {
   Trash,
   Trash2,
   Check,
-  CheckCheck,
   MessageSquare,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -215,11 +214,7 @@ export default function ChatPage() {
   
   const handleSelectChat = useCallback((contact: UserProfile) => {
     setSelectedChatId(contact.id);
-    if (!user || !firestore) return;
-    
-    // Unread count logic can be re-implemented here later if needed.
-    
-  }, [user, firestore]);
+  }, []);
 
   const isLoading = chatMetadataLoading || (chattedUserIds != null && chattedUserIds.length > 0 && chattedUsersLoading) || newContactLoading;
 
@@ -522,8 +517,6 @@ export default function ChatPage() {
         ) : displayedChats.length > 0 ? (
           displayedChats.map(({ meta, contact }) => {
             if (!user || !contact) return null;
-            // Unread count logic removed for simplicity, can be added back
-            const unreadCount = 0;
             
             return (
               <div
@@ -542,18 +535,12 @@ export default function ChatPage() {
                 </Avatar>
                 <div className="flex-grow overflow-hidden">
                   <p className="font-semibold truncate">{contact.name || contact.email}</p>
-                  <p className={cn(
-                    "text-sm truncate",
-                    unreadCount > 0 ? "text-foreground font-medium" : "text-muted-foreground"
-                    )}>
+                  <p className="text-sm truncate text-muted-foreground">
                     {meta?.lastMessageText}
                   </p>
                 </div>
                  <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
                     <span>{getMessageTimestamp(meta?.lastMessageTimestamp)}</span>
-                    {unreadCount > 0 && (
-                        <Badge className="h-5 w-5 flex items-center justify-center p-0">{unreadCount}</Badge>
-                    )}
                  </div>
               </div>
             );
@@ -610,8 +597,6 @@ export default function ChatPage() {
                 ? getInitials(user.displayName)
                 : getInitials(selectedChat.name);
             
-            const isRead = true; 
-
             return (
               <div
                 key={msg.id || index}
@@ -673,11 +658,7 @@ export default function ChatPage() {
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
                     <span>{getMessageTimestamp(msg.timestamp)}</span>
                     {msg.own && (
-                      isRead ? (
-                          <CheckCheck className="h-4 w-4 text-blue-500" />
-                      ) : (
-                          <Check className="h-4 w-4" />
-                      )
+                        <Check className="h-4 w-4" />
                     )}
                   </div>
                 </div>
