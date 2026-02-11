@@ -42,7 +42,9 @@ export default function AdminPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersCollectionRef = useMemoFirebase(() => {
+    return firestore && currentUser ? collection(firestore, 'users') : null;
+  }, [firestore, currentUser]);
   const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
   
   const adminRolesCollection = useMemoFirebase(() => collection(firestore, 'roles_admin'), [firestore]);

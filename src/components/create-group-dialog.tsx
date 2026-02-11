@@ -35,7 +35,9 @@ export function CreateGroupDialog({ children, open, onOpenChange }: { children: 
   const firestore = useFirestore();
   const { toast } = useToast();
   
-  const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const usersCollectionRef = useMemoFirebase(() => {
+    return firestore && user ? collection(firestore, 'users') : null;
+  }, [firestore, user]);
   const { data: allUsers, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
 
   const form = useForm<GroupFormValues>({
@@ -179,4 +181,3 @@ function MultiSelect({ aivailableUsers, selectedUsers, setSelectedUsers, isLoadi
         </Popover>
     );
 }
-
