@@ -7,14 +7,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X, ImagePlus, Send, Heart, Eye } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, uploadToFirebaseStorage } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import type { UserProfile } from "@/types";
-import { uploadToCloudinary } from "@/lib/cloudinary";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getInitials } from "@/lib/utils";
@@ -257,7 +256,7 @@ export default function StatusPage() {
 
         setIsUploading(true);
         try {
-            const downloadURL = await uploadToCloudinary(statusFile);
+            const downloadURL = await uploadToFirebaseStorage(statusFile, 'status-updates');
             
             const statusCollectionRef = collection(firestore, 'status_updates');
             addDocumentNonBlocking(statusCollectionRef, {

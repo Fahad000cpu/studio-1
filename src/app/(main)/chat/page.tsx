@@ -31,7 +31,7 @@ import {
   updateDocumentNonBlocking,
   useDoc,
 } from '@/firebase';
-import { cn } from '@/lib/utils';
+import { cn, uploadToFirebaseStorage } from '@/lib/utils';
 import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -39,7 +39,6 @@ import type { UserProfile, ChatGroup } from '@/types';
 import type { Message, ChatMetadata, ChatListItem } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
-import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Badge } from '@/components/ui/badge';
 import { getInitials } from '@/lib/utils';
 import { sendChatNotification } from '@/lib/chat-notifications';
@@ -294,7 +293,7 @@ export default function ChatPage() {
     if (!user || !messagesCollection || !selectedChat) return;
     setIsUploading(true);
     try {
-      const downloadURL = await uploadToCloudinary(file);
+      const downloadURL = await uploadToFirebaseStorage(file, `chat-media/${type}`);
 
       const basePayload = {
         text: '',
