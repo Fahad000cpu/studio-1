@@ -23,7 +23,7 @@ export function MainNav() {
 
   const menuItems = [
     { href: "/discover", label: "Discover", icon: Users },
-    { href: "/chat", label: "Debug", icon: MessageSquare },
+    { href: "/chat", label: "Chat", icon: MessageSquare },
     { href: "/status", label: "Status", icon: ImageIcon },
     { href: "/products", label: "Products", icon: ShoppingBag },
     { href: "/settings", label: "Settings", icon: Settings },
