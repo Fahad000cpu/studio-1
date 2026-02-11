@@ -31,27 +31,31 @@ export function UserNav() {
     try {
       // Check if user and service worker are available
       if (user && firestore && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-        // Dynamically import messaging functions to avoid issues on server
-        const { getMessaging, getToken } = await import("firebase/messaging");
-        
         const swRegistration = await navigator.serviceWorker.ready;
-        const app = getApp();
-        const messaging = getMessaging(app);
+        
+        // Dynamically import messaging functions to avoid issues on server
+        const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
+        const supported = await isSupported();
 
-        // Attempt to get the current token
-        const currentToken = await getToken(messaging, {
-          serviceWorkerRegistration: swRegistration,
-        }).catch(() => null); // Return null if it fails
+        if (supported) {
+            const app = getApp();
+            const messaging = getMessaging(app);
 
-        if (currentToken) {
-          const userDocRef = doc(firestore, 'users', user.uid);
-          // Fire-and-forget the update. No need to await.
-          // This makes logout feel faster and prevents it from failing if the DB update has an issue.
-          updateDoc(userDocRef, {
-            fcmTokens: arrayRemove(currentToken),
-          }).catch((err) => {
-            console.error('Failed to remove FCM token on logout:', err);
-          });
+            // Attempt to get the current token
+            const currentToken = await getToken(messaging, {
+              serviceWorkerRegistration: swRegistration,
+            }).catch(() => null); // Return null if it fails
+
+            if (currentToken) {
+              const userDocRef = doc(firestore, 'users', user.uid);
+              // Fire-and-forget the update. No need to await.
+              // This makes logout feel faster and prevents it from failing if the DB update has an issue.
+              updateDoc(userDocRef, {
+                fcmTokens: arrayRemove(currentToken),
+              }).catch((err) => {
+                console.error('Failed to remove FCM token on logout:', err);
+              });
+            }
         }
       }
     } catch (error) {

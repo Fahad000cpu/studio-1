@@ -191,5 +191,3 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     </>
   );
 }
-
-    
