@@ -17,6 +17,7 @@ import {
   where,
   orderBy,
   arrayUnion,
+  documentId,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
 import {
@@ -129,7 +130,7 @@ export default function ChatPage() {
   const chattedUsersCollectionRef = useMemoFirebase(() => {
     if (!firestore || !chattedUserIds || chattedUserIds.length === 0) return null;
     const idsToQuery = chattedUserIds.slice(0, 30);
-    return query(collection(firestore, 'users'), where('id', 'in', idsToQuery));
+    return query(collection(firestore, 'users'), where(documentId(), 'in', idsToQuery));
   }, [firestore, chattedUserIds]);
   const { data: chattedUsers, isLoading: chattedUsersLoading } = useCollection<UserProfile>(chattedUsersCollectionRef);
   
@@ -799,3 +800,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
