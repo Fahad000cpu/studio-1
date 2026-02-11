@@ -12,13 +12,14 @@ export type Message = {
   status?: 'sending' | 'sent' | 'failed';
   messageType: 'text' | 'image' | 'video' | 'file' | 'audio' | 'link';
   mediaUrl?: string | null;
+  textColor?: string;
   chatId?: string;
   deletedFor?: string[];
   memberIds?: string[]; // For group chat messages
 };
 
 // Represents the metadata for a single 1-on-1 chat conversation.
-// Stored in the top-level /chat_metadata collection.
+// Stored in the user's private subcollection: /users/{userId}/chats/{chatId}
 export type ChatMetadata = {
   id: string; // The doc ID, which is the combined chatId (uid1_uid2)
   participants: string[];

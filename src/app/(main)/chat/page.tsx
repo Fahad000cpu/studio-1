@@ -30,7 +30,7 @@ import {
   useMemoFirebase,
 } from '@/firebase';
 import { cn, uploadToCloudinary } from '@/lib/utils';
-import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users } from 'lucide-react';
+import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users, Palette, X } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile, ChatGroup } from '@/types';
@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/use-toast';
 import { getInitials } from '@/lib/utils';
 import { sendChatNotification } from '@/lib/chat-notifications';
 import { CreateGroupDialog } from '@/components/create-group-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 
 function getChatId(uid1: string, uid2: string) {
@@ -68,6 +69,8 @@ const getPresenceStatus = (lastActive?: Timestamp | Date): string => {
   return `Last seen ${formatDistanceToNow(lastActiveDate, { addSuffix: true })}`;
 };
 
+const colorPresets = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#3B82F6', '#8B5CF6', '#EC4899'];
+
 
 export default function ChatPage() {
   const isMobile = useIsMobile();
@@ -82,6 +85,7 @@ export default function ChatPage() {
 
   const [selectedChat, setSelectedChat] = useState<ChatListItem | null>(null);
   const [newMessage, setNewMessage] = useState('');
+  const [textColor, setTextColor] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -252,6 +256,7 @@ export default function ChatPage() {
 
     const messageText = newMessage;
     setNewMessage('');
+    setTextColor('');
     const isLink = /(https?:\/\/[^\s]+)/g.test(messageText.trim());
     
     const basePayload = {
@@ -260,6 +265,7 @@ export default function ChatPage() {
       timestamp: serverTimestamp(),
       messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
+      textColor: textColor || null,
     };
     
     let finalPayload: any = basePayload;
@@ -386,15 +392,40 @@ export default function ChatPage() {
   };
 
   const renderMessageContent = (msg: Message) => {
+    const messageStyle = msg.textColor ? { color: msg.textColor } : {};
+
     switch (msg.messageType) {
       case 'image': return msg.mediaUrl ? <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer"><Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/></a> : null;
       case 'video': return msg.mediaUrl ? <video src={msg.mediaUrl} controls className="rounded-md max-w-xs" /> : null;
       case 'audio': return msg.mediaUrl ? <audio controls src={msg.mediaUrl} className="max-w-full h-10" /> : null;
-      case 'link': return <a href={msg.text} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">{msg.text}</a>;
+      case 'link': 
+        return (
+            <a 
+                href={msg.text} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className={cn("underline", !msg.textColor && "text-blue-500 hover:text-blue-700")} 
+                style={messageStyle}
+            >
+                {msg.text}
+            </a>
+        );
       case 'text':
       default:
         const parts = msg.text.split(/(https?:\/\/[^\s]+)/g);
-        return <p>{parts.map((part, i) => /(https?:\/\/[^\s]+)/g.test(part) ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">{part}</a> : part)}</p>;
+        return (
+            <p style={messageStyle}>
+                {parts.map((part, i) => 
+                    /(https?:\/\/[^\s]+)/g.test(part) ? (
+                        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className={cn("underline", !msg.textColor && "text-blue-500 hover:text-blue-700")}>
+                            {part}
+                        </a>
+                    ) : (
+                        part
+                    )
+                )}
+            </p>
+        );
     }
   };
 
@@ -508,11 +539,38 @@ export default function ChatPage() {
 
       <div className="p-4 border-t">
         <form onSubmit={handleSendMessage} className="relative">
-          <Input placeholder={isRecording ? "Recording..." : "Type a message..."} className="pr-28" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={!selectedChat || isUploading || isRecording} />
+          <Input 
+            placeholder={isRecording ? "Recording..." : "Type a message..."} 
+            className="pr-40" 
+            value={newMessage} 
+            onChange={(e) => setNewMessage(e.target.value)} 
+            disabled={!selectedChat || isUploading || isRecording} 
+            style={{color: textColor || undefined}}
+            />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
             <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading || isRecording}><Paperclip className="w-5 h-5" /></Button>
             <Button variant="ghost" size="icon" type="button" onMouseDown={handleStartRecording} onMouseUp={handleStopRecording} onTouchStart={handleStartRecording} onTouchEnd={handleStopRecording} className={cn(isRecording && "text-red-500")} disabled={!selectedChat || isUploading}>{isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}</Button>
+            
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" type="button" disabled={!selectedChat || isUploading || isRecording}>
+                        <Palette className="w-5 h-5" style={{ color: textColor || 'hsl(var(--foreground))' }}/>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-2">
+                    <div className="grid grid-cols-4 gap-2">
+                        {colorPresets.map(color => (
+                            <button key={color} onClick={() => setTextColor(color)} className="h-6 w-6 rounded-full border" style={{ backgroundColor: color }} />
+                        ))}
+                        <button onClick={() => setTextColor('#FFFFFF')} className="h-6 w-6 rounded-full border bg-white" />
+                        <button onClick={() => setTextColor('')} className="h-6 w-6 rounded-full border flex items-center justify-center bg-background" title="Default color">
+                            <X className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                    </div>
+                </PopoverContent>
+            </Popover>
+
             <Button size="icon" className="bg-primary hover:bg-primary/90" type="submit" disabled={!selectedChat || !newMessage.trim() || isUploading || isRecording}><SendHorizonal className="w-5 h-5" /></Button>
           </div>
         </form>
@@ -528,5 +586,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
