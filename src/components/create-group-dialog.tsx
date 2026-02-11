@@ -21,11 +21,12 @@ import { Check, X } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from './ui/scroll-area';
 
 const groupSchema = z.object({
   name: z.string().min(3, 'Group name must be at least 3 characters.'),
   description: z.string().optional(),
-  members: z.array(z.string()).min(1, 'You must add at least one member to the group.'),
+  members: z.array(z.string()).min(1, 'You must add at least one other member to the group.'),
 });
 
 type GroupFormValues = z.infer<typeof groupSchema>;
@@ -53,7 +54,8 @@ export function CreateGroupDialog({ children }: { children: React.ReactNode }) {
     }
 
     const groupsCollection = collection(firestore, 'groups');
-    const memberIds = [...new Set([user.uid, ...data.members])]; // Ensure creator is a member
+    // **FIX**: Always include the creator in the members list.
+    const memberIds = [...new Set([user.uid, ...data.members])]; 
 
     addDocumentNonBlocking(groupsCollection, {
       name: data.name,
@@ -75,48 +77,58 @@ export function CreateGroupDialog({ children }: { children: React.ReactNode }) {
     return allUsers.filter(u => u.id !== user.uid);
   }, [allUsers, user]);
 
+  // Reset form when dialog is closed
+  React.useEffect(() => {
+    if (!open) {
+      form.reset();
+    }
+  }, [open, form]);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent className="sm:max-w-lg max-h-[90dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Group</DialogTitle>
           <DialogDescription>
             Give your group a name and add members to start collaborating.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="name">Group Name</Label>
-              <Input id="name" {...form.register('name')} placeholder="e.g., Project Team" className="mt-1" />
-              {form.formState.errors.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.name.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea id="description" {...form.register('description')} placeholder="What is this group about?" className="mt-1" />
-            </div>
+        
+        <div className="flex-grow overflow-y-auto -mx-6 px-6">
+          <form id="create-group-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="name">Group Name</Label>
+                <Input id="name" {...form.register('name')} placeholder="e.g., Project Team" className="mt-1" />
+                {form.formState.errors.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.name.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="description">Description (Optional)</Label>
+                <Textarea id="description" {...form.register('description')} placeholder="What is this group about?" className="mt-1" />
+              </div>
 
-            <Controller
-                control={form.control}
-                name="members"
-                render={({ field }) => (
-                    <div>
-                        <Label>Members</Label>
-                        <MultiSelect aivailableUsers={availableUsers} selectedUsers={field.value} setSelectedUsers={field.onChange} isLoading={usersLoading} />
-                        {form.formState.errors.members && <p className="text-sm text-destructive mt-1">{form.formState.errors.members.message}</p>}
-                    </div>
-                )}
-            />
+              <Controller
+                  control={form.control}
+                  name="members"
+                  render={({ field }) => (
+                      <div>
+                          <Label>Members</Label>
+                          <MultiSelect aivailableUsers={availableUsers} selectedUsers={field.value} setSelectedUsers={field.onChange} isLoading={usersLoading} />
+                          {form.formState.errors.members && <p className="text-sm text-destructive mt-1">{form.formState.errors.members.message}</p>}
+                      </div>
+                  )}
+              />
+          </form>
+        </div>
 
-             <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? 'Creating...' : 'Create Group'}
-                </Button>
-            </DialogFooter>
-        </form>
+        <DialogFooter className="pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="submit" form="create-group-form" disabled={form.formState.isSubmitting}>
+                {form.formState.isSubmitting ? 'Creating...' : 'Create Group'}
+            </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -139,21 +151,28 @@ function MultiSelect({ aivailableUsers, selectedUsers, setSelectedUsers, isLoadi
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
-                <div className="mt-1 flex flex-wrap gap-2 p-2 border rounded-md min-h-10 cursor-text">
-                    {selectedUsers.map(userId => {
-                        const user = usersMap.get(userId);
-                        return (
-                            <Badge key={userId} variant="secondary" className="flex items-center gap-1">
-                                {user?.name || '...'}
-                                <button type="button" onClick={(e) => { e.stopPropagation(); handleDeselect(userId); }} className="rounded-full hover:bg-muted-foreground/20">
-                                    <X className="h-3 w-3"/>
-                                </button>
-                            </Badge>
-                        )
-                    })}
-                    <span className={cn("text-sm text-muted-foreground", selectedUsers.length > 0 && "hidden")}>
-                        Select members...
-                    </span>
+                <div className="mt-1 flex items-center flex-wrap gap-2 p-2 border rounded-md min-h-10 cursor-text">
+                    {selectedUsers.length > 0 ? (
+                      <ScrollArea className="max-h-24 w-full">
+                        <div className="flex flex-wrap gap-1 p-1">
+                          {selectedUsers.map(userId => {
+                              const user = usersMap.get(userId);
+                              return (
+                                  <Badge key={userId} variant="secondary" className="flex items-center gap-1">
+                                      {user?.name || '...'}
+                                      <button type="button" onClick={(e) => { e.stopPropagation(); handleDeselect(userId); }} className="rounded-full hover:bg-muted-foreground/20">
+                                          <X className="h-3 w-3"/>
+                                      </button>
+                                  </Badge>
+                              )
+                          })}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <span className={cn("text-sm text-muted-foreground px-1 py-2")}>
+                          Select members...
+                      </span>
+                    )}
                 </div>
             </PopoverTrigger>
             <PopoverContent className="w-[300px] p-0" align="start">
