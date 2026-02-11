@@ -26,11 +26,15 @@ service cloud.firestore {
 
     // --- 1-on-1 CHAT METADATA ---
     match /chat_metadata/{chatId} {
-      // A user can read a chat's metadata IF the participants field exists, is a list, AND their UID is in it.
-      // This robust rule structure is critical for securing list queries against malformed data.
-      allow read: if request.auth != null && 
+      // Rule for GETTING a SINGLE chat's metadata. We can use robust checks on resource.data.
+      allow get: if request.auth != null && 
                    'participants' in resource.data &&
                    resource.data.participants is list &&
+                   request.auth.uid in resource.data.participants;
+      
+      // Rule for LISTING multiple chats. This rule MUST match the query constraint.
+      // It cannot perform deep checks on resource.data like the 'get' rule.
+      allow list: if request.auth != null && 
                    request.auth.uid in resource.data.participants;
 
       // A user can create a chat metadata doc IF they are in the incoming participants list.
@@ -59,11 +63,14 @@ service cloud.firestore {
 
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
-      // A user can read group info IF their UID is in the memberIds list.
-      // This rule is now robust against malformed data.
-      allow read: if request.auth != null &&
+      // Rule for GETTING a SINGLE group's info. We can use robust checks.
+      allow get: if request.auth != null &&
                    'memberIds' in resource.data &&
                    resource.data.memberIds is list &&
+                   request.auth.uid in resource.data.memberIds;
+
+      // Rule for LISTING multiple groups. This rule must match the query constraint.
+      allow list: if request.auth != null &&
                    request.auth.uid in resource.data.memberIds;
       
       // A user can create a group IF they are the creator AND are in the member list.
