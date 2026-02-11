@@ -1,10 +1,12 @@
+
 'use client';
 
 import { useState, useMemo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, PlusCircle, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlusCircle, Search, MoreVertical, Edit, Trash2 } from "lucide-react";
 import { useAdmin } from "@/hooks/use-admin";
 import { AddProductDialog } from "@/components/add-product-dialog";
 import { useCollection, useMemoFirebase, useFirestore, deleteDocumentNonBlocking } from "@/firebase";
@@ -106,93 +108,84 @@ export default function ProductsPage() {
        {isLoading ? (
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden shadow-lg flex flex-col">
+                <Card key={i} className="overflow-hidden shadow-lg flex flex-col h-full">
                     <CardHeader className="p-0">
                         <div className="aspect-[4/3] relative bg-muted animate-pulse" />
                     </CardHeader>
-                    <CardContent className="p-6 space-y-2 flex-grow">
+                    <CardContent className="p-6 space-y-4 flex-grow">
                         <div className="h-6 w-3/4 rounded bg-muted animate-pulse" />
                         <div className="h-4 w-full rounded bg-muted animate-pulse" />
                         <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
                     </CardContent>
-                    <CardFooter>
-                        <div className="h-10 w-full rounded bg-muted animate-pulse" />
-                    </CardFooter>
                 </Card>
             ))}
          </div>
        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {filteredProducts.map((product) => (
-            <Card key={product.id} className="overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 group glass flex flex-col">
-              <CardHeader className="relative aspect-[4/3] p-0">
-                {isAdmin && (
-                    <div className="absolute top-2 right-2 z-10">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/30 text-white hover:bg-black/50 focus-visible:ring-white/50">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <EditProductDialog product={product}>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                        <Edit className="mr-2 h-4 w-4" />
-                                        <span>Edit</span>
-                                    </DropdownMenuItem>
-                                </EditProductDialog>
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                                            <Trash2 className="mr-2 h-4 w-4"/>
-                                            <span>Delete</span>
+             <Link key={product.id} href={`/products/${product.id}`} className="group outline-none block" tabIndex={0}>
+                <Card className="overflow-hidden shadow-lg h-full hover:shadow-xl transition-shadow duration-300 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 glass flex flex-col">
+                  <CardHeader className="relative aspect-[4/3] p-0">
+                    {isAdmin && (
+                        <div className="absolute top-2 right-2 z-20">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/30 text-white hover:bg-black/50 focus-visible:ring-white/50" onClick={(e) => e.preventDefault()}>
+                                        <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <EditProductDialog product={product}>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            <span>Edit</span>
                                         </DropdownMenuItem>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                This action cannot be undone. This will permanently delete the product "{product.name}".
-                                            </AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                            <AlertDialogAction 
-                                                className="bg-destructive hover:bg-destructive/90"
-                                                onClick={() => handleDeleteProduct(product.id, product.name)}>
-                                                Delete
-                                            </AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    </div>
-                )}
-                <Image
-                  src={product.imageUrl}
-                  alt={product.name}
-                  fill
-                  className="object-cover transition-transform group-hover:scale-105"
-                />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                 <CardTitle className="font-headline text-2xl absolute bottom-4 left-4 text-white z-10">{product.name}</CardTitle>
-                 {product.category && <Badge variant="secondary" className="absolute top-3 left-3 z-10">{product.category}</Badge>}
-              </CardHeader>
-              <CardContent className="p-6 flex-grow">
-                <CardDescription>
-                  {product.description}
-                </CardDescription>
-              </CardContent>
-              <CardFooter>
-                <Button asChild className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                  <a href={product.affiliateLink} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    View Product
-                  </a>
-                </Button>
-              </CardFooter>
-            </Card>
+                                    </EditProductDialog>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
+                                                <Trash2 className="mr-2 h-4 w-4"/>
+                                                <span>Delete</span>
+                                            </DropdownMenuItem>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete the product "{product.name}".
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction 
+                                                    className="bg-destructive hover:bg-destructive/90"
+                                                    onClick={() => handleDeleteProduct(product.id, product.name)}>
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    )}
+                    <Image
+                      src={product.imageUrl}
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-transform group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    <CardTitle className="font-headline text-2xl absolute bottom-4 left-4 text-white z-10">{product.name}</CardTitle>
+                    {product.category && <Badge variant="secondary" className="absolute top-3 left-3 z-10">{product.category}</Badge>}
+                  </CardHeader>
+                  <CardContent className="p-6 flex-grow">
+                    <CardDescription>
+                      {product.description}
+                    </CardDescription>
+                  </CardContent>
+                </Card>
+            </Link>
           ))}
         </div>
        )}
