@@ -1,7 +1,7 @@
 
 'use server';
 import * as admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import type { UserProfile } from '@/types';
 
 // Initialize Firebase Admin SDK if not already initialized.
@@ -26,11 +26,47 @@ interface SendChatNotificationParams {
 }
 
 /**
- * A server action to send a push notification for a new chat message.
+ * A server action to send a push notification for a new chat message
+ * AND update chat metadata for both users.
  * @param {SendChatNotificationParams} params - The notification details.
  */
 export async function sendChatNotification({ recipientId, senderId, senderName, messageText }: SendChatNotificationParams): Promise<void> {
   const db = getFirestore();
+
+  // --- Update Chat Metadata for both users ---
+  const metadataTimestamp = Timestamp.now();
+  
+  const senderChatRef = db.collection('users').doc(senderId).collection('chats').doc(recipientId);
+  const recipientChatRef = db.collection('users').doc(recipientId).collection('chats').doc(senderId);
+
+  const metadataText = messageText.length > 30 ? `${messageText.substring(0, 27)}...` : messageText;
+
+  const senderPayload = {
+    id: recipientId,
+    lastMessageText: metadataText,
+    lastMessageTimestamp: metadataTimestamp,
+  };
+
+  const recipientPayload = {
+    id: senderId,
+    lastMessageText: metadataText,
+    lastMessageTimestamp: metadataTimestamp,
+    unreadCount: FieldValue.increment(1),
+  };
+
+  try {
+    const batch = db.batch();
+    batch.set(senderChatRef, senderPayload, { merge: true });
+    batch.set(recipientChatRef, recipientPayload, { merge: true });
+    await batch.commit();
+  } catch (metadataError) {
+    console.error('[Chat Action] Failed to update chat metadata:', metadataError);
+    // Don't proceed if metadata fails, as it indicates a larger issue.
+    return;
+  }
+  // --- End of Metadata Update ---
+
+
   const recipientDocRef = db.collection('users').doc(recipientId);
 
   try {
@@ -85,7 +121,7 @@ export async function sendChatNotification({ recipientId, senderId, senderName, 
 
     if (tokensToRemove.length > 0) {
       await recipientDocRef.update({
-        fcmTokens: admin.firestore.FieldValue.arrayRemove(...tokensToRemove)
+        fcmTokens: FieldValue.arrayRemove(...tokensToRemove)
       });
       console.log(`[FCM] Removed ${tokensToRemove.length} invalid tokens for user ${recipientId}.`);
     }

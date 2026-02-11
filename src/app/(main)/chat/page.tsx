@@ -7,12 +7,8 @@ import {
   serverTimestamp,
   Timestamp,
   collection,
-  deleteDoc,
   doc,
-  GeoPoint,
   updateDoc,
-  increment,
-  setDoc,
   query,
   where,
   orderBy,
@@ -44,7 +40,6 @@ import {
   useMemoFirebase,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
-  setDocumentNonBlocking,
   useDoc,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
@@ -273,33 +268,6 @@ export default function ChatPage() {
 
 
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  
-  const updateChatMetadata = (text: string) => {
-    if (!user || !selectedChat || !firestore) return;
-
-    const recipientId = selectedChat.id;
-    const senderId = user.uid;
-
-    const timestamp = serverTimestamp();
-
-    const senderChatRef = doc(firestore, 'users', senderId, 'chats', recipientId);
-    const senderPayload = {
-        id: recipientId,
-        lastMessageText: text,
-        lastMessageTimestamp: timestamp,
-    };
-    setDocumentNonBlocking(senderChatRef, senderPayload, { merge: true });
-
-    const recipientChatRef = doc(firestore, 'users', recipientId, 'chats', senderId);
-    const recipientPayload = {
-        id: senderId,
-        lastMessageText: text,
-        lastMessageTimestamp: timestamp,
-        unreadCount: increment(1),
-    };
-    setDocumentNonBlocking(recipientChatRef, recipientPayload, { merge: true });
-  };
-
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
@@ -320,15 +288,14 @@ export default function ChatPage() {
       chatId: chatId,
     });
     
+    const notificationText = isLink ? '🔗 Link' : messageText;
+    
     sendChatNotification({
         recipientId: selectedChat.id,
         senderId: user.uid,
         senderName: user.displayName || 'A new message',
-        messageText: messageText,
+        messageText: notificationText,
     });
-
-    const metadataText = isLink ? '🔗 Link' : messageText;
-    updateChatMetadata(metadataText);
   };
 
   const handleAttachmentClick = () => {
@@ -357,7 +324,6 @@ export default function ChatPage() {
       if (type === 'image') body = '📷 Photo';
       if (type === 'video') body = '🎥 Video';
       if (type === 'audio') body = '🎤 Voice Message';
-      updateChatMetadata(body);
 
       sendChatNotification({
         recipientId: selectedChat.id,
@@ -800,5 +766,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
