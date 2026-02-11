@@ -21,7 +21,8 @@ service cloud.firestore {
     // Path: /users/{userId}
     // Users can read any profile, but only create/update their own. Admins have full access.
     match /users/{userId} {
-      // Allow any logged-in user to read a profile (for discover, chat, etc.)
+      // Allow any logged-in user to read a single profile OR list all users.
+      // This is crucial for discover, admin, and group creation features.
       allow get, list: if isLoggedIn();
 
       // A user can only create their own profile document.
@@ -40,9 +41,9 @@ service cloud.firestore {
     // Path: /roles_admin/{userId}
     // Only admins can manage who is an admin.
     match /roles_admin/{userId} {
-      // Allow admins to see who else is an admin.
       // Allow any logged-in user to check if THEY are an admin (for useAdmin hook).
       allow get: if isLoggedIn();
+      // Allow admins to see the list of all other admins.
       allow list: if isAdmin();
 
       // Only admins can grant or revoke admin roles.
@@ -60,7 +61,6 @@ service cloud.firestore {
     // This collection stores metadata for 1-on-1 chats to make loading lists faster.
     match /chat_metadata/{chatId} {
       // A user can read/write metadata only if they are a participant in that chat.
-      // The `sendChatNotification` server action handles writes, but this rule provides client-side security.
       allow read, write: if isLoggedIn() && request.auth.uid in resource.data.participants;
     }
 
@@ -170,11 +170,6 @@ service cloud.firestore {
 
       // Only admins can create, update, or delete products.
       allow write: if isAdmin();
-    }
-    
-    // Default deny all other paths
-    match /{document=**} {
-      allow read, write: if false;
     }
   }
 }
