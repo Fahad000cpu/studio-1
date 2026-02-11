@@ -59,7 +59,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="container mx-auto space-y-8">
+    <div className="space-y-8">
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
@@ -121,7 +121,7 @@ export default function ProductsPage() {
             ))}
          </div>
        ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {filteredProducts.map((product) => (
              <Link key={product.id} href={`/products/${product.id}`} className="group outline-none block" tabIndex={0}>
                 <Card className="overflow-hidden shadow-lg h-full hover:shadow-xl transition-shadow duration-300 group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 glass flex flex-col">
