@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -89,6 +90,7 @@ export default function LoginPage() {
   const [resetEmail, setResetEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [authDomainError, setAuthDomainError] = useState<string | null>(null);
+  const [isProviderErrorOpen, setIsProviderErrorOpen] = useState(false);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -150,6 +152,10 @@ export default function LoginPage() {
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
             return;
         }
+        if (error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
+            setIsProviderErrorOpen(true);
+            return;
+        }
         if (error.code === 'auth/account-exists-with-different-credential') {
             toast({
                 variant: "destructive",
@@ -192,6 +198,10 @@ export default function LoginPage() {
         
     } catch (error: any) {
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') {
+            return;
+        }
+        if (error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
+            setIsProviderErrorOpen(true);
             return;
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
@@ -380,7 +390,32 @@ export default function LoginPage() {
             </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog open={isProviderErrorOpen} onOpenChange={setIsProviderErrorOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Sign-In Configuration Error (Error 403)</AlertDialogTitle>
+                <AlertDialogDescription>
+                    <div className="space-y-3 text-left">
+                        <p>Partner, yeh "403 error" code ki galti nahi, balki **Google Cloud project ke setup** ki samasya hai. Aksar yeh tab hota hai jab aapka "OAuth consent screen" publish nahi hua hota.</p>
+                        <p className="font-bold">Ise theek karne ke liye, kripya yeh check karein:</p>
+                        <ol className="list-decimal list-inside space-y-2">
+                            <li>Apne project ke <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-primary">OAuth consent screen</a> par jaayein. (Sahi project chuna hua hai, yeh sunishchit karein).</li>
+                            <li>Wahan, **"Publishing status"** check karein. Agar yeh **"Testing"** hai, to **"PUBLISH APP"** button par click karke ise live karein.</li>
+                            <li>Yadi aap ise "Testing" mein rakhna chahte hain, to sunishchit karein ki aapka email address "Test users" ki list mein joda gaya hai.</li>
+                        </ol>
+                        <p className="mt-4 text-xs text-muted-foreground">Yeh Google aur Facebook dono sign-in ke liye zaroori ho sakta hai.</p>
+                    </div>
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setIsProviderErrorOpen(false)}>Samajh Gaya</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
       </CardContent>
     </Card>
   );
 }
+
+    
