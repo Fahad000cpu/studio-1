@@ -29,8 +29,9 @@ import {
   useCollection,
   useMemoFirebase,
 } from '@/firebase';
-import { cn, uploadToCloudinary } from '@/lib/utils';
-import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users, Palette, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { uploadToCloudinary } from '@/lib/cloudinary';
+import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users, Palette, X, Settings } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile, ChatGroup } from '@/types';
@@ -40,6 +41,7 @@ import { getInitials } from '@/lib/utils';
 import { sendChatNotification } from '@/lib/chat-notifications';
 import { CreateGroupDialog } from '@/components/create-group-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { GroupInfoSheet } from '@/components/group-info-sheet';
 
 
 function getChatId(uid1: string, uid2: string) {
@@ -89,6 +91,7 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
   
   const chatWithId = searchParams.get('chatWith');
 
@@ -485,7 +488,7 @@ export default function ChatPage() {
          <Avatar className="w-10 h-10">
             {selectedChat.type === 'group' ? (
                 <>
-                    <AvatarImage src={selectedChat.avatarUrl} />
+                    <AvatarImage src={selectedChat.group?.groupPhotoUrl} />
                     <AvatarFallback>
                         <Users className="w-5 h-5 text-muted-foreground" />
                     </AvatarFallback>
@@ -497,11 +500,16 @@ export default function ChatPage() {
                 </>
             )}
         </Avatar>
-        <div className="ml-4">
+        <div className="ml-4 flex-grow">
             <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
             {selectedChat.type === 'group' && <p className="text-sm text-muted-foreground">{selectedChat.group?.memberIds.length} members</p>}
              {selectedChat.type === 'user' && <p className="text-sm text-muted-foreground">{getPresenceStatus(selectedChat.contact?.lastActive)}</p>}
         </div>
+        {selectedChat.type === 'group' && (
+          <Button variant="ghost" size="icon" onClick={() => setIsGroupSheetOpen(true)}>
+            <Settings className="h-5 w-5" />
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
@@ -583,6 +591,17 @@ export default function ChatPage() {
       <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass h-full">
         {isMobile ? (selectedChat ? ChatWindow : ChatList) : (<>{ChatList}{ChatWindow ? ChatWindow : <div className="flex flex-col h-full items-center justify-center text-center p-8 bg-background/30"><div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent to-primary flex items-center justify-center mb-6"><SendHorizonal className="w-10 h-10 text-primary-foreground" /></div><h2 className="text-2xl font-bold font-headline">Welcome to ConnectSphere Chat</h2><p className="text-muted-foreground mt-2">Select a chat or create a group to start messaging.</p></div>}</>)}
       </div>
+      {selectedChat?.type === 'group' && selectedChat.group && (
+        <GroupInfoSheet
+          group={selectedChat.group}
+          allUsersMap={allUsersMap}
+          open={isGroupSheetOpen}
+          onOpenChange={setIsGroupSheetOpen}
+          onGroupDeleted={() => setSelectedChat(null)}
+        />
+      )}
     </div>
   );
 }
+
+    

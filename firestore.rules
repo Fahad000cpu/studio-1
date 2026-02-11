@@ -52,8 +52,16 @@ service cloud.firestore {
                      request.resource.data.memberIds is list &&
                      request.auth.uid in request.resource.data.memberIds;
 
-      // The creator or an admin can update group details.
-      allow update: if (request.auth != null && get(/databases/$(database)/documents/groups/$(groupId)).data.creatorId == request.auth.uid) || (request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
+      // The creator or an admin can update group details. Members can update to remove themselves.
+      allow update: if request.auth != null && (
+                     (resource.data.creatorId == request.auth.uid) || 
+                     (exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))) ||
+                     (
+                       request.auth.uid in resource.data.memberIds &&
+                       request.resource.data.memberIds == resource.data.memberIds.removeAll([request.auth.uid]) &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+                     )
+                   );
 
       // The creator or an admin can delete a group.
       allow delete: if (request.auth != null && resource.data.creatorId == request.auth.uid) || (request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
@@ -111,3 +119,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
