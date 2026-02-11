@@ -11,22 +11,26 @@ service cloud.firestore {
     }
 
     // --- USER PROFILE RULES ---
+    // Rule for the top-level 'users' collection documents.
     match /users/{userId} {
-      // A user can see other user profiles (for discover page).
+      // Allow any authenticated user to read user profiles (for discover page, etc.).
       allow get, list: if request.auth != null;
-      // A user can modify their own profile, or an admin can.
+      // Allow a user to write to their own profile, or an admin to write to any profile.
       allow write: if request.auth.uid == userId || isAdmin();
     }
 
     // --- USER CHAT METADATA RULES ---
-    // This allows a user to read and write their own chat metadata, which enables listing chats.
-    match /users/{userId}/chats/{path=**} {
-      allow read, write: if request.auth.uid == userId;
+    // Rule for the 'chats' subcollection within each user document.
+    // This is the specific rule that fixes the "permission denied" error for listing chats.
+    match /users/{userId}/chats/{chatId} {
+        // A user can read (get, list) and write (create, update, delete)
+        // documents ONLY within their own 'chats' subcollection.
+        allow read, write: if request.auth.uid == userId;
     }
-
+    
     // --- TOP-LEVEL COLLECTION RULES ---
 
-    // Rules for one-on-one chat messages.
+    // Rules for one-on-one chat messages stored in the top-level 'chats' collection.
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
         return request.auth != null && request.auth.uid in chatId.split('_');
