@@ -12,7 +12,6 @@ import {
   where,
   orderBy,
   arrayUnion,
-  documentId,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -29,17 +28,15 @@ import {
   useMemoFirebase,
   deleteDocumentNonBlocking,
   updateDocumentNonBlocking,
-  useDoc,
 } from '@/firebase';
-import { cn, uploadToFirebaseStorage } from '@/lib/utils';
+import { cn, uploadToCloudinary } from '@/lib/utils';
 import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { UserProfile, ChatGroup } from '@/types';
 import type { Message, ChatMetadata, ChatListItem } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
-import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
-import { Badge } from '@/components/ui/badge';
+import type { CollectionOptions } from '@/firebase/firestore/use-collection';
 import { getInitials } from '@/lib/utils';
 import { sendChatNotification } from '@/lib/chat-notifications';
 import { CreateGroupDialog } from '@/components/create-group-dialog';
@@ -89,18 +86,21 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   
   const chatWithId = searchParams.get('chatWith');
 
-  // 1. Fetch 1-on-1 chat metadata
+  // 1. Fetch all users
+  const usersCollection = useMemoFirebase(() => firestore ? collection(firestore, 'users') : null, [firestore]);
+  const { data: allUsersData, isLoading: allUsersLoading } = useCollection<UserProfile>(usersCollection);
+
+  // 2. Fetch 1-on-1 chat metadata
   const chatMetadataQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, 'chat_metadata'), where('participants', 'array-contains', user.uid));
   }, [firestore, user]);
   const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataQuery);
 
-  // 2. Fetch group chats
+  // 3. Fetch group chats
   const groupsQuery = useMemoFirebase(() => {
       if (!firestore || !user) return null;
       return query(collection(firestore, 'groups'), where('memberIds', 'array-contains', user.uid));
@@ -108,56 +108,33 @@ export default function ChatPage() {
   const { data: groups, isLoading: groupsLoading } = useCollection<ChatGroup>(groupsQuery);
 
 
-  // 3. Fetch all user profiles needed for both chat types
-  const allContactIds = useMemo(() => {
-    if (!chatMetadata || !user) return [];
-    return chatMetadata.map(cm => cm.participants.find(p => p !== user.uid)).filter(Boolean) as string[];
-  }, [chatMetadata, user]);
-
-  const allUsersQuery = useMemoFirebase(() => {
-    if (!firestore || allContactIds.length === 0) return null;
-    const idsToQuery = [...new Set(allContactIds)].slice(0, 30);
-    if (idsToQuery.length === 0) return null;
-    return query(collection(firestore, 'users'), where(documentId(), 'in', idsToQuery));
-  }, [firestore, allContactIds]);
-  const { data: usersData } = useCollection<UserProfile>(allUsersQuery);
-
-  // 4. Handle a new contact being opened from another page
-  const newContactDocRef = useMemoFirebase(() => {
-    if (!firestore || !chatWithId || allContactIds.includes(chatWithId)) return null;
-    return doc(firestore, 'users', chatWithId);
-  }, [firestore, chatWithId, allContactIds]);
-  const { data: newContact, isLoading: newContactLoading } = useDoc<UserProfile>(newContactDocRef);
-
-
-  // 5. Create a map of all users for quick lookups
-  const usersMap = useMemo(() => {
-    const map = new Map<string, UserProfile>();
-    if (usersData) usersData.forEach(u => map.set(u.id, u));
-    if (newContact) map.set(newContact.id, newContact);
-    return map;
-  }, [usersData, newContact]);
-
-  // 6. Combine 1-on-1 and group chats into a single list
+  // 4. Combine all users, active chats, and groups into a single, sorted, searchable list
   const displayedChats = useMemo(() => {
-    if (!user) return [];
+    if (!user || !allUsersData) return [];
 
-    // Process 1-on-1 chats
-    const userChats: ChatListItem[] = (chatMetadata || []).map(meta => {
-      const contactId = meta.participants.find(p => p !== user.uid);
-      const contact = contactId ? usersMap.get(contactId) : undefined;
-      return {
-        id: meta.id,
-        type: 'user',
-        name: contact?.name || 'Unknown User',
-        avatarUrl: contact?.profilePictureUrl,
-        lastMessageText: meta.lastMessageText,
-        lastMessageTimestamp: meta.lastMessageTimestamp,
-        contact: contact,
-      };
-    }).filter(item => !!item.contact);
-    
-    // Process group chats
+    const chatMetaMap = new Map<string, ChatMetadata>();
+    (chatMetadata || []).forEach(meta => {
+        const contactId = meta.participants.find(p => p !== user.uid);
+        if (contactId) {
+            chatMetaMap.set(contactId, meta);
+        }
+    });
+
+    const combinedUserChats: ChatListItem[] = allUsersData
+        .filter(u => u.id !== user.uid) // Exclude self
+        .map(contact => {
+            const existingChatMeta = chatMetaMap.get(contact.id);
+            return {
+                id: existingChatMeta ? existingChatMeta.id : getChatId(user.uid, contact.id),
+                type: 'user',
+                name: contact.name,
+                avatarUrl: contact.profilePictureUrl,
+                lastMessageText: existingChatMeta ? existingChatMeta.lastMessageText : "Start a conversation",
+                lastMessageTimestamp: existingChatMeta ? existingChatMeta.lastMessageTimestamp : undefined,
+                contact: contact,
+            };
+        });
+
     const groupChats: ChatListItem[] = (groups || []).map(group => ({
         id: group.id,
         type: 'group',
@@ -168,29 +145,24 @@ export default function ChatPage() {
         group: group,
     }));
 
-    let combined = [...userChats, ...groupChats];
-    
-    // Add new potential contact
-    if (newContact && !combined.some(c => c.type === 'user' && c.contact?.id === newContact.id)) {
-        combined.unshift({
-            id: getChatId(user.uid, newContact.id),
-            type: 'user',
-            name: newContact.name,
-            avatarUrl: newContact.profilePictureUrl,
-            lastMessageText: "Start a new conversation",
-            contact: newContact
-        });
-    }
+    let combined = [...combinedUserChats, ...groupChats];
 
-    // Sort by last message time
-    combined.sort((a, b) => (b.lastMessageTimestamp?.toMillis() || 0) - (a.lastMessageTimestamp?.toMillis() || 0));
+    // Sort by last message time (chats with messages first), then by name
+    combined.sort((a, b) => {
+        const timeA = a.lastMessageTimestamp?.toMillis() || 0;
+        const timeB = b.lastMessageTimestamp?.toMillis() || 0;
+        if (timeA !== timeB) {
+            return timeB - timeA;
+        }
+        return a.name.localeCompare(b.name);
+    });
 
     // Filter by search term
     if (!searchTerm) return combined;
     const termLower = searchTerm.toLowerCase();
     return combined.filter(item => item.name.toLowerCase().includes(termLower));
 
-  }, [user, chatMetadata, groups, usersMap, newContact, searchTerm]);
+  }, [user, allUsersData, chatMetadata, groups, searchTerm]);
   
 
   const handleSelectChat = useCallback((chat: ChatListItem) => {
@@ -202,7 +174,7 @@ export default function ChatPage() {
     }
   }, [isMobile]);
 
-  const isLoading = chatMetadataLoading || groupsLoading || newContactLoading;
+  const isLoading = chatMetadataLoading || groupsLoading || allUsersLoading;
 
   useEffect(() => {
     if (isLoading || selectedChat) return;
@@ -230,6 +202,11 @@ export default function ChatPage() {
   const messageCollectionOptions = useMemo<CollectionOptions>(() => ({ orderBy: ['timestamp', 'asc'] }), []);
 
   const { data: messagesData } = useCollection<Message>(messagesCollection, messageCollectionOptions);
+
+  const allUsersMap = useMemo(() => {
+    if (!allUsersData) return new Map<string, UserProfile>();
+    return new Map(allUsersData.map(u => [u.id, u]));
+  }, [allUsersData]);
   
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
@@ -237,10 +214,10 @@ export default function ChatPage() {
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
-            sender: usersMap.get(msg.senderId),
+            sender: allUsersMap.get(msg.senderId),
         }))
         .filter(msg => !msg.deletedFor?.includes(user.uid!));
-  }, [messagesData, user?.uid, usersMap]);
+  }, [messagesData, user?.uid, allUsersMap]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -293,7 +270,7 @@ export default function ChatPage() {
     if (!user || !messagesCollection || !selectedChat) return;
     setIsUploading(true);
     try {
-      const downloadURL = await uploadToFirebaseStorage(file, `chat-media/${type}`);
+      const downloadURL = await uploadToCloudinary(file);
 
       const basePayload = {
         text: '',
@@ -403,7 +380,7 @@ export default function ChatPage() {
       <div className="p-4 space-y-4">
         <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold font-headline">Chats</h1>
-            <CreateGroupDialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+            <CreateGroupDialog>
                 <Button variant="ghost" size="icon">
                     <Plus className="h-5 w-5" />
                 </Button>
@@ -411,7 +388,7 @@ export default function ChatPage() {
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search chats or groups..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search users or groups..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
       </div>
       <Separator />
@@ -436,7 +413,7 @@ export default function ChatPage() {
             </div>
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground"><MessageSquare className="w-10 h-10 mb-4" /><h3 className="font-semibold text-lg text-foreground">No Chats Found</h3><p className="text-sm mt-1">Find people in Discover or create a group to start a conversation.</p></div>
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground"><MessageSquare className="w-10 h-10 mb-4" /><h3 className="font-semibold text-lg text-foreground">No Users Found</h3><p className="text-sm mt-1">Try a different search, or find people on the Discover page.</p></div>
         )}
       </ScrollArea>
     </div>

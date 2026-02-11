@@ -6,7 +6,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +17,7 @@ import { useUser, useFirestore, addDocumentNonBlocking, useCollection, useMemoFi
 import { collection, serverTimestamp } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, X, Users } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { Badge } from './ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,8 @@ const groupSchema = z.object({
 
 type GroupFormValues = z.infer<typeof groupSchema>;
 
-export function CreateGroupDialog({ children, open, onOpenChange }: { children: React.ReactNode, open: boolean, onOpenChange: (open: boolean) => void }) {
+export function CreateGroupDialog({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = React.useState(false);
   const { user } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -60,11 +61,13 @@ export function CreateGroupDialog({ children, open, onOpenChange }: { children: 
       creatorId: user.uid,
       memberIds: memberIds,
       timestamp: serverTimestamp(),
+      lastMessageText: `Group created by ${user.displayName || 'a user'}.`,
+      lastMessageTimestamp: serverTimestamp(),
     });
 
     toast({ title: 'Group Created!', description: `"${data.name}" has been successfully created.` });
     form.reset();
-    onOpenChange(false);
+    setOpen(false);
   };
   
   const availableUsers = React.useMemo(() => {
@@ -73,7 +76,10 @@ export function CreateGroupDialog({ children, open, onOpenChange }: { children: 
   }, [allUsers, user]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        {children}
+      </DialogTrigger>
       <DialogContent className="sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>Create New Group</DialogTitle>
@@ -105,7 +111,7 @@ export function CreateGroupDialog({ children, open, onOpenChange }: { children: 
             />
 
              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={form.formState.isSubmitting}>
                     {form.formState.isSubmitting ? 'Creating...' : 'Create Group'}
                 </Button>
