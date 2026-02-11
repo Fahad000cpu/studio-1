@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -17,7 +18,6 @@ service cloud.firestore {
     // The recursive wildcard `{path=**}` matches any document at any depth
     // under a specific user's document (e.g., /users/USER_A/chats/CHAT_ID_B).
     // This is NECESSARY to allow a 'list' operation on a subcollection.
-    // A rule on '/users/{userId}/chats/{chatId}' is NOT sufficient for a 'list'.
     match /users/{userId}/{path=**} {
       // Allows read/write access ONLY if the requesting user's ID matches the
       // {userId} in the path. This secures the subcollections.
@@ -50,9 +50,14 @@ service cloud.firestore {
       function isSender() {
         return request.auth != null && request.auth.uid == resource.data.senderId;
       }
+      // Participants can read messages and create new ones.
       allow read, create: if isChatParticipant();
+      
+      // "Delete for me" is an update. A participant should be able to update.
+      allow update: if isChatParticipant();
+
+      // Only the original sender can delete the message for everyone.
       allow delete: if isSender();
-      allow update: if false; // Messages are immutable
     }
 
     match /groups/{groupId} {
@@ -73,6 +78,8 @@ service cloud.firestore {
 
     match /groups/{groupId}/messages/{messageId} {
       function isGroupMember() {
+          // Note: This relies on a `get` call which can be inefficient.
+          // For better performance, the group members should be denormalized into the message document.
           return request.auth != null && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
       }
       allow get, list: if isGroupMember();
