@@ -117,7 +117,7 @@ export default function MainLayout({
               <ThemeToggle />
               <UserNav />
               </header>
-              <main className="flex-1 p-4 md:p-6">
+              <main className="flex-1 py-4 md:py-6">
               {children}
               </main>
           </SidebarInset>
