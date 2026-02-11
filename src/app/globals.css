@@ -75,6 +75,9 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  .dark {
+    text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
+  }
 }
 
 @layer utilities {
