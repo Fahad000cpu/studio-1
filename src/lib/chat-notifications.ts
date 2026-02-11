@@ -19,7 +19,8 @@ if (admin.apps.length === 0) {
 }
 
 interface SendChatNotificationParams {
-  recipientId: string;
+  recipientId?: string; // For 1-on-1 chats
+  groupId?: string; // For group chats
   senderId: string;
   senderName: string;
   messageText: string;
@@ -27,96 +28,105 @@ interface SendChatNotificationParams {
 
 /**
  * A server action to send a push notification for a new chat message
- * AND update chat metadata in the new top-level `chat_metadata` collection.
+ * AND update chat metadata in the new top-level `chat_metadata` collection or `groups` collection.
  * @param {SendChatNotificationParams} params - The notification details.
  */
-export async function sendChatNotification({ recipientId, senderId, senderName, messageText }: SendChatNotificationParams): Promise<void> {
+export async function sendChatNotification({ recipientId, groupId, senderId, senderName, messageText }: SendChatNotificationParams): Promise<void> {
   const db = getFirestore();
-
-  // --- Update Chat Metadata ---
   const metadataTimestamp = Timestamp.now();
-  const chatId = [senderId, recipientId].sort().join('_');
-  const chatMetadataRef = db.collection('chat_metadata').doc(chatId);
-
   const metadataText = messageText.length > 30 ? `${messageText.substring(0, 27)}...` : messageText;
 
-  const metadataPayload = {
-    participants: [senderId, recipientId],
-    lastMessageText: metadataText,
-    lastMessageTimestamp: metadataTimestamp,
-  };
-
-  try {
-    // This will create the document if it doesn't exist, or update it if it does.
-    await chatMetadataRef.set(metadataPayload, { merge: true });
-  } catch (metadataError) {
-    console.error('[Chat Action] Failed to update chat metadata:', metadataError);
-    // Don't proceed if metadata fails, as it indicates a larger issue.
-    return;
-  }
-  // --- End of Metadata Update ---
-
-
-  const recipientDocRef = db.collection('users').doc(recipientId);
-
-  try {
-    const recipientDoc = await recipientDocRef.get();
-    if (!recipientDoc.exists) {
-      console.log(`[FCM] Recipient ${recipientId} not found.`);
-      return;
+  // --- Update Chat Metadata ---
+  if (groupId) {
+    // --- Group Chat Metadata Update ---
+    const groupRef = db.collection('groups').doc(groupId);
+    try {
+      await groupRef.update({
+        lastMessageText: metadataText,
+        lastMessageTimestamp: metadataTimestamp,
+      });
+      // Group notifications are not yet implemented in this action to keep it simple.
+      // This could be a future enhancement.
+    } catch (metadataError) {
+      console.error('[Chat Action] Failed to update group chat metadata:', metadataError);
     }
+    return; // Exit after updating group metadata
+  } 
+  
+  if (recipientId) {
+    // --- One-on-One Chat Metadata & Notification ---
+    const chatId = [senderId, recipientId].sort().join('_');
+    const chatMetadataRef = db.collection('chat_metadata').doc(chatId);
 
-    const recipient = recipientDoc.data() as UserProfile;
-    const tokens = recipient.fcmTokens?.filter(Boolean);
-
-    if (!tokens || tokens.length === 0) {
-      console.log(`[FCM] Recipient ${recipientId} has no FCM tokens.`);
-      return;
-    }
-    
-    // Truncate message if it's too long for a notification body
-    const body = messageText.length > 100 ? `${messageText.substring(0, 97)}...` : messageText;
-
-    const messagePayload: admin.messaging.MulticastMessage = {
-      tokens,
-      notification: {
-        title: senderName,
-        body: body,
-      },
-      webpush: {
-        fcmOptions: {
-          // This link is what the browser uses if the app is already open
-          link: `/chat?chatWith=${senderId}`,
-        },
-      },
-      // This data payload is what the service worker receives to construct the notification
-      // and handle clicks when the app is closed.
-      data: {
-        url: `/chat?chatWith=${senderId}`,
-      }
+    const metadataPayload = {
+      participants: [senderId, recipientId],
+      lastMessageText: metadataText,
+      lastMessageTimestamp: metadataTimestamp,
     };
 
-    const response = await admin.messaging().sendEachForMulticast(messagePayload);
-    
-    // Cleanup invalid tokens
-    const tokensToRemove: string[] = [];
-    response.responses.forEach((result, index) => {
-      if (!result.success) {
-        const error = result.error;
-        if (error && (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token')) {
-          tokensToRemove.push(tokens[index]);
-        }
-      }
-    });
-
-    if (tokensToRemove.length > 0) {
-      await recipientDocRef.update({
-        fcmTokens: FieldValue.arrayRemove(...tokensToRemove)
-      });
-      console.log(`[FCM] Removed ${tokensToRemove.length} invalid tokens for user ${recipientId}.`);
+    try {
+      await chatMetadataRef.set(metadataPayload, { merge: true });
+    } catch (metadataError) {
+      console.error('[Chat Action] Failed to update chat metadata:', metadataError);
+      return;
     }
+    
+    // --- Send Push Notification ---
+    const recipientDocRef = db.collection('users').doc(recipientId);
+    try {
+      const recipientDoc = await recipientDocRef.get();
+      if (!recipientDoc.exists) {
+        console.log(`[FCM] Recipient ${recipientId} not found.`);
+        return;
+      }
 
-  } catch (error) {
-    console.error('Error sending chat notification via Server Action:', error);
+      const recipient = recipientDoc.data() as UserProfile;
+      const tokens = recipient.fcmTokens?.filter(Boolean);
+
+      if (!tokens || tokens.length === 0) {
+        console.log(`[FCM] Recipient ${recipientId} has no FCM tokens.`);
+        return;
+      }
+      
+      const body = messageText.length > 100 ? `${messageText.substring(0, 97)}...` : messageText;
+
+      const messagePayload: admin.messaging.MulticastMessage = {
+        tokens,
+        notification: {
+          title: senderName,
+          body: body,
+        },
+        webpush: {
+          fcmOptions: {
+            link: `/chat?chatWith=${senderId}`,
+          },
+        },
+        data: {
+          url: `/chat?chatWith=${senderId}`,
+        }
+      };
+
+      const response = await admin.messaging().sendEachForMulticast(messagePayload);
+      
+      const tokensToRemove: string[] = [];
+      response.responses.forEach((result, index) => {
+        if (!result.success) {
+          const error = result.error;
+          if (error && (error.code === 'messaging/registration-token-not-registered' || error.code === 'messaging/invalid-registration-token')) {
+            tokensToRemove.push(tokens[index]);
+          }
+        }
+      });
+
+      if (tokensToRemove.length > 0) {
+        await recipientDocRef.update({
+          fcmTokens: FieldValue.arrayRemove(...tokensToRemove)
+        });
+        console.log(`[FCM] Removed ${tokensToRemove.length} invalid tokens for user ${recipientId}.`);
+      }
+
+    } catch (error) {
+      console.error('Error sending chat notification via Server Action:', error);
+    }
   }
 }

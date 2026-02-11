@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
@@ -14,22 +15,12 @@ import {
   documentId,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday } from 'date-fns';
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   useUser,
   useFirestore,
@@ -41,30 +32,19 @@ import {
   useDoc,
 } from '@/firebase';
 import { cn } from '@/lib/utils';
-import {
-  Search,
-  Paperclip,
-  Mic,
-  SendHorizonal,
-  ArrowLeft,
-  ImageIcon,
-  Square,
-  MoreVertical,
-  Trash,
-  Trash2,
-  Check,
-  MessageSquare,
-} from 'lucide-react';
+import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users } from 'lucide-react';
 import Image from 'next/image';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { UserProfile } from '@/types';
-import type { Message, ChatMetadata } from '@/types/chat';
+import type { UserProfile, ChatGroup } from '@/types';
+import type { Message, ChatMetadata, ChatListItem } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
 import { WithId, type CollectionOptions } from '@/firebase/firestore/use-collection';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Badge } from '@/components/ui/badge';
 import { getInitials } from '@/lib/utils';
 import { sendChatNotification } from '@/lib/chat-notifications';
+import { CreateGroupDialog } from '@/components/create-group-dialog';
+
 
 function getChatId(uid1: string, uid2: string) {
   return [uid1, uid2].sort().join('_');
@@ -73,13 +53,8 @@ function getChatId(uid1: string, uid2: string) {
 const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null): string => {
   if (!timestamp) return '';
   const date = timestamp instanceof Timestamp ? timestamp.toDate() : (timestamp as Date);
-  
-  if (isToday(date)) {
-    return format(date, 'p'); 
-  }
-  if (isYesterday(date)) {
-    return 'Yesterday';
-  }
+  if (isToday(date)) return format(date, 'p');
+  if (isYesterday(date)) return 'Yesterday';
   return format(date, 'dd/MM/yyyy');
 };
 
@@ -95,174 +70,163 @@ export default function ChatPage() {
   const audioChunksRef = useRef<Blob[]>([]);
   const searchParams = useSearchParams();
 
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChat, setSelectedChat] = useState<ChatListItem | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   
   const chatWithId = searchParams.get('chatWith');
 
-  // Fetch chat metadata for the current user from the new top-level collection.
+  // 1. Fetch 1-on-1 chat metadata
   const chatMetadataQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
-    // Simplified query to fix permission errors. Sorting is now handled on the client.
-    return query(
-        collection(firestore, 'chat_metadata'),
-        where('participants', 'array-contains', user.uid)
-    );
+    return query(collection(firestore, 'chat_metadata'), where('participants', 'array-contains', user.uid));
   }, [firestore, user]);
   const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataQuery);
 
-  // From the metadata, get the IDs of users we've chatted with.
-  const chattedUserIds = useMemo(() => {
-    if (!chatMetadata || !user) return null;
-    if (chatMetadata.length === 0) return [];
-    return chatMetadata
-      .map(cm => cm.participants.find(p => p !== user.uid))
-      .filter(Boolean) as string[];
+  // 2. Fetch group chats
+  const groupsQuery = useMemoFirebase(() => {
+      if (!firestore || !user) return null;
+      return query(collection(firestore, 'groups'), where('memberIds', 'array-contains', user.uid));
+  }, [firestore, user]);
+  const { data: groups, isLoading: groupsLoading } = useCollection<ChatGroup>(groupsQuery);
+
+
+  // 3. Fetch all user profiles needed for both chat types
+  const allContactIds = useMemo(() => {
+    if (!chatMetadata || !user) return [];
+    return chatMetadata.map(cm => cm.participants.find(p => p !== user.uid)).filter(Boolean) as string[];
   }, [chatMetadata, user]);
 
-  // Fetch profiles for only the users we have active chats with.
-  const chattedUsersCollectionRef = useMemoFirebase(() => {
-    if (!firestore || !chattedUserIds || chattedUserIds.length === 0) return null;
-    const idsToQuery = chattedUserIds.slice(0, 30);
+  const allUsersQuery = useMemoFirebase(() => {
+    if (!firestore || allContactIds.length === 0) return null;
+    const idsToQuery = [...new Set(allContactIds)].slice(0, 30);
+    if (idsToQuery.length === 0) return null;
     return query(collection(firestore, 'users'), where(documentId(), 'in', idsToQuery));
-  }, [firestore, chattedUserIds]);
-  const { data: chattedUsers, isLoading: chattedUsersLoading } = useCollection<UserProfile>(chattedUsersCollectionRef);
-  
-  // If navigating from Discover, fetch the profile for the new contact.
+  }, [firestore, allContactIds]);
+  const { data: usersData } = useCollection<UserProfile>(allUsersQuery);
+
+  // 4. Handle a new contact being opened from another page
   const newContactDocRef = useMemoFirebase(() => {
-    if (!firestore || !chatWithId) return null;
-    if (chattedUserIds?.includes(chatWithId)) return null;
+    if (!firestore || !chatWithId || allContactIds.includes(chatWithId)) return null;
     return doc(firestore, 'users', chatWithId);
-  }, [firestore, chatWithId, chattedUserIds]);
+  }, [firestore, chatWithId, allContactIds]);
   const { data: newContact, isLoading: newContactLoading } = useDoc<UserProfile>(newContactDocRef);
 
-  // Create a map of all user profiles needed for the view (existing chats + new contact).
+
+  // 5. Create a map of all users for quick lookups
   const usersMap = useMemo(() => {
     const map = new Map<string, UserProfile>();
-    if (chattedUsers) {
-        chattedUsers.forEach(u => map.set(u.id, u));
-    }
-    if (newContact) {
-        map.set(newContact.id, newContact);
-    }
+    if (usersData) usersData.forEach(u => map.set(u.id, u));
+    if (newContact) map.set(newContact.id, newContact);
     return map;
-  }, [chattedUsers, newContact]);
+  }, [usersData, newContact]);
 
-  // Create the final list of chats to display, including any new potential chat.
+  // 6. Combine 1-on-1 and group chats into a single list
   const displayedChats = useMemo(() => {
     if (!user) return [];
 
-    let existingChats: { meta: ChatMetadata; contact: UserProfile }[] = [];
+    // Process 1-on-1 chats
+    const userChats: ChatListItem[] = (chatMetadata || []).map(meta => {
+      const contactId = meta.participants.find(p => p !== user.uid);
+      const contact = contactId ? usersMap.get(contactId) : undefined;
+      return {
+        id: meta.id,
+        type: 'user',
+        name: contact?.name || 'Unknown User',
+        avatarUrl: contact?.profilePictureUrl,
+        lastMessageText: meta.lastMessageText,
+        lastMessageTimestamp: meta.lastMessageTimestamp,
+        contact: contact,
+      };
+    }).filter(item => !!item.contact);
+    
+    // Process group chats
+    const groupChats: ChatListItem[] = (groups || []).map(group => ({
+        id: group.id,
+        type: 'group',
+        name: group.name,
+        avatarUrl: group.groupPhotoUrl,
+        lastMessageText: group.lastMessageText,
+        lastMessageTimestamp: group.lastMessageTimestamp,
+        group: group,
+    }));
 
-    if (chatMetadata) {
-      existingChats = chatMetadata
-        .map((meta) => {
-          const otherUserId = meta.participants.find((p) => p !== user.uid);
-          const contact = otherUserId ? usersMap.get(otherUserId) : null;
-          return { meta, contact };
-        })
-        .filter(
-          (item): item is { meta: ChatMetadata; contact: UserProfile } =>
-            !!item.contact
-        );
+    let combined = [...userChats, ...groupChats];
+    
+    // Add new potential contact
+    if (newContact && !combined.some(c => c.type === 'user' && c.contact?.id === newContact.id)) {
+        combined.unshift({
+            id: getChatId(user.uid, newContact.id),
+            type: 'user',
+            name: newContact.name,
+            avatarUrl: newContact.profilePictureUrl,
+            lastMessageText: "Start a new conversation",
+            contact: newContact
+        });
     }
 
-    // Sort existing chats by last message timestamp on the client.
-    existingChats.sort((a, b) => {
-      const timeA = a.meta.lastMessageTimestamp?.toMillis() || 0;
-      const timeB = b.meta.lastMessageTimestamp?.toMillis() || 0;
-      return timeB - timeA;
-    });
+    // Sort by last message time
+    combined.sort((a, b) => (b.lastMessageTimestamp?.toMillis() || 0) - (a.lastMessageTimestamp?.toMillis() || 0));
 
-    let combinedItems: {
-      meta: Partial<ChatMetadata>;
-      contact: UserProfile;
-    }[] = existingChats;
+    // Filter by search term
+    if (!searchTerm) return combined;
+    const termLower = searchTerm.toLowerCase();
+    return combined.filter(item => item.name.toLowerCase().includes(termLower));
 
-    // Add a placeholder for a new chat initiated from the Discover page, at the top.
-    if (newContact && !chattedUserIds?.includes(newContact.id)) {
-      combinedItems.unshift({
-        meta: {
-          id: getChatId(user.uid, newContact.id),
-          participants: [user.uid, newContact.id],
-          lastMessageText: 'Start a conversation',
-        },
-        contact: newContact,
-      });
-    }
-
-    if (!searchTerm) return combinedItems;
-
-    return combinedItems.filter((item) => {
-      const contact = item.contact;
-      if (!contact) return false;
-      const searchTermLower = searchTerm.toLowerCase();
-      const nameMatch = (contact.name || '').toLowerCase().includes(searchTermLower);
-      const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
-      return nameMatch || emailMatch;
-    });
-  }, [chatMetadata, newContact, searchTerm, usersMap, user, chattedUserIds]);
-
-
-  const selectedChat = useMemo(() => {
-    if (!selectedChatId || !usersMap) return null;
-    return usersMap.get(selectedChatId) ?? null;
-  }, [selectedChatId, usersMap]);
+  }, [user, chatMetadata, groups, usersMap, newContact, searchTerm]);
   
-  const handleSelectChat = useCallback((contact: UserProfile) => {
-    setSelectedChatId(contact.id);
-  }, []);
 
-  const isLoading = chatMetadataLoading || (chattedUserIds != null && chattedUserIds.length > 0 && chattedUsersLoading) || newContactLoading;
+  const handleSelectChat = useCallback((chat: ChatListItem) => {
+    setSelectedChat(chat);
+    if(isMobile) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('chatWith');
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [isMobile]);
+
+  const isLoading = chatMetadataLoading || groupsLoading || newContactLoading;
 
   useEffect(() => {
-    if (isLoading || selectedChatId) return;
+    if (isLoading || selectedChat) return;
 
     if (chatWithId) {
-        const userToChatWith = usersMap.get(chatWithId);
-        if (userToChatWith) {
-            handleSelectChat(userToChatWith);
+        const chatToSelect = displayedChats.find(c => c.type === 'user' && c.contact?.id === chatWithId);
+        if (chatToSelect) {
+            handleSelectChat(chatToSelect);
             return;
         }
     }
     
-    if (!isMobile && displayedChats && displayedChats.length > 0) {
-        const firstChatItem = displayedChats[0];
-        if (firstChatItem?.contact) {
-            handleSelectChat(firstChatItem.contact);
-        }
+    if (!isMobile && displayedChats.length > 0) {
+        handleSelectChat(displayedChats[0]);
     }
-  }, [displayedChats, usersMap, selectedChatId, chatWithId, isMobile, handleSelectChat, isLoading]);
+  }, [displayedChats, selectedChat, chatWithId, isMobile, handleSelectChat, isLoading]);
 
-
-  const chatId = useMemo(() => {
-    if (!user || !selectedChatId) return null;
-    return getChatId(user.uid, selectedChatId);
-  }, [user, selectedChatId]);
 
   const messagesCollection = useMemoFirebase(() => {
-    if (!firestore || !chatId) return null;
-    return collection(firestore, 'chats', chatId, 'messages');
-  }, [firestore, chatId]);
+    if (!firestore || !selectedChat) return null;
+    const path = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
+    return collection(firestore, path);
+  }, [firestore, selectedChat]);
 
-  const messageCollectionOptions = useMemo<CollectionOptions>(() => ({
-    orderBy: ['timestamp', 'asc']
-  }), []);
+  const messageCollectionOptions = useMemo<CollectionOptions>(() => ({ orderBy: ['timestamp', 'asc'] }), []);
 
   const { data: messagesData } = useCollection<Message>(messagesCollection, messageCollectionOptions);
-
-  const messages: Message[] = useMemo(() => {
+  
+  const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     return messagesData
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
+            sender: usersMap.get(msg.senderId),
         }))
         .filter(msg => !msg.deletedFor?.includes(user.uid!));
-  }, [messagesData, user?.uid]);
+  }, [messagesData, user?.uid, usersMap]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -274,58 +238,65 @@ export default function ChatPage() {
   }, [messages]);
 
 
-  const urlRegex = /(https?:\/\/[^\s]+)/g;
-
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedChat || !user || !messagesCollection || !chatId) return;
+    if (!newMessage.trim() || !selectedChat || !user || !messagesCollection) return;
 
     const messageText = newMessage;
     setNewMessage('');
-
-    const isLink = urlRegex.test(messageText.trim());
+    const isLink = /(https?:\/\/[^\s]+)/g.test(messageText.trim());
     
-    addDocumentNonBlocking(messagesCollection, {
+    const basePayload = {
       text: messageText,
       senderId: user.uid,
-      recipientId: selectedChat.id,
       timestamp: serverTimestamp(),
       messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
-      chatId: chatId,
-    });
+    };
+    
+    let finalPayload: any = basePayload;
+    if (selectedChat.type === 'user') {
+      finalPayload = { ...basePayload, recipientId: selectedChat.contact?.id, chatId: selectedChat.id };
+    } else {
+      finalPayload = { ...basePayload, memberIds: selectedChat.group?.memberIds };
+    }
+
+    addDocumentNonBlocking(messagesCollection, finalPayload);
     
     const notificationText = isLink ? '🔗 Link' : messageText;
-    
     sendChatNotification({
-        recipientId: selectedChat.id,
+        recipientId: selectedChat.type === 'user' ? selectedChat.contact?.id : undefined,
+        groupId: selectedChat.type === 'group' ? selectedChat.id : undefined,
         senderId: user.uid,
         senderName: user.displayName || 'A new message',
         messageText: notificationText,
     });
   };
 
-  const handleAttachmentClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleAttachmentClick = () => fileInputRef.current?.click();
 
   const uploadMedia = async (file: Blob, type: 'image' | 'video' | 'audio') => {
-    if (!user || !messagesCollection || !chatId || !selectedChat) {
-      return;
-    }
+    if (!user || !messagesCollection || !selectedChat) return;
     setIsUploading(true);
     try {
       const downloadURL = await uploadToCloudinary(file);
 
-      addDocumentNonBlocking(messagesCollection, {
+      const basePayload = {
         text: '',
         senderId: user.uid,
-        recipientId: selectedChat.id,
         timestamp: serverTimestamp(),
         messageType: type,
         mediaUrl: downloadURL,
-        chatId: chatId,
-      });
+      };
+      
+      let finalPayload: any = basePayload;
+      if (selectedChat.type === 'user') {
+        finalPayload = { ...basePayload, recipientId: selectedChat.contact?.id, chatId: selectedChat.id };
+      } else {
+        finalPayload = { ...basePayload, memberIds: selectedChat.group?.memberIds };
+      }
+
+      addDocumentNonBlocking(messagesCollection, finalPayload);
 
       let body = 'Sent a file';
       if (type === 'image') body = '📷 Photo';
@@ -333,7 +304,8 @@ export default function ChatPage() {
       if (type === 'audio') body = '🎤 Voice Message';
 
       sendChatNotification({
-        recipientId: selectedChat.id,
+        recipientId: selectedChat.type === 'user' ? selectedChat.contact?.id : undefined,
+        groupId: selectedChat.type === 'group' ? selectedChat.id : undefined,
         senderId: user.uid,
         senderName: user.displayName || 'A new message',
         messageText: body,
@@ -341,43 +313,19 @@ export default function ChatPage() {
 
     } catch (error) {
       console.error("File upload failed:", error);
-      toast({
-        variant: "destructive",
-        title: "Upload Failed",
-        description: "Could not upload your file. Please try again.",
-      });
+      toast({ variant: "destructive", title: "Upload Failed", description: "Could not upload your file. Please try again." });
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) {
-      return;
-    }
-
+    if (!event.target.files?.[0]) return;
     const file = event.target.files[0];
-    let fileType: 'image' | 'video' | null = null;
-    
-    if (file.type.startsWith('image/')) {
-        fileType = 'image';
-    } else if (file.type.startsWith('video/')) {
-        fileType = 'video';
-    } else {
-        toast({
-            variant: "destructive",
-            title: "Invalid File Type",
-            description: "Please select an image or video file."
-        });
-        return;
-    }
-    
-    if (fileType) {
-        await uploadMedia(file, fileType);
-    }
+    let fileType: 'image' | 'video' | null = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : null;
+    if (fileType) await uploadMedia(file, fileType);
+    else toast({ variant: "destructive", title: "Invalid File Type", description: "Please select an image or video file." });
   };
 
   const handleStartRecording = async () => {
@@ -386,41 +334,19 @@ export default function ChatPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
+      mediaRecorderRef.current.ondataavailable = (event) => { if (event.data.size > 0) audioChunksRef.current.push(event.data); };
       mediaRecorderRef.current.onstop = async () => {
         stream.getTracks().forEach(track => track.stop());
-
-        if (audioChunksRef.current.length === 0) {
-            console.warn("No audio chunks recorded, skipping upload.");
-            return;
-        }
-
+        if (audioChunksRef.current.length === 0) return;
         const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-
-        if (audioBlob.size === 0) {
-            console.warn("Recorded audio blob is empty, skipping upload.");
-            return;
-        }
-
-        await uploadMedia(audioBlob, 'audio');
+        if (audioBlob.size > 0) await uploadMedia(audioBlob, 'audio');
       };
-
       mediaRecorderRef.current.start();
       setIsRecording(true);
     } catch (error) {
       console.error("Could not start recording:", error);
-      toast({
-        variant: "destructive",
-        title: "Recording Error",
-        description: "Could not access microphone. Please check permissions."
-      })
+      toast({ variant: "destructive", title: "Recording Error", description: "Could not access microphone. Please check permissions." });
     }
   };
 
@@ -432,127 +358,71 @@ export default function ChatPage() {
   };
   
   const handleDeleteForMe = (messageId: string) => {
-    if (!chatId || !user) return;
-    const messageRef = doc(firestore, 'chats', chatId, 'messages', messageId);
-    updateDocumentNonBlocking(messageRef, {
-        deletedFor: arrayUnion(user.uid)
-    });
+    if (!selectedChat || !user) return;
+    const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
+    const messageRef = doc(firestore, collectionPath, messageId);
+    updateDocumentNonBlocking(messageRef, { deletedFor: arrayUnion(user.uid) });
   };
 
   const handleDeleteForEveryone = (messageId: string) => {
-    if (!chatId) return;
-    const messageRef = doc(firestore, 'chats', chatId, 'messages', messageId);
+    if (!selectedChat) return;
+    const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
+    const messageRef = doc(firestore, collectionPath, messageId);
     deleteDocumentNonBlocking(messageRef);
   };
 
   const renderMessageContent = (msg: Message) => {
     switch (msg.messageType) {
-      case 'image':
-        return msg.mediaUrl ? (
-          <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer">
-            <Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/>
-          </a>
-        ) : null;
-      case 'video':
-        return msg.mediaUrl ? (
-            <video src={msg.mediaUrl} controls className="rounded-md max-w-xs" />
-        ) : null;
-      case 'audio':
-        return msg.mediaUrl ? (
-          <audio controls src={msg.mediaUrl} className="max-w-full h-10" />
-        ) : null;
-      case 'link':
-         return (
-          <a href={msg.text} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">
-            {msg.text}
-          </a>
-        );
+      case 'image': return msg.mediaUrl ? <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer"><Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/></a> : null;
+      case 'video': return msg.mediaUrl ? <video src={msg.mediaUrl} controls className="rounded-md max-w-xs" /> : null;
+      case 'audio': return msg.mediaUrl ? <audio controls src={msg.mediaUrl} className="max-w-full h-10" /> : null;
+      case 'link': return <a href={msg.text} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">{msg.text}</a>;
       case 'text':
       default:
-        const parts = msg.text.split(urlRegex);
-        return (
-          <p>
-            {parts.map((part, i) =>
-              urlRegex.test(part) ? (
-                <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">
-                  {part}
-                </a>
-              ) : (
-                part
-              )
-            )}
-          </p>
-        );
+        const parts = msg.text.split(/(https?:\/\/[^\s]+)/g);
+        return <p>{parts.map((part, i) => /(https?:\/\/[^\s]+)/g.test(part) ? <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline text-blue-500 hover:text-blue-700">{part}</a> : part)}</p>;
     }
   };
 
   const ChatList = (
     <div className="flex flex-col border-r bg-muted/20 h-full">
-      <div className="p-4">
-        <h1 className="text-2xl font-bold font-headline">Chats</h1>
-        <div className="relative mt-4">
+      <div className="p-4 space-y-4">
+        <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold font-headline">Chats</h1>
+            <CreateGroupDialog open={isCreateGroupOpen} onOpenChange={setIsCreateGroupOpen}>
+                <Button variant="ghost" size="icon">
+                    <Plus className="h-5 w-5" />
+                </Button>
+            </CreateGroupDialog>
+        </div>
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search chats..." 
-            className="pl-10" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+          <Input placeholder="Search chats or groups..." className="pl-10" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
       </div>
       <Separator />
       <ScrollArea className="flex-grow">
         {isLoading ? (
-          <div className="p-4 space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={`skeleton-${i}`} className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-muted-foreground/20 animate-pulse" />
-                <div className="flex-grow space-y-2">
-                  <div className="h-4 w-3/4 rounded bg-muted-foreground/20 animate-pulse" />
-                  <div className="h-3 w-1/2 rounded bg-muted-foreground/20 animate-pulse" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <div className="p-4 space-y-4">{[...Array(5)].map((_, i) => (<div key={i} className="flex items-center gap-4"><div className="h-12 w-12 rounded-full bg-muted-foreground/20 animate-pulse" /><div className="flex-grow space-y-2"><div className="h-4 w-3/4 rounded bg-muted-foreground/20 animate-pulse" /><div className="h-3 w-1/2 rounded bg-muted-foreground/20 animate-pulse" /></div></div>))}</div>
         ) : displayedChats.length > 0 ? (
-          displayedChats.map(({ meta, contact }) => {
-            if (!user || !contact) return null;
-            
-            return (
-              <div
-                key={contact.id}
-                className={cn(
-                  'group relative flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50',
-                  selectedChatId === contact.id && 'bg-accent/80'
+          displayedChats.map((chat) => (
+            <div key={chat.id} className={cn('group relative flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50', selectedChat?.id === chat.id && 'bg-accent/80')} onClick={() => handleSelectChat(chat)}>
+              <Avatar className="w-12 h-12">
+                {chat.type === 'group' ? (
+                  <div className="w-full h-full flex items-center justify-center bg-muted rounded-full"><Users className="w-6 h-6 text-muted-foreground" /></div>
+                ) : (
+                  <>
+                    <AvatarImage src={chat.avatarUrl || `https://picsum.photos/seed/${chat.id}/200`} />
+                    <AvatarFallback>{getInitials(chat.name)}</AvatarFallback>
+                  </>
                 )}
-                onClick={() => handleSelectChat(contact)}
-              >
-                <Avatar>
-                  <AvatarImage
-                    src={contact.profilePictureUrl || `https://picsum.photos/seed/${contact.id}/200`}
-                  />
-                  <AvatarFallback>{getInitials(contact.name)}</AvatarFallback>
-                </Avatar>
-                <div className="flex-grow overflow-hidden">
-                  <p className="font-semibold truncate">{contact.name || contact.email}</p>
-                  <p className="text-sm truncate text-muted-foreground">
-                    {meta?.lastMessageText}
-                  </p>
-                </div>
-                 <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap">
-                    <span>{getMessageTimestamp(meta?.lastMessageTimestamp)}</span>
-                 </div>
-              </div>
-            );
-        })
+              </Avatar>
+              <div className="flex-grow overflow-hidden"><p className="font-semibold truncate">{chat.name}</p><p className="text-sm truncate text-muted-foreground">{chat.lastMessageText}</p></div>
+              <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground whitespace-nowrap"><span>{getMessageTimestamp(chat.lastMessageTimestamp)}</span></div>
+            </div>
+          ))
         ) : (
-          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground">
-            <MessageSquare className="w-10 h-10 mb-4" />
-            <h3 className="font-semibold text-lg text-foreground">No chats found</h3>
-            <p className="text-sm mt-1">
-              Find someone in Discover to start a conversation.
-            </p>
-          </div>
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center text-muted-foreground"><MessageSquare className="w-10 h-10 mb-4" /><h3 className="font-semibold text-lg text-foreground">No Chats Found</h3><p className="text-sm mt-1">Find people in Discover or create a group to start a conversation.</p></div>
         )}
       </ScrollArea>
     </div>
@@ -560,166 +430,66 @@ export default function ChatPage() {
 
   const ChatWindow = selectedChat && user && (
     <div className="flex flex-col h-full">
-      {/* Chat Header */}
       <div className="flex items-center p-3 border-b">
-        {isMobile && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="mr-2"
-            onClick={() => setSelectedChatId(null)}
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-        )}
-        <Avatar>
-          <AvatarImage
-             src={selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`}
-          />
-          <AvatarFallback>{getInitials(selectedChat.name)}</AvatarFallback>
+        {isMobile && <Button variant="ghost" size="icon" className="mr-2" onClick={() => setSelectedChat(null)}><ArrowLeft className="h-6 w-6" /></Button>}
+         <Avatar className="w-10 h-10">
+            {selectedChat.type === 'group' ? (
+                <div className="w-full h-full flex items-center justify-center bg-muted rounded-full"><Users className="w-5 h-5 text-muted-foreground" /></div>
+            ) : (
+                <>
+                <AvatarImage src={selectedChat.avatarUrl || `https://picsum.photos/seed/${selectedChat.id}/200`} />
+                <AvatarFallback>{getInitials(selectedChat.name)}</AvatarFallback>
+                </>
+            )}
         </Avatar>
         <div className="ml-4">
-          <p className="font-semibold text-lg font-headline">
-            {selectedChat.name || selectedChat.email}
-          </p>
-          <p className="text-sm text-muted-foreground">Online</p>
+            <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
+            {selectedChat.type === 'group' && <p className="text-sm text-muted-foreground">{selectedChat.group?.memberIds.length} members</p>}
+             {selectedChat.type === 'user' && <p className="text-sm text-muted-foreground">Online</p>}
         </div>
       </div>
 
-      {/* Messages */}
       <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
         <div className="flex flex-col gap-1">
           {messages.map((msg, index) => {
-             const avatarSrc = msg.own
-                ? user.photoURL || `https://picsum.photos/seed/${user?.uid}/200`
-                : selectedChat.profilePictureUrl || `https://picsum.photos/seed/${selectedChat.id}/200`;
-            const avatarFallback = msg.own
-                ? getInitials(user.displayName)
-                : getInitials(selectedChat.name);
-            
+            const avatarSrc = msg.sender?.profilePictureUrl || `https://picsum.photos/seed/${msg.senderId}/200`;
+            const avatarFallback = getInitials(msg.sender?.name);
             return (
-              <div
-                key={msg.id || index}
-                className={cn(
-                  'group flex items-end max-w-[75%] gap-2 py-2',
-                  msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto'
-                )}
-              >
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align={msg.own ? "end" : "start"}>
-                        <DropdownMenuItem onClick={() => handleDeleteForMe(msg.id)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            <span>Delete for me</span>
-                        </DropdownMenuItem>
-                        {msg.own && (
-                            <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg.id)}>
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    <span>Delete for everyone</span>
-                                </DropdownMenuItem>
-                            </>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+              <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+                 <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align={msg.own ? "end" : "start"}><DropdownMenuItem onClick={() => handleDeleteForMe(msg.id)}><Trash className="mr-2 h-4 w-4" /><span>Delete for me</span></DropdownMenuItem>{msg.own && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg.id)}><Trash2 className="mr-2 h-4 w-4" /><span>Delete for everyone</span></DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>
                 
-                <Avatar className="w-8 h-8 self-start">
-                  <AvatarImage src={avatarSrc} />
-                  <AvatarFallback>{avatarFallback}</AvatarFallback>
+                <Avatar className="w-8 h-8">
+                    <AvatarImage src={avatarSrc} />
+                    <AvatarFallback>{avatarFallback}</AvatarFallback>
                 </Avatar>
 
-                <div
-                  className={cn(
-                    'flex flex-col gap-1',
-                    msg.own ? 'items-end' : 'items-start'
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'rounded-lg',
-                       msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3',
-                       (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2',
-                      msg.own
-                        ? 'bg-primary text-primary-foreground rounded-br-none'
-                        : 'bg-muted rounded-bl-none'
-                    )}
-                  >
+                <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
+                  {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
+                  <div className={cn('rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'bg-primary text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                     {renderMessageContent(msg)}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
                     <span>{getMessageTimestamp(msg.timestamp)}</span>
-                    {msg.own && (
-                        <Check className="h-4 w-4" />
-                    )}
+                    {msg.own && (<Check className="h-4 w-4" />)}
                   </div>
                 </div>
               </div>
             );
           })}
            {isUploading && (
-             <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50">
-               <Avatar className="w-8 h-8">
-                 <AvatarImage src={`https://picsum.photos/seed/${user?.uid}/200`} />
-                 <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
-               </Avatar>
-               <div className="flex flex-col">
-                 <div className="rounded-lg p-3 text-sm bg-primary text-primary-foreground rounded-br-none">
-                   <div className="flex items-center gap-2">
-                     <ImageIcon className="w-4 h-4 animate-pulse" />
-                     <p>Uploading...</p>
-                   </div>
-                 </div>
-               </div>
-             </div>
+             <div className="flex max-w-[75%] gap-2 ml-auto flex-row-reverse opacity-50"><Avatar className="w-8 h-8"><AvatarImage src={user?.photoURL || ''} /><AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback></Avatar><div className="flex flex-col"><div className="rounded-lg p-3 text-sm bg-primary text-primary-foreground rounded-br-none"><div className="flex items-center gap-2"><ImageIcon className="w-4 h-4 animate-pulse" /><p>Uploading...</p></div></div></div></div>
            )}
         </div>
       </ScrollArea>
 
-      {/* Message Input */}
       <div className="p-4 border-t">
         <form onSubmit={handleSendMessage} className="relative">
-          <Input
-            placeholder={isRecording ? "Recording..." : "Type a message..."}
-            className="pr-28"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            disabled={!selectedChat || isUploading || isRecording}
-          />
+          <Input placeholder={isRecording ? "Recording..." : "Type a message..."} className="pr-28" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} disabled={!selectedChat || isUploading || isRecording} />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
-            <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading || isRecording}>
-              <Paperclip className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              type="button"
-              onMouseDown={handleStartRecording}
-              onMouseUp={handleStopRecording}
-              onTouchStart={handleStartRecording}
-              onTouchEnd={handleStopRecording}
-              className={cn(isRecording && "text-red-500")}
-              disabled={!selectedChat || isUploading}
-            >
-               {isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-            </Button>
-            <Button
-              size="icon"
-              className="bg-primary hover:bg-primary/90"
-              type="submit"
-              disabled={!selectedChat || !newMessage.trim() || isUploading || isRecording}
-            >
-              <SendHorizonal className="w-5 h-5" />
-            </Button>
+            <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading || isRecording}><Paperclip className="w-5 h-5" /></Button>
+            <Button variant="ghost" size="icon" type="button" onMouseDown={handleStartRecording} onMouseUp={handleStopRecording} onTouchStart={handleStartRecording} onTouchEnd={handleStopRecording} className={cn(isRecording && "text-red-500")} disabled={!selectedChat || isUploading}>{isRecording ? <Square className="w-5 h-5" /> : <Mic className="w-5 h-5" />}</Button>
+            <Button size="icon" className="bg-primary hover:bg-primary/90" type="submit" disabled={!selectedChat || !newMessage.trim() || isUploading || isRecording}><SendHorizonal className="w-5 h-5" /></Button>
           </div>
         </form>
       </div>
@@ -729,32 +499,7 @@ export default function ChatPage() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex-grow grid grid-cols-1 md:grid-cols-[300px_1fr] lg:grid-cols-[350px_1fr] border rounded-lg overflow-hidden glass h-full">
-        {isMobile ? (
-          selectedChat ? (
-            ChatWindow
-          ) : (
-            ChatList
-          )
-        ) : (
-          <>
-            {ChatList}
-            {ChatWindow ? (
-              ChatWindow
-            ) : (
-              <div className="flex flex-col h-full items-center justify-center text-center p-8 bg-background/30">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent to-primary flex items-center justify-center mb-6">
-                  <SendHorizonal className="w-10 h-10 text-primary-foreground" />
-                </div>
-                <h2 className="text-2xl font-bold font-headline">
-                  Welcome to ConnectSphere Chat
-                </h2>
-                <p className="text-muted-foreground mt-2">
-                  Select a user from the list to start messaging.
-                </p>
-              </div>
-            )}
-          </>
-        )}
+        {isMobile ? (selectedChat ? ChatWindow : ChatList) : (<>{ChatList}{ChatWindow ? ChatWindow : <div className="flex flex-col h-full items-center justify-center text-center p-8 bg-background/30"><div className="w-20 h-20 rounded-full bg-gradient-to-tr from-accent to-primary flex items-center justify-center mb-6"><SendHorizonal className="w-10 h-10 text-primary-foreground" /></div><h2 className="text-2xl font-bold font-headline">Welcome to ConnectSphere Chat</h2><p className="text-muted-foreground mt-2">Select a chat or create a group to start messaging.</p></div>}</>)}
       </div>
     </div>
   );

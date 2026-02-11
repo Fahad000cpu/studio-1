@@ -10,15 +10,3 @@ generate:
     - outputDir: ../../functions/src/dataconnect-admin-generated
       package: "@dataconnect/admin-generated"
       packageJsonDir: ../../functions
-    - outputDir: ../../cs/src/dataconnect-admin-generated
-      package: "@dataconnect/admin-generated"
-      packageJsonDir: ../../cs
-    - outputDir: ../../codecode_1/src/dataconnect-admin-generated
-      package: "@dataconnect/admin-generated"
-      packageJsonDir: ../../codecode_1
-    - outputDir: ../../codebase_1/src/dataconnect-admin-generated
-      package: "@dataconnect/admin-generated"
-      packageJsonDir: ../../codebase_1
-    - outputDir: ../../codebase/src/dataconnect-admin-generated
-      package: "@dataconnect/admin-generated"
-      packageJsonDir: ../../codebase

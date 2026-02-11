@@ -1,5 +1,5 @@
 
-import type { GeoPoint } from 'firebase/firestore';
+import type { GeoPoint, Timestamp } from 'firebase/firestore';
 
 export type UserProfile = {
     id: string; 
@@ -21,4 +21,16 @@ export type AffiliateProduct = {
     imageUrl: string;
     affiliateLink: string;
     adminId: string;
+};
+
+export type ChatGroup = {
+    id: string;
+    name: string;
+    description?: string;
+    creatorId: string;
+    memberIds: string[];
+    groupPhotoUrl?: string;
+    lastMessageText?: string;
+    lastMessageTimestamp?: Timestamp;
+    timestamp?: Timestamp;
 };
