@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -89,6 +88,7 @@ export default function LoginPage() {
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [authDomainError, setAuthDomainError] = useState<string | null>(null);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -160,13 +160,7 @@ export default function LoginPage() {
             return;
         }
         if (error.code === 'auth/unauthorized-domain') {
-            const domain = window.location.hostname;
-            toast({
-                variant: "destructive",
-                title: "Domain Not Authorized",
-                description: `The domain '${domain}' is not authorized. You must add it to the 'Authorized domains' list in BOTH the Firebase Console (Authentication -> Sign-in method) AND your Google Cloud Console's OAuth client settings.`,
-                duration: 15000,
-            });
+            setAuthDomainError(window.location.hostname);
             return;
         }
         console.error("Google Sign-In Error:", error);
@@ -208,13 +202,8 @@ export default function LoginPage() {
                 duration: 10000,
             });
         } else if (error.code === 'auth/unauthorized-domain') {
-            const domain = window.location.hostname;
-            toast({
-                variant: "destructive",
-                title: "Domain Not Authorized",
-                description: `The domain '${domain}' is not authorized. You must add it to the 'Authorized domains' list in BOTH the Firebase Console (Authentication -> Sign-in method) AND your Facebook For Developers app settings.`,
-                duration: 15000,
-            });
+            setAuthDomainError(window.location.hostname);
+            return;
         } else {
             console.error("Facebook Sign-In Error:", error);
             toast({
@@ -370,9 +359,28 @@ export default function LoginPage() {
           </AlertDialogContent>
         </AlertDialog>
 
+        <AlertDialog open={!!authDomainError} onOpenChange={() => setAuthDomainError(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Domain Not Authorized</AlertDialogTitle>
+                <AlertDialogDescription>
+                    To enable sign-in with this provider, you need to add your app's domain to the list of authorized domains in the Firebase console.
+                    <br/><br/>
+                    <span className="font-bold">Domain to add:</span>
+                    <div className="mt-2 p-2 bg-muted rounded-md font-mono text-sm break-all">
+                    {authDomainError}
+                    </div>
+                    <br/>
+                    Go to your Firebase project, then **Authentication → Settings → Authorized domains**, and click **Add domain**.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setAuthDomainError(null)}>I Understand</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
       </CardContent>
     </Card>
   );
 }
-
-    
