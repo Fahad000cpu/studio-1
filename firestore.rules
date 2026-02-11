@@ -45,23 +45,25 @@ service cloud.firestore {
     //     1-on-1 CHAT METADATA
     // =================================
     match /chat_metadata/{chatId} {
-      // A user can read (get/list) metadata if their UID is part of the document ID.
-      // This is a more robust way to secure list queries as it doesn't rely on `resource.data`.
-      // The client query `where('participants', 'array-contains', uid)` finds the documents,
-      // and this rule secures access to them based on their ID.
-      allow read: if isLoggedIn() && request.auth.uid in chatId.split('_');
-
-      // A user can create new chat metadata ONLY if they are included in the participants list
-      // AND their UID is part of the chatId.
-      allow create: if isLoggedIn() && request.auth.uid in request.resource.data.participants && request.auth.uid in chatId.split('_');
-
-      // A user can update metadata (like last message) if they are a participant.
-      // Checking the chatId is sufficient and more efficient than a get() call.
-      allow update: if isLoggedIn() && request.auth.uid in chatId.split('_');
+      // This is the CRITICAL rule for LIST operations.
+      // It secures the client query: `where('participants', 'array-contains', auth.uid)`
+      // By first checking for the existence of the 'participants' field (`'participants' in resource.data`),
+      // we make the rule "bulletproof" against malformed documents that might lack this field.
+      // This prevents the entire list query from failing.
+      allow read: if isLoggedIn() && 
+                   'participants' in resource.data && 
+                   request.auth.uid in resource.data.participants;
       
+      // Creating a new chat requires the creator to be in the participants list.
+      allow create: if isLoggedIn() && request.auth.uid in request.resource.data.participants;
+      
+      // Updating a chat (e.g., last message) requires being a participant.
+      allow update: if isLoggedIn() && 'participants' in resource.data && request.auth.uid in resource.data.participants;
+
       // Deleting chat metadata is not allowed for users.
       allow delete: if false;
     }
+
 
     // =================================
     //     1-on-1 CHAT MESSAGES
@@ -76,10 +78,11 @@ service cloud.firestore {
     //     GROUP CHATS
     // =================================
     match /groups/{groupId} {
-      // A user can read (get/list) a group's data ONLY if they are a member.
-      // This works with the client query: `where('memberIds', 'array-contains', auth.uid)`.
-      // This rule is also now "bulletproof" against malformed documents.
-      allow read: if isLoggedIn() && 'memberIds' in resource.data && request.auth.uid in resource.data.memberIds;
+      // Secures the client query: `where('memberIds', 'array-contains', auth.uid)`.
+      // Also made "bulletproof" by checking for field existence first.
+      allow read: if isLoggedIn() && 
+                   'memberIds' in resource.data && 
+                   request.auth.uid in resource.data.memberIds;
       
       // A user can create a group ONLY if they are the creator and are included in the member list.
       allow create: if isLoggedIn() && request.resource.data.creatorId == request.auth.uid && 
