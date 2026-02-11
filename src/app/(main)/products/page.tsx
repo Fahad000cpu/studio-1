@@ -59,7 +59,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="w-full space-y-8">
       <Card className="bg-card/80 backdrop-blur-sm">
         <CardHeader>
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
