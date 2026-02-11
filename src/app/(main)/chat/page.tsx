@@ -114,9 +114,11 @@ export default function ChatPage() {
 
     const chatMetaMap = new Map<string, ChatMetadata>();
     (chatMetadata || []).forEach(meta => {
-        const contactId = meta.participants.find(p => p !== user.uid);
-        if (contactId) {
-            chatMetaMap.set(contactId, meta);
+        if (meta && Array.isArray(meta.participants)) {
+            const contactId = meta.participants.find(p => p !== user.uid);
+            if (contactId) {
+                chatMetaMap.set(contactId, meta);
+            }
         }
     });
 
