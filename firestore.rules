@@ -34,9 +34,23 @@ service cloud.firestore {
 
     // --- 1-on-1 CHAT MESSAGES ---
     match /chats/{chatId}/messages/{messageId} {
-      // A user can read/write messages in a chat ONLY if their UID is part of the chatId (e.g., 'uid1_uid2').
-      // This is a simple and effective rule for 1-on-1 chats stored this way.
-      allow read, write: if request.auth != null && request.auth.uid in chatId.split('_');
+      // A user can read messages in a chat ONLY if their UID is part of the chatId.
+      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
+
+      // A user can create a message if they are the sender and part of the chat.
+      allow create: if request.auth != null && 
+                      request.auth.uid in chatId.split('_') &&
+                      request.resource.data.senderId == request.auth.uid;
+      
+      // The sender of the message can delete it for everyone.
+      allow delete: if request.auth != null && 
+                      request.auth.uid == resource.data.senderId;
+
+      // A user in the chat can update a message, but only to add themselves to the 'deletedFor' list.
+      allow update: if request.auth != null && 
+                      request.auth.uid in chatId.split('_') &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
+                      request.resource.data.deletedFor.toSet() == resource.data.deletedFor.toSet().union([request.auth.uid]);
     }
 
     // --- GROUP CHAT RULES ---
@@ -73,19 +87,16 @@ service cloud.firestore {
         allow read: if request.auth != null && 
                      request.auth.uid in resource.data.memberIds;
 
-        // CREATE: User can create a message if they are a group member.
-        // The new message must correctly denormalize the group's member list.
+        // CREATE: User can create a message if they are the sender AND are in the member list they provide.
         allow create: if request.auth != null &&
                        request.resource.data.senderId == request.auth.uid &&
-                       request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds &&
-                       request.resource.data.memberIds == get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+                       request.auth.uid in request.resource.data.memberIds;
 
-        // UPDATE: User can "delete for me" by adding their UID to the deletedFor list.
-        // They must be a member of the group to do this.
+        // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
         allow update: if request.auth != null &&
                        request.auth.uid in resource.data.memberIds &&
                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-                       request.resource.data.deletedFor == resource.data.deletedFor.insert(request.auth.uid);
+                       request.resource.data.deletedFor.toSet() == resource.data.deletedFor.toSet().union([request.auth.uid]);
 
         // DELETE: The sender of the message can delete it for everyone.
         allow delete: if request.auth != null && 
