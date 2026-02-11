@@ -5,7 +5,7 @@ export const uploadToCloudinary = async (file: Blob) => {
   const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
 
   if (!cloudName || !uploadPreset) {
-    throw new Error('Cloudinary environment variables are not set.');
+    throw new Error('Cloudinary environment variables (NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) are not set in the .env file.');
   }
 
   const url = `https://api.cloudinary.com/v1_1/${cloudName}/upload`;

@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { PlusCircle, X, ImagePlus, Send, Heart, Eye } from "lucide-react";
-import { cn, uploadToFirebaseStorage } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, query, where, Timestamp, serverTimestamp, orderBy, getDocs, writeBatch, doc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -256,7 +257,7 @@ export default function StatusPage() {
 
         setIsUploading(true);
         try {
-            const downloadURL = await uploadToFirebaseStorage(statusFile, 'status-updates');
+            const downloadURL = await uploadToCloudinary(statusFile);
             
             const statusCollectionRef = collection(firestore, 'status_updates');
             addDocumentNonBlocking(statusCollectionRef, {
@@ -271,9 +272,9 @@ export default function StatusPage() {
             
             toast({ title: "Status Added!", description: "Your new status is now live." });
             handleCancelAddStatus();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Status upload failed:", error);
-            toast({ variant: "destructive", title: "Upload Failed", description: "Could not add your status." });
+            toast({ variant: "destructive", title: "Upload Failed", description: error.message || "Could not add your status." });
         } finally {
             setIsUploading(false);
         }

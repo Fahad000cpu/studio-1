@@ -158,12 +158,12 @@ export default function SettingsPage() {
         setAvatarKey(Date.now());
         setIsCropperOpen(false);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error uploading avatar:", error);
         toast({
             variant: "destructive",
             title: "Upload Failed",
-            description: "Could not update your profile picture. Please try again."
+            description: error.message || "Could not update your profile picture. Please try again."
         });
     } finally {
         setIsUploading(false);

@@ -14,13 +14,9 @@ service cloud.firestore {
     // Rule for the top-level 'users' collection documents.
     match /users/{userId} {
       // Allow any authenticated user to LIST all users (for Discover page, admin panel, search, etc.)
-      // The query must be allowed if there's any chance it could return a document.
-      // Since our query is broad (`collection('users')`), this rule must also be broad.
-      allow list: if request.auth != null;
+      // and to GET a single user profile. This is crucial for the app to function.
+      allow get, list: if request.auth != null;
       
-      // Allow any authenticated user to GET a single user profile document by its ID.
-      allow get: if request.auth != null;
-
       // Allow a user to write to their own profile, or an admin to write to any profile.
       allow write: if request.auth.uid == userId || isAdmin();
     }
