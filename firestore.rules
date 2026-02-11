@@ -7,22 +7,23 @@ service cloud.firestore {
     // --- USER PROFILE RULES ---
     // Rule for the main user document at /users/{userId}
     match /users/{userId} {
-      // Any logged-in user can read a user's profile (for discover page, etc.)
+      // Any logged-in user can read another user's profile.
       allow get, list: if request.auth != null;
       // Only the user themselves can write to their own profile.
       allow write: if request.auth.uid == userId;
     }
 
-    // --- USER SUBCOLLECTION FIX ---
-    // This is the definitive rule to allow querying subcollections.
-    // The recursive wildcard `{path=**}` matches any document at any depth
-    // under a specific user's document (e.g., /users/USER_A/chats/CHAT_ID_B).
-    // This is NECESSARY to allow a 'list' operation on a subcollection.
+    // --- DEFINITIVE USER SUBCOLLECTION RULE ---
+    // This is the correct, documented way to secure all data under a user's document.
+    // The recursive wildcard `{path=**}` matches ANY path at ANY depth under /users/{userId}.
+    // This includes the 'chats' collection path itself, which is what a 'list' operation needs.
     match /users/{userId}/{path=**} {
-      // Allows read/write access ONLY if the requesting user's ID matches the
-      // {userId} in the path. This secures all subcollections like 'chats'.
+      // Allows read (get, list) and write (create, update, delete) access ONLY if
+      // the requesting user's ID matches the {userId} in the path.
+      // This secures all subcollections like 'chats'.
       allow read, write: if request.auth.uid == userId;
     }
+
 
     // --- OTHER TOP-LEVEL COLLECTIONS ---
 
