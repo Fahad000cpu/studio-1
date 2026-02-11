@@ -58,7 +58,7 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import type { UserProfile } from '@/types';
 import type { Message, ChatMetadata } from '@/types/chat';
 import { useToast } from '@/hooks/use-toast';
@@ -108,10 +108,10 @@ export default function ChatPage() {
   // Fetch chat metadata for the current user from the new top-level collection.
   const chatMetadataQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
+    // Simplified query to fix permission errors. Sorting is now handled on the client.
     return query(
         collection(firestore, 'chat_metadata'),
-        where('participants', 'array-contains', user.uid),
-        orderBy('lastMessageTimestamp', 'desc')
+        where('participants', 'array-contains', user.uid)
     );
   }, [firestore, user]);
   const { data: chatMetadata, isLoading: chatMetadataLoading } = useCollection<ChatMetadata>(chatMetadataQuery);
@@ -156,40 +156,56 @@ export default function ChatPage() {
   // Create the final list of chats to display, including any new potential chat.
   const displayedChats = useMemo(() => {
     if (!user) return [];
-    
-    let combinedItems: {meta: Partial<ChatMetadata>, contact: UserProfile}[] = [];
+
+    let existingChats: { meta: ChatMetadata; contact: UserProfile }[] = [];
 
     if (chatMetadata) {
-        combinedItems = chatMetadata.map(meta => {
-            const otherUserId = meta.participants.find(p => p !== user.uid);
-            const contact = otherUserId ? usersMap.get(otherUserId) : null;
-            return { meta, contact };
-        }).filter((item): item is { meta: ChatMetadata; contact: UserProfile } => !!item.contact);
+      existingChats = chatMetadata
+        .map((meta) => {
+          const otherUserId = meta.participants.find((p) => p !== user.uid);
+          const contact = otherUserId ? usersMap.get(otherUserId) : null;
+          return { meta, contact };
+        })
+        .filter(
+          (item): item is { meta: ChatMetadata; contact: UserProfile } =>
+            !!item.contact
+        );
     }
 
-    // Add a placeholder for a new chat initiated from the Discover page.
+    // Sort existing chats by last message timestamp on the client.
+    existingChats.sort((a, b) => {
+      const timeA = a.meta.lastMessageTimestamp?.toMillis() || 0;
+      const timeB = b.meta.lastMessageTimestamp?.toMillis() || 0;
+      return timeB - timeA;
+    });
+
+    let combinedItems: {
+      meta: Partial<ChatMetadata>;
+      contact: UserProfile;
+    }[] = existingChats;
+
+    // Add a placeholder for a new chat initiated from the Discover page, at the top.
     if (newContact && !chattedUserIds?.includes(newContact.id)) {
-        combinedItems.unshift({
-            meta: { 
-              id: getChatId(user.uid, newContact.id),
-              participants: [user.uid, newContact.id],
-              lastMessageText: 'Start a conversation' 
-            },
-            contact: newContact,
-        });
+      combinedItems.unshift({
+        meta: {
+          id: getChatId(user.uid, newContact.id),
+          participants: [user.uid, newContact.id],
+          lastMessageText: 'Start a conversation',
+        },
+        contact: newContact,
+      });
     }
 
     if (!searchTerm) return combinedItems;
 
-    return combinedItems.filter(item => {
-        const contact = item.contact;
-        if (!contact) return false;
-        const searchTermLower = searchTerm.toLowerCase();
-        const nameMatch = (contact.name || '').toLowerCase().includes(searchTermLower);
-        const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
-        return nameMatch || emailMatch;
+    return combinedItems.filter((item) => {
+      const contact = item.contact;
+      if (!contact) return false;
+      const searchTermLower = searchTerm.toLowerCase();
+      const nameMatch = (contact.name || '').toLowerCase().includes(searchTermLower);
+      const emailMatch = (contact.email || '').toLowerCase().includes(searchTermLower);
+      return nameMatch || emailMatch;
     });
-
   }, [chatMetadata, newContact, searchTerm, usersMap, user, chattedUserIds]);
 
 
