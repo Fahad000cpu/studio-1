@@ -19,12 +19,11 @@ service cloud.firestore {
       allow write: if request.auth.uid == userId || isAdmin();
     }
     
-    // --- TOP-LEVEL COLLECTION RULES ---
+    // --- CHAT & GROUP RULES ---
 
-    // Rules for one-on-one chat messages stored in the top-level 'chats' collection.
+    // Rules for one-on-one chat messages.
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
-        // A user is a participant if their UID is part of the chatId string (e.g., "uid1_uid2").
         return request.auth != null && request.auth.uid in chatId.split('_');
       }
       function isSender() {
@@ -32,52 +31,34 @@ service cloud.firestore {
       }
       // Participants can read messages and create new ones.
       allow read, create: if isChatParticipant();
-      
-      // "Delete for me" is an update operation. A participant should be able to update their view.
-      allow update: if isChatParticipant();
-
-      // Only the original sender can delete the message for everyone.
-      allow delete: if isSender();
+      allow update: if isChatParticipant(); // For "delete for me"
+      allow delete: if isSender(); // For "delete for everyone"
     }
     
-    // Rule for the new top-level chat metadata collection
+    // Rule for the 1-on-1 chat metadata collection.
     match /chat_metadata/{chatId} {
         // A user can read a chat's metadata if their UID is in the `participants` array.
         // This rule correctly secures list queries using `where('participants', 'array-contains', request.auth.uid)`.
-        allow read: if request.auth.uid in resource.data.participants;
+        allow read: if request.auth != null && request.auth.uid in resource.data.participants;
         // Deny all client-side writes. Metadata is only written by the server action.
         allow write: if false;
     }
 
-    // Rules for status updates.
-    match /status_updates/{statusId} {
-        function isOwner() {
-          return request.auth != null && request.auth.uid == resource.data.userId;
-        }
-        function isCreatingOwnStatus() {
-           return request.auth != null && request.auth.uid == request.resource.data.userId;
-        }
-        function isUpdatingLikesOrViews() {
-          let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
-          return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
-        }
-        allow read: if request.auth != null;
-        allow create: if isCreatingOwnStatus();
-        allow update: if request.auth != null && isUpdatingLikesOrViews();
-        allow delete: if isOwner();
-    }
-    
     // Rules for group metadata.
     match /groups/{groupId} {
-      function isMember() {
-        return request.auth != null && request.auth.uid in resource.data.memberIds;
-      }
       function isGroupCreator() {
         return request.auth != null && resource.data.creatorId == request.auth.uid;
       }
-      allow get, list: if request.auth != null;
+      
+      // Allow reading (get/list) a group doc if the user is a member.
+      // This correctly secures the 'array-contains' query on the 'groups' collection.
+      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      
+      // Allow creating a group if the user is the creator listed in the new document.
       allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
-      allow update: if isMember();
+      // Allow updating a group if the user is a member (e.g., to change name/description).
+      allow update: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      // Only the group creator can delete the group.
       allow delete: if isGroupCreator();
     }
 
@@ -95,6 +76,26 @@ service cloud.firestore {
       allow get, list: if isMember();
       allow create: if isMemberOfNewMessage() && request.resource.data.senderId == request.auth.uid;
       allow update, delete: if false; // Group messages are immutable for now.
+    }
+    
+    // --- OTHER TOP-LEVEL COLLECTIONS ---
+
+    // Rules for status updates.
+    match /status_updates/{statusId} {
+        function isOwner() {
+          return request.auth != null && request.auth.uid == resource.data.userId;
+        }
+        function isCreatingOwnStatus() {
+           return request.auth != null && request.auth.uid == request.resource.data.userId;
+        }
+        function isUpdatingLikesOrViews() {
+          let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+          return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
+        }
+        allow read: if request.auth != null;
+        allow create: if isCreatingOwnStatus();
+        allow update: if request.auth != null && isUpdatingLikesOrViews();
+        allow delete: if isOwner();
     }
 
     // Rules for affiliate products.
