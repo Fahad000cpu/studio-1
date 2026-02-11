@@ -43,7 +43,8 @@ service cloud.firestore {
     // Rule for the new top-level chat metadata collection
     match /chat_metadata/{chatId} {
         // A user can read a chat's metadata if their UID is in the `participants` array.
-        allow read: if request.auth != null && request.auth.uid in resource.data.participants;
+        // This rule correctly secures list queries using `where('participants', 'array-contains', request.auth.uid)`.
+        allow read: if request.auth.uid in resource.data.participants;
         // Deny all client-side writes. Metadata is only written by the server action.
         allow write: if false;
     }
