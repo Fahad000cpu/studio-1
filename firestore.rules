@@ -14,6 +14,7 @@ service cloud.firestore {
     // Rule for the top-level 'users' collection documents.
     match /users/{userId} {
       // Allow any authenticated user to read user profiles (for discover page, etc.).
+      // 'get' is for a single doc, 'list' is for queries. Both are needed.
       allow get, list: if request.auth != null;
       // Allow a user to write to their own profile, or an admin to write to any profile.
       allow write: if request.auth.uid == userId || isAdmin();
