@@ -4,116 +4,94 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // =================================
-    //     HELPER FUNCTIONS
-    // =================================
-    function isLoggedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isLoggedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
-
-    // =================================
     //     USER PROFILES
     // =================================
     match /users/{userId} {
       // Any logged-in user can get or list profiles.
-      // List is needed for Discover, Admin, and Create Group pages.
-      allow get, list: if isLoggedIn();
+      // This is required for the Discover page, Admin panel, and creating new groups.
+      allow get, list: if request.auth != null;
       
       // A user can create their own profile document.
-      allow create: if isLoggedIn() && request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
 
       // A user can update their own profile, or an admin can update any profile.
-      allow update: if isLoggedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if (request.auth.uid == userId) || (exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
 
       // Only admins can delete user profiles.
-      allow delete: if isAdmin();
+      allow delete: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     // =================================
     //     ADMIN ROLES
     // =================================
     match /roles_admin/{userId} {
-      allow get: if isLoggedIn();
-      allow list: if isAdmin();
-      allow create, delete: if isAdmin();
-      allow update: if false; // Prevent accidental role changes. Use create/delete.
+      // Only an admin can read the admin roles list.
+      allow read: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      
+      // Only an admin can grant or revoke admin roles.
+      allow write: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     // =================================
-    //     1-on-1 CHAT METADATA (TOP-LEVEL)
+    //     1-on-1 CHAT METADATA
     // =================================
     match /chat_metadata/{chatId} {
-      // A user can GET a specific chat's metadata if they are a participant.
-      allow get: if isLoggedIn() && request.auth.uid in resource.data.participants;
+      // A user can read (get/list) chat metadata ONLY if they are a participant.
+      // This rule works with the client-side query: `where('participants', 'array-contains', auth.uid)`.
+      allow read: if request.auth.uid in resource.data.participants;
 
-      // A user can LIST chats, but ONLY if the query filters for their own chats.
-      // This rule ensures that a user cannot list all chats in the database.
-      // It works with the client query: where('participants', 'array-contains', auth.uid).
-      allow list: if isLoggedIn() && request.auth.uid in resource.data.participants;
+      // A user can create new chat metadata ONLY if they are included in the participants list.
+      allow create: if request.auth.uid in request.resource.data.participants;
 
-      // A user can CREATE metadata if they are one of the participants in the new document.
-      allow create: if isLoggedIn() && request.auth.uid in request.resource.data.participants;
-
-      // A user can UPDATE metadata (e.g., last message) if they are already a participant in that chat.
-      allow update: if isLoggedIn() && get(/databases/$(database)/documents/chat_metadata/$(chatId)).data.participants.hasAny([request.auth.uid]);
+      // A user can update metadata (like last message) ONLY if they are a participant.
+      // We use `get()` to check the existing document's state before allowing the update.
+      allow update: if request.auth.uid in get(/databases/$(database)/documents/chat_metadata/$(chatId)).data.participants;
+      
+      // Deleting chat metadata is not allowed for users.
+      allow delete: if false;
     }
 
     // =================================
     //     1-on-1 CHAT MESSAGES
     // =================================
     match /chats/{chatId}/messages/{messageId} {
-      function isParticipant() {
-        return isLoggedIn() && (request.auth.uid in chatId.split('_'));
-      }
-      allow read: if isParticipant();
-      allow create: if isParticipant() && request.resource.data.senderId == request.auth.uid;
-      allow update: if isParticipant(); // For "delete for me"
-      allow delete: if isLoggedIn() && resource.data.senderId == request.auth.uid; // For "delete for everyone"
+      // A user can read/write messages in a chat ONLY if their UID is part of the chatId.
+      // This pattern assumes chatId is 'uid1_uid2'.
+      allow read, write: if request.auth.uid in chatId.split('_');
     }
 
     // =================================
     //     GROUP CHATS
     // =================================
     match /groups/{groupId} {
-      function isMember() {
-        return isLoggedIn() && request.auth.uid in resource.data.memberIds;
-      }
-      function isCreator() {
-        return isLoggedIn() && request.auth.uid == resource.data.creatorId;
-      }
+      // A user can read (get/list) a group's data ONLY if they are a member.
+      // This works with the client query: `where('memberIds', 'array-contains', auth.uid)`.
+      allow read: if request.auth.uid in resource.data.memberIds;
       
-      // A user can GET a group if they are a member.
-      allow get: if isMember();
-
-      // A user can LIST groups, but ONLY if the query filters for groups they are in.
-      // Works with the client query: where('memberIds', 'array-contains', auth.uid).
-      allow list: if isLoggedIn() && request.auth.uid in resource.data.memberIds;
-      
-      // A user can CREATE a group if they are the creator and included in the member list.
-      allow create: if isLoggedIn() &&
-                     request.resource.data.creatorId == request.auth.uid &&
+      // A user can create a group ONLY if they are the creator and are included in the member list.
+      allow create: if request.resource.data.creatorId == request.auth.uid && 
                      request.auth.uid in request.resource.data.memberIds;
 
-      // The creator or an admin can UPDATE group details.
-      allow update: if isCreator() || isAdmin();
+      // The creator or an admin can update group details (e.g., name, description).
+      allow update: if resource.data.creatorId == request.auth.uid || 
+                     exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
 
-      // The creator or an admin can DELETE a group.
-      allow delete: if isCreator() || isAdmin();
+      // The creator or an admin can delete a group.
+      allow delete: if resource.data.creatorId == request.auth.uid || 
+                     exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
       
       // --- NESTED: GROUP MESSAGES ---
       match /messages/{messageId} {
-        // For reading, check the denormalized member list on the message itself for efficiency.
-        allow read: if isLoggedIn() && request.auth.uid in resource.data.memberIds;
+        // A user can read messages if they are a member of the parent group.
+        // This requires a 'get()' call, which has a small performance cost but is very secure.
+        allow read: if request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
         
-        // For writing, we MUST verify against the canonical source of truth (the group document).
-        allow create: if isLoggedIn() && 
-                       request.resource.data.senderId == request.auth.uid &&
+        // A user can create a message if they are the sender and a member of the group.
+        allow create: if request.resource.data.senderId == request.auth.uid &&
                        request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
 
-        allow update, delete: if false; // Group messages are immutable
+        // Group messages are immutable for now.
+        allow update, delete: if false;
       }
     }
 
@@ -121,21 +99,30 @@ service cloud.firestore {
     //     STATUS UPDATES
     // =================================
     match /status_updates/{statusId} {
-      function isOwner() {
-        return isLoggedIn() && request.auth.uid == resource.data.userId;
-      }
-      allow read: if isLoggedIn();
-      allow create: if isLoggedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isLoggedIn() && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'views']) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']));
-      allow delete: if isOwner() || isAdmin();
+      // Any logged-in user can read status updates.
+      allow read: if request.auth != null;
+      
+      // A user can only create a status for themselves.
+      allow create: if request.resource.data.userId == request.auth.uid;
+      
+      // Anyone can update 'likes' and 'views', but only the owner can change other fields.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'views']) || 
+                     (request.auth.uid == resource.data.userId);
+                     
+      // The owner or an admin can delete a status.
+      allow delete: if request.auth.uid == resource.data.userId || 
+                     exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     // =================================
     //     AFFILIATE PRODUCTS
     // =================================
     match /affiliate_products/{productId} {
-      allow read: if isLoggedIn();
-      allow write: if isAdmin();
+      // Any logged-in user can view products.
+      allow read: if request.auth != null;
+      
+      // Only admins can add, update, or delete products.
+      allow write: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
   }
 }
