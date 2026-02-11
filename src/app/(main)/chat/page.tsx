@@ -14,7 +14,7 @@ import {
   arrayUnion,
   documentId,
 } from 'firebase/firestore';
-import { format, isToday, isYesterday } from 'date-fns';
+import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,21 @@ const getMessageTimestamp = (timestamp: Timestamp | Date | undefined | null): st
   if (isToday(date)) return format(date, 'p');
   if (isYesterday(date)) return 'Yesterday';
   return format(date, 'dd/MM/yyyy');
+};
+
+const getPresenceStatus = (lastActive?: Timestamp | Date): string => {
+  if (!lastActive) return 'Offline';
+
+  const lastActiveDate = lastActive instanceof Timestamp ? lastActive.toDate() : lastActive;
+  const now = new Date();
+  // Difference in minutes
+  const diffInMinutes = (now.getTime() - lastActiveDate.getTime()) / (1000 * 60);
+
+  if (diffInMinutes < 2) {
+    return 'Online';
+  }
+
+  return `Last seen ${formatDistanceToNow(lastActiveDate, { addSuffix: true })}`;
 };
 
 
@@ -445,7 +460,7 @@ export default function ChatPage() {
         <div className="ml-4">
             <p className="font-semibold text-lg font-headline">{selectedChat.name}</p>
             {selectedChat.type === 'group' && <p className="text-sm text-muted-foreground">{selectedChat.group?.memberIds.length} members</p>}
-             {selectedChat.type === 'user' && <p className="text-sm text-muted-foreground">Online</p>}
+             {selectedChat.type === 'user' && <p className="text-sm text-muted-foreground">{getPresenceStatus(selectedChat.contact?.lastActive)}</p>}
         </div>
       </div>
 

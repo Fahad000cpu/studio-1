@@ -1,9 +1,10 @@
 
 "use client";
 
-import { useUser } from "@/firebase";
+import { useUser, useFirestore, updateDocumentNonBlocking } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { doc } from 'firebase/firestore';
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -29,6 +30,7 @@ export default function MainLayout({
 }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const firestore = useFirestore();
 
   useEffect(() => {
     // If auth state is resolved and there's no user, redirect to login.
@@ -36,6 +38,41 @@ export default function MainLayout({
       router.replace("/login");
     }
   }, [isUserLoading, user, router]);
+
+  useEffect(() => {
+    if (!user || !firestore) return;
+
+    const userRef = doc(firestore, 'users', user.uid);
+    let intervalId: NodeJS.Timeout;
+
+    const updatePresence = () => {
+      // Use non-blocking update for a smoother user experience
+      updateDocumentNonBlocking(userRef, {
+        lastActive: new Date(),
+      });
+    };
+
+    // Update immediately when layout mounts and user is available
+    updatePresence();
+
+    // Set up an interval to update presence periodically (e.g., every 60 seconds)
+    intervalId = setInterval(updatePresence, 60 * 1000);
+
+    // Update presence when the tab becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updatePresence();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Clean up on component unmount
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, firestore]);
 
   // While loading or if there's no user, show a loader.
   // The useEffect above will handle the redirection.

@@ -11,6 +11,7 @@ export type UserProfile = {
     fcmTokens: string[];
     profilePictureUrl?: string;
     createdAt?: Date;
+    lastActive?: Timestamp;
 };
 
 export type AffiliateProduct = {

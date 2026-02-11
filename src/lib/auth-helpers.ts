@@ -41,6 +41,7 @@ export const handleUserProfileUpdate = (
                 coordinates: null,
                 fcmTokens: [],
                 createdAt: new Date(),
+                lastActive: new Date(),
             };
             // Do not await this. Let it run in the background.
             setDoc(userRef, userProfile).catch(e => {
