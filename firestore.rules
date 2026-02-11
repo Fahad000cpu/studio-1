@@ -26,16 +26,10 @@ service cloud.firestore {
 
     // --- 1-on-1 CHAT METADATA ---
     match /chat_metadata/{chatId} {
-      // Rule for GETTING a SINGLE chat's metadata. We can use robust checks on resource.data.
-      allow get: if request.auth != null && 
-                   'participants' in resource.data &&
-                   resource.data.participants is list &&
-                   request.auth.uid in resource.data.participants;
-      
-      // Rule for LISTING multiple chats. This rule MUST match the query constraint.
-      // It cannot perform deep checks on resource.data like the 'get' rule.
-      allow list: if request.auth != null && 
-                   request.auth.uid in resource.data.participants;
+      // This rule allows a user to read a chat's metadata (both get and list)
+      // if their UID is in the 'participants' array.
+      // This rule directly corresponds to the client-side `where('participants', 'array-contains', uid)` query.
+      allow read: if request.auth != null && request.auth.uid in resource.data.participants;
 
       // A user can create a chat metadata doc IF they are in the incoming participants list.
       allow create: if request.auth != null && 
@@ -44,10 +38,7 @@ service cloud.firestore {
                      request.auth.uid in request.resource.data.participants;
       
       // A user can update a chat's metadata (e.g., last message) IF they are a participant.
-      allow update: if request.auth != null && 
-                     'participants' in resource.data &&
-                     resource.data.participants is list &&
-                     request.auth.uid in resource.data.participants;
+      allow update: if request.auth != null && request.auth.uid in resource.data.participants;
 
       // Deleting chat metadata is disallowed for data integrity.
       allow delete: if false;
@@ -63,15 +54,9 @@ service cloud.firestore {
 
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
-      // Rule for GETTING a SINGLE group's info. We can use robust checks.
-      allow get: if request.auth != null &&
-                   'memberIds' in resource.data &&
-                   resource.data.memberIds is list &&
-                   request.auth.uid in resource.data.memberIds;
-
-      // Rule for LISTING multiple groups. This rule must match the query constraint.
-      allow list: if request.auth != null &&
-                   request.auth.uid in resource.data.memberIds;
+      // A user can read a group's info (both get and list) if they are a member.
+      // This relies on the client-side query using `where('memberIds', 'array-contains', uid)`.
+      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
       
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
