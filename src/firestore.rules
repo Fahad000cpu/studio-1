@@ -3,15 +3,20 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Rules for 'users' collection and all its subcollections
-    match /users/{userId}/{path=**} {
-      // A user can read and write to their own document and any subcollections within it.
-      allow read, write: if request.auth.uid == userId;
-    }
-
-    // Allow any authenticated user to list the main 'users' collection for discovery purposes.
+    // --- USER PROFILE RULES ---
+    // allow list, get: Any logged-in user can see a list of users for the Discover page.
+    // allow write: A user can only write to their own profile document.
     match /users/{userId} {
       allow list, get: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+    }
+
+    // --- USER SUBCOLLECTION RULES (THE FIX) ---
+    // This rule allows a user to read and write to any document in any
+    // subcollection under their own user document (e.g., '/users/USER_A/chats/CHAT_META_B').
+    // The recursive wildcard `{path=**}` is the key to solving the permission error for listing subcollections.
+    match /users/{userId}/{path=**} {
+      allow read, write: if request.auth.uid == userId;
     }
 
     // Rules for 'status_updates' collection
