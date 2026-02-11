@@ -20,7 +20,7 @@ service cloud.firestore {
 
     // --- USER CHAT METADATA RULES ---
     // This allows a user to read and write their own chat metadata, which enables listing chats.
-    match /users/{userId}/chats/{chatId} {
+    match /users/{userId}/chats/{path=**} {
       allow read, write: if request.auth.uid == userId;
     }
 
