@@ -1,25 +1,5 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "chat_metadata",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "participants",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "participats",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "ASCENDING"
-        }
-      ],
-      "density": "SPARSE_ALL"
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": [
     {
       "collectionGroup": "chat_metadata",
@@ -37,18 +17,25 @@
         {
           "arrayConfig": "CONTAINS",
           "queryScope": "COLLECTION"
-        },
+        }
+      ]
+    },
+    {
+      "collectionGroup": "groups",
+      "fieldPath": "memberIds",
+      "ttl": false,
+      "indexes": [
         {
           "order": "ASCENDING",
-          "queryScope": "COLLECTION_GROUP"
+          "queryScope": "COLLECTION"
         },
         {
           "order": "DESCENDING",
-          "queryScope": "COLLECTION_GROUP"
+          "queryScope": "COLLECTION"
         },
         {
           "arrayConfig": "CONTAINS",
-          "queryScope": "COLLECTION_GROUP"
+          "queryScope": "COLLECTION"
         }
       ]
     }
