@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useState, useMemo } from 'react';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Shield, Send, BellRing, Copy, Link, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
-import { collection, doc, arrayRemove, updateDoc } from 'firebase/firestore';
+import { collection, doc, arrayRemove, updateDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { sendFcmNotification } from '@/ai/flows/send-fcm-notification';
@@ -32,14 +32,23 @@ import {
     AlertDialogTitle,
   } from "@/components/ui/alert-dialog";
 import { DeviceIdFetcher } from '@/components/device-id-fetcher';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export default function AdminPage() {
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
+  const { user: currentUser } = useUser();
   const firestore = useFirestore();
   const { toast } = useToast();
 
   const usersCollectionRef = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersCollectionRef);
+  
+  const adminRolesCollection = useMemoFirebase(() => collection(firestore, 'roles_admin'), [firestore]);
+  const { data: adminRoles, isLoading: adminRolesLoading } = useCollection(adminRolesCollection);
+  
+  const adminUids = useMemo(() => new Set(adminRoles?.map(role => role.id) || []), [adminRoles]);
 
   const [notificationTitle, setNotificationTitle] = useState('');
   const [notificationBody, setNotificationBody] = useState('');
@@ -49,7 +58,7 @@ export default function AdminPage() {
   const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
   const [isDeletingToken, setIsDeletingToken] = useState(false);
   
-  const isLoading = isAdminLoading || usersLoading;
+  const isLoading = isAdminLoading || usersLoading || adminRolesLoading;
 
   const handleSendNotification = async () => {
     if (!notificationTitle || !notificationBody) {
@@ -146,6 +155,24 @@ export default function AdminPage() {
        });
     } finally {
       setIsDeletingToken(false);
+    }
+  };
+
+  const handleToggleAdminRole = async (targetUserId: string, newIsAdmin: boolean, targetUserName: string) => {
+    if (!firestore || !currentUser || currentUser.uid === targetUserId) return;
+
+    const roleDocRef = doc(firestore, 'roles_admin', targetUserId);
+    try {
+        if (newIsAdmin) {
+            await setDoc(roleDocRef, { grantedAt: serverTimestamp() });
+            toast({ title: "Admin Role Granted", description: `${targetUserName} is now an admin.` });
+        } else {
+            await deleteDoc(roleDocRef);
+            toast({ title: "Admin Role Revoked", description: `${targetUserName} is no longer an admin.` });
+        }
+    } catch (error) {
+        console.error("Error toggling admin role:", error);
+        toast({ variant: "destructive", title: "Operation Failed", description: "Could not update admin role. See console for details." });
     }
   };
 
@@ -260,9 +287,9 @@ export default function AdminPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>User Push Notification Tokens (FCM)</CardTitle>
+                <CardTitle>User Management</CardTitle>
                 <CardDescription>
-                  List of users and their registered Firebase Cloud Messaging (FCM) tokens for Push Notifications.
+                  Manage users, their notification tokens, and roles.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -275,8 +302,8 @@ export default function AdminPage() {
                       <TableRow>
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
                         <TableHead>FCM Tokens</TableHead>
+                        <TableHead className="text-right">Admin</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -284,7 +311,6 @@ export default function AdminPage() {
                         <TableRow key={u.id}>
                           <TableCell className="font-medium">{u.name}</TableCell>
                           <TableCell>{u.email}</TableCell>
-                          <TableCell>{u.phoneNumber || 'N/A'}</TableCell>
                           <TableCell>
                             {(() => {
                               const validTokens = u.fcmTokens?.filter(Boolean) ?? [];
@@ -310,6 +336,20 @@ export default function AdminPage() {
                               }
                               return <span className="text-muted-foreground text-xs">No tokens</span>;
                             })()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end space-x-2">
+                                <Label htmlFor={`admin-switch-${u.id}`} className={cn("text-xs", currentUser?.uid === u.id && "text-muted-foreground")}>
+                                    {adminUids.has(u.id) ? 'Admin' : 'User'}
+                                </Label>
+                                <Switch
+                                    id={`admin-switch-${u.id}`}
+                                    checked={adminUids.has(u.id)}
+                                    onCheckedChange={(checked) => handleToggleAdminRole(u.id, checked, u.name)}
+                                    disabled={currentUser?.uid === u.id}
+                                    aria-label={`Toggle admin status for ${u.name}`}
+                                />
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
