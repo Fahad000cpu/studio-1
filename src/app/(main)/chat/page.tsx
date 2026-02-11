@@ -12,6 +12,9 @@ import {
   where,
   orderBy,
   arrayUnion,
+  addDoc,
+  updateDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -23,11 +26,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import {
   useUser,
   useFirestore,
-  addDocumentNonBlocking,
   useCollection,
   useMemoFirebase,
-  deleteDocumentNonBlocking,
-  updateDocumentNonBlocking,
 } from '@/firebase';
 import { cn, uploadToCloudinary } from '@/lib/utils';
 import { Search, Paperclip, Mic, SendHorizonal, ArrowLeft, ImageIcon, Square, MoreVertical, Trash, Trash2, Check, MessageSquare, Plus, Users } from 'lucide-react';
@@ -272,7 +272,7 @@ export default function ChatPage() {
       finalPayload = { ...basePayload, memberIds: selectedChat.group?.memberIds };
     }
 
-    addDocumentNonBlocking(messagesCollection, finalPayload);
+    await addDoc(messagesCollection, finalPayload);
     
     const notificationText = isLink ? '🔗 Link' : messageText;
     sendChatNotification({
@@ -310,7 +310,7 @@ export default function ChatPage() {
         finalPayload = { ...basePayload, memberIds: selectedChat.group?.memberIds };
       }
 
-      addDocumentNonBlocking(messagesCollection, finalPayload);
+      await addDoc(messagesCollection, finalPayload);
 
       let body = 'Sent a file';
       if (type === 'image') body = '📷 Photo';
@@ -325,9 +325,9 @@ export default function ChatPage() {
         messageText: body,
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("File upload failed:", error);
-      toast({ variant: "destructive", title: "Upload Failed", description: "Could not upload your file. Please try again." });
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message || "Could not upload your file. Please try again." });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -371,18 +371,18 @@ export default function ChatPage() {
     }
   };
   
-  const handleDeleteForMe = (messageId: string) => {
+  const handleDeleteForMe = async (messageId: string) => {
     if (!selectedChat || !user || !firestore) return;
     const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
     const messageRef = doc(firestore, collectionPath, messageId);
-    updateDocumentNonBlocking(messageRef, { deletedFor: arrayUnion(user.uid) });
+    await updateDoc(messageRef, { deletedFor: arrayUnion(user.uid) });
   };
 
-  const handleDeleteForEveryone = (messageId: string) => {
+  const handleDeleteForEveryone = async (messageId: string) => {
     if (!selectedChat || !firestore) return;
     const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
     const messageRef = doc(firestore, collectionPath, messageId);
-    deleteDocumentNonBlocking(messageRef);
+    await deleteDoc(messageRef);
   };
 
   const renderMessageContent = (msg: Message) => {
@@ -423,7 +423,12 @@ export default function ChatPage() {
             <div key={chat.id} className={cn('group relative flex items-center gap-4 p-4 cursor-pointer hover:bg-accent/50', selectedChat?.id === chat.id && 'bg-accent/80')} onClick={() => handleSelectChat(chat)}>
               <Avatar className="w-12 h-12">
                 {chat.type === 'group' ? (
-                  <div className="w-full h-full flex items-center justify-center bg-muted rounded-full"><Users className="w-6 h-6 text-muted-foreground" /></div>
+                  <>
+                    <AvatarImage src={chat.avatarUrl} />
+                    <AvatarFallback>
+                        <Users className="w-6 h-6 text-muted-foreground" />
+                    </AvatarFallback>
+                  </>
                 ) : (
                   <>
                     <AvatarImage src={chat.avatarUrl || `https://picsum.photos/seed/${chat.id}/200`} />
@@ -448,7 +453,12 @@ export default function ChatPage() {
         {isMobile && <Button variant="ghost" size="icon" className="mr-2" onClick={() => setSelectedChat(null)}><ArrowLeft className="h-6 w-6" /></Button>}
          <Avatar className="w-10 h-10">
             {selectedChat.type === 'group' ? (
-                <div className="w-full h-full flex items-center justify-center bg-muted rounded-full"><Users className="w-5 h-5 text-muted-foreground" /></div>
+                <>
+                    <AvatarImage src={selectedChat.avatarUrl} />
+                    <AvatarFallback>
+                        <Users className="w-5 h-5 text-muted-foreground" />
+                    </AvatarFallback>
+                </>
             ) : (
                 <>
                 <AvatarImage src={selectedChat.avatarUrl || `https://picsum.photos/seed/${selectedChat.id}/200`} />
@@ -518,3 +528,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
