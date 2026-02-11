@@ -4,43 +4,45 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // --- USER PROFILE RULES ---
-    // allow list, get: Any logged-in user can see a list of users for the Discover page.
-    // allow write: A user can only write to their own profile document.
+    // Rule for the main user document at /users/{userId}
     match /users/{userId} {
-      allow list, get: if request.auth != null;
+      // Any logged-in user can read a user's profile (for discover page, etc.)
+      allow get, list: if request.auth != null;
+      // Only the user themselves can write to their own profile.
       allow write: if request.auth.uid == userId;
     }
 
-    // --- USER SUBCOLLECTION RULES (THE FIX) ---
-    // This rule allows a user to read and write to any document in any
-    // subcollection under their own user document (e.g., '/users/USER_A/chats/CHAT_META_B').
-    // The recursive wildcard `{path=**}` is the key to solving the permission error for listing subcollections.
+    // --- USER SUBCOLLECTION FIX ---
+    // This is the definitive rule to allow querying subcollections.
+    // The recursive wildcard `{path=**}` matches any document at any depth
+    // under a specific user's document (e.g., /users/USER_A/chats/CHAT_ID_B).
+    // This is NECESSARY to allow a 'list' operation on a subcollection.
+    // A rule on '/users/{userId}/chats/{chatId}' is NOT sufficient for a 'list'.
     match /users/{userId}/{path=**} {
+      // Allows read/write access ONLY if the requesting user's ID matches the
+      // {userId} in the path. This secures the subcollections.
       allow read, write: if request.auth.uid == userId;
     }
 
-    // Rules for 'status_updates' collection
+    // --- OTHER TOP-LEVEL COLLECTIONS ---
+
     match /status_updates/{statusId} {
         function isOwner() {
           return request.auth != null && request.auth.uid == resource.data.userId;
         }
-
         function isCreatingOwnStatus() {
            return request.auth != null && request.auth.uid == request.resource.data.userId;
         }
-
         function isUpdatingLikesOrViews() {
           let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
           return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
         }
-
         allow read: if request.auth != null;
         allow create: if isCreatingOwnStatus();
         allow update: if request.auth != null && isUpdatingLikesOrViews();
         allow delete: if isOwner();
     }
 
-    // Rules for one-on-one 'chats' (the messages themselves)
     match /chats/{chatId}/messages/{messageId} {
       function isChatParticipant() {
         return request.auth != null && request.auth.uid in chatId.split('_');
@@ -48,13 +50,11 @@ service cloud.firestore {
       function isSender() {
         return request.auth != null && request.auth.uid == resource.data.senderId;
       }
-
       allow read, create: if isChatParticipant();
       allow delete: if isSender();
       allow update: if false; // Messages are immutable
     }
 
-    // Rules for 'groups' collection and its subcollections
     match /groups/{groupId} {
       function isSignedIn() {
         return request.auth != null;
@@ -65,40 +65,33 @@ service cloud.firestore {
       function isGroupCreator() {
         return isSignedIn() && resource.data.creatorId == request.auth.uid;
       }
-
       allow get, list: if isSignedIn();
       allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
       allow update: if isMember();
       allow delete: if isGroupCreator();
     }
 
-    // Rules for group chat messages
     match /groups/{groupId}/messages/{messageId} {
       function isGroupMember() {
           return request.auth != null && get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.hasAny([request.auth.uid]);
       }
-
       allow get, list: if isGroupMember();
       allow create: if isGroupMember() && request.resource.data.groupId == groupId;
       allow update, delete: if false; // Group messages are immutable
     }
 
-    // Rules for 'affiliate_products' collection
     match /affiliate_products/{productId} {
       function isAdmin() {
           return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
       }
-
       allow read: if request.auth != null;
       allow create, update, delete: if isAdmin();
     }
 
-    // Rules for 'roles_admin' collection
     match /roles_admin/{userId} {
        function isAdmin() {
            return request.auth != null && request.auth.token.email == 'fahadkhanamrohivi@gmail.com';
        }
-
        allow get, list, create, delete: if isAdmin();
        allow update: if false;
     }
