@@ -14,7 +14,7 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Shield, Send, BellRing, Copy, Link, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Shield, Send, BellRing, Copy, Link, Image as ImageIcon, Trash2, Search } from 'lucide-react';
 import { useAdmin } from '@/hooks/use-admin';
 import { collection, doc, arrayRemove, updateDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
 import type { UserProfile } from '@/types';
@@ -57,8 +57,20 @@ export default function AdminPage() {
   const [isSending, setIsSending] = useState(false);
   const [tokenToDelete, setTokenToDelete] = useState<{userId: string, token: string, userName: string} | null>(null);
   const [isDeletingToken, setIsDeletingToken] = useState(false);
-  
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+
   const isLoading = isAdminLoading || usersLoading || adminRolesLoading;
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    if (!userSearchTerm) return users;
+
+    const lowercasedTerm = userSearchTerm.toLowerCase();
+    return users.filter(u => 
+        (u.name || '').toLowerCase().includes(lowercasedTerm) || 
+        (u.email || '').toLowerCase().includes(lowercasedTerm)
+    );
+  }, [users, userSearchTerm]);
 
   const handleSendNotification = async () => {
     if (!notificationTitle || !notificationBody) {
@@ -293,6 +305,15 @@ export default function AdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                <div className="relative mb-6">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        placeholder="Search users by name or email..."
+                        className="pl-10"
+                        value={userSearchTerm}
+                        onChange={(e) => setUserSearchTerm(e.target.value)}
+                    />
+                </div>
                 {isLoading ? (
                   <p className="text-muted-foreground">Loading user data...</p>
                 ) : (
@@ -307,7 +328,7 @@ export default function AdminPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {users?.map(u => (
+                      {filteredUsers?.map(u => (
                         <TableRow key={u.id}>
                           <TableCell className="font-medium">{u.name}</TableCell>
                           <TableCell>{u.email}</TableCell>
@@ -355,6 +376,11 @@ export default function AdminPage() {
                       ))}
                     </TableBody>
                   </Table>
+                  {filteredUsers?.length === 0 && (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <p>No users found{userSearchTerm ? ` for "${userSearchTerm}"` : ''}.</p>
+                    </div>
+                  )}
                   </div>
                 )}
               </CardContent>
