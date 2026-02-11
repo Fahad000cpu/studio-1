@@ -1,3 +1,4 @@
+
 'use client';
 
 import { getApp } from 'firebase/app';
@@ -46,7 +47,10 @@ export const requestPermission = async (firestore: Firestore, user: User): Promi
     const app = getApp();
     const messagingInstance = getMessaging(app);
     
-    const currentToken = await getToken(messagingInstance, { serviceWorkerRegistration: swRegistration });
+    const currentToken = await getToken(messagingInstance, {
+      serviceWorkerRegistration: swRegistration,
+      vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+    });
 
     if (currentToken) {
       const userDocRef = doc(firestore, 'users', user.uid);
