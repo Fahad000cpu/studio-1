@@ -10,7 +10,7 @@ export default function DiscoverPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   return (
-    <div className="w-full space-y-8">
+    <div className="w-full space-y-8 p-4 md:p-6">
       <NotificationPermissionAlert />
       <div>
         <div className="mb-8 bg-card/80 p-6 rounded-lg shadow-lg backdrop-blur-sm space-y-4">
