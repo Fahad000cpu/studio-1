@@ -619,12 +619,11 @@ export default function ChatPage() {
                   </div>
                 </div>
                 {msg.messageType !== 'deleted' && (
-                  <div className="shrink-0">
+                  <div className="shrink-0 z-10">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                           <MoreVertical className="h-4 w-4" />
-                        </Button>
+                      <DropdownMenuTrigger className="flex items-center justify-center h-8 w-8 rounded-full hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                        <MoreVertical className="h-4 w-4" />
+                        <span className="sr-only">Message options</span>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align={msg.own ? 'end' : 'start'}>
                         <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
