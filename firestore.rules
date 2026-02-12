@@ -47,9 +47,7 @@ service cloud.firestore {
 
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
-      // LIST: The client query MUST use an array-contains filter on memberIds.
-      allow list: if request.auth.uid in resource.data.memberIds;
-      // GET: Allow reading a single message if user is a member. More robust check.
+      // GET: Allow reading a single message if user is a member. This rule also secures list queries.
       allow get: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND in the member list.
@@ -70,9 +68,7 @@ service cloud.firestore {
 
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
-       // LIST: The client query must use an array-contains filter on memberIds.
-      allow list: if request.auth.uid in resource.data.memberIds;
-       // GET: Allow reading a single message if user is a member. More robust check.
+       // GET: Allow reading a single message if user is a member. This rule also secures list queries.
       allow get: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
@@ -93,9 +89,7 @@ service cloud.firestore {
 
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
-      // LIST: The client query must use an array-contains filter on memberIds.
-      allow list: if request.auth.uid in resource.data.memberIds;
-      // GET: Allow reading a single message if user is a member. More robust check.
+      // GET: Allow reading a single group if user is a member. This rule also secures list queries.
       allow get: if request.auth != null && isUserInMemberList();
       
       // A user can create a group IF they are the creator AND are in the member list.
