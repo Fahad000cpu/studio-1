@@ -603,14 +603,14 @@ export default function ChatPage() {
             const isDeletableForEveryone = msg.own && msg.timestamp && (Date.now() - (msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : msg.timestamp).getTime()) < 15 * 60 * 1000;
             
             return (
-              <div key={msg.id} className={cn('group flex max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                <Avatar className="w-8 h-8 shrink-0 self-end">
+              <div key={msg.id} className={cn('group flex items-end gap-2 py-2 max-w-[85%]', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+                <Avatar className="w-8 h-8 shrink-0">
                   <AvatarImage src={avatarSrc} />
                   <AvatarFallback>{avatarFallback}</AvatarFallback>
                 </Avatar>
                 <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
-                  <div className={cn('rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
+                  <div className={cn('rounded-lg p-3 break-words', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                     {renderMessageContent(msg)}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
@@ -619,10 +619,10 @@ export default function ChatPage() {
                   </div>
                 </div>
                 {msg.messageType !== 'deleted' && (
-                  <div className="shrink-0 self-center z-10">
+                  <div className="shrink-0 self-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-50 group-hover:opacity-100">
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
                            <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
