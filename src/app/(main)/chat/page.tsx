@@ -209,9 +209,11 @@ export default function ChatPage() {
       return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
     } else { // group chat
       const collectionPath = `groups/${selectedChat.id}/messages`;
-      // No orderBy here to avoid composite index requirement with array-contains.
-      // We sort on the client-side for group messages.
-      return firestoreQuery(collection(firestore, collectionPath), where('memberIds', 'array-contains', user.uid));
+      return firestoreQuery(
+        collection(firestore, collectionPath), 
+        where('memberIds', 'array-contains', user.uid),
+        orderBy('timestamp', 'asc') // Now we can order by timestamp
+      );
     }
   
   }, [firestore, selectedChat, user]);
@@ -228,26 +230,14 @@ export default function ChatPage() {
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     
-    // Create a mutable copy for sorting
-    const sortedMessages = [...messagesData];
-
-    // For group chats, sort client-side as we removed orderBy from the query
-    if (selectedChat?.type === 'group') {
-      sortedMessages.sort((a, b) => {
-        const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp as Date).getTime()) : 0;
-        const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp as Date).getTime()) : 0;
-        return timeA - timeB;
-      });
-    }
-
-    return sortedMessages
+    return messagesData
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
             sender: allUsersMap.get(msg.senderId),
         }))
         .filter(msg => !msg.deletedFor?.includes(user.uid!));
-  }, [messagesData, user?.uid, allUsersMap, selectedChat?.type]);
+  }, [messagesData, user?.uid, allUsersMap]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -552,9 +542,32 @@ export default function ChatPage() {
           {messages.map((msg, index) => {
             const avatarSrc = msg.sender?.profilePictureUrl || `https://picsum.photos/seed/${msg.senderId}/200`;
             const avatarFallback = getInitials(msg.sender?.name);
+            const isDeletableForEveryone = msg.own && msg.timestamp && (Date.now() - (msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : msg.timestamp).getTime()) < 15 * 60 * 1000;
+            
             return (
               <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                 <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align={msg.own ? "end" : "start"}><DropdownMenuItem onClick={() => handleDeleteForMe(msg)}><Trash className="mr-2 h-4 w-4" /><span>Delete for me</span></DropdownMenuItem>{msg.own && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}><Trash2 className="mr-2 h-4 w-4" /><span>Delete for everyone</span></DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>
+                 <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={msg.own ? "end" : "start"}>
+                        <DropdownMenuItem onClick={() => handleDeleteForMe(msg)}>
+                            <Trash className="mr-2 h-4 w-4" />
+                            <span>Delete for me</span>
+                        </DropdownMenuItem>
+                        {isDeletableForEveryone && (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    <span>Delete for everyone</span>
+                                </DropdownMenuItem>
+                            </>
+                        )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
                 
                 <Avatar className="w-8 h-8">
                     <AvatarImage src={avatarSrc} />
@@ -638,5 +651,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    

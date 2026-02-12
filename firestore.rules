@@ -47,11 +47,14 @@ service cloud.firestore {
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
                       'memberIds' in resource.data &&
-                      resource.data.memberIds.includes(request.auth.uid) &&
+                      resource.data.memberIds is list &&
+                      request.auth.uid in resource.data.memberIds &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
-      // DELETE: The sender of the message can delete it for everyone.
-      allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+      // DELETE: The sender of the message can delete it for everyone, BUT ONLY WITHIN 15 MINUTES.
+      allow delete: if request.auth != null && 
+                       request.auth.uid == resource.data.senderId &&
+                       request.time < resource.data.timestamp + duration.value(15, 'm');
     }
 
     // --- Group Chat Messages ---
@@ -60,6 +63,7 @@ service cloud.firestore {
        // This relies on the client query including `where('memberIds', 'array-contains', auth.uid)`.
       allow read: if request.auth != null &&
                     'memberIds' in resource.data &&
+                    resource.data.memberIds is list &&
                     resource.data.memberIds.includes(request.auth.uid);
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
@@ -72,11 +76,14 @@ service cloud.firestore {
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
                       'memberIds' in resource.data &&
-                      resource.data.memberIds.includes(request.auth.uid) &&
+                      resource.data.memberIds is list &&
+                      request.auth.uid in resource.data.memberIds &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
-      // DELETE: The sender of the message can delete it for everyone.
-      allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+      // DELETE: The sender of the message can delete it for everyone, BUT ONLY WITHIN 15 MINUTES.
+      allow delete: if request.auth != null && 
+                       request.auth.uid == resource.data.senderId &&
+                       request.time < resource.data.timestamp + duration.value(15, 'm');
     }
 
     // --- GROUP CHAT RULES ---
@@ -137,5 +144,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
