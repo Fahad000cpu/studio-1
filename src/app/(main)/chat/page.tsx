@@ -207,10 +207,12 @@ export default function ChatPage() {
   
     const messagesCollectionGroup = collectionGroup(firestore, 'messages');
     
+    // NOTE: We cannot use orderBy('timestamp') here in combination with `array-contains`
+    // on a collection group query. Firestore limitations require a specific composite index
+    // that is often not feasible. We will sort the messages on the client side.
     let q = firestoreQuery(
       messagesCollectionGroup,
-      where('memberIds', 'array-contains', user.uid),
-      orderBy('timestamp', 'asc')
+      where('memberIds', 'array-contains', user.uid)
     );
   
     if (selectedChat.type === 'user' && selectedChat.contact) {
@@ -236,8 +238,14 @@ export default function ChatPage() {
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     
-    // The data is already sorted by timestamp from the Firestore query
-    return messagesData
+    // Sort messages on the client-side as we cannot combine 'array-contains' and 'orderBy' in a single collection group query on the server.
+    const sortedData = [...messagesData].sort((a, b) => {
+        const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()) : 0;
+        const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) : 0;
+        return timeA - timeB;
+    });
+
+    return sortedData
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
