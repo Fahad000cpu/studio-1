@@ -413,9 +413,9 @@ export default function ChatPage() {
   const handleDeleteForMe = async (message: Message) => {
     if (!selectedChat || !user || !firestore) return;
     
-    const collectionPath = message.groupId
-        ? `groups/${message.groupId}/messages`
-        : `chats/${message.chatId}/messages`;
+    const collectionPath = selectedChat.type === 'group'
+        ? `groups/${selectedChat.id}/messages`
+        : `chats/${selectedChat.id}/messages`;
     
     if (!collectionPath) return;
 
@@ -436,9 +436,9 @@ export default function ChatPage() {
   const handleDeleteForEveryone = async (message: Message) => {
     if (!selectedChat || !firestore || !user) return;
     
-    const collectionPath = message.groupId
-        ? `groups/${message.groupId}/messages`
-        : `chats/${message.chatId}/messages`;
+    const collectionPath = selectedChat.type === 'group'
+        ? `groups/${selectedChat.id}/messages`
+        : `chats/${selectedChat.id}/messages`;
 
     if (!collectionPath) return;
 
