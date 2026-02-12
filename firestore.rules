@@ -35,9 +35,11 @@ service cloud.firestore {
     // --- COLLECTION GROUP: MESSAGES ---
     // This rule is for all documents in any 'messages' subcollection (e.g., /chats/{chatId}/messages/{msgId} or /groups/{groupId}/messages/{msgId})
     match /{path=**}/messages/{messageId} {
-      // A user can read a message (get or list) if their UID is in the message's memberIds list.
-      // This works for collection group queries because Firestore evaluates it against each potential document.
-      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      // A user can read a message if their UID is in the message's memberIds list.
+      // This is the secure pattern for collection group queries.
+      allow read: if request.auth != null &&
+                    'memberIds' in resource.data &&
+                    request.auth.uid in resource.data.memberIds;
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
