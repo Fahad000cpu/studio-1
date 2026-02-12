@@ -236,7 +236,7 @@ export default function ChatPage() {
     // Sort messages on the client side to ensure correct order
     const sortedMessages = filteredMessages.sort((a, b) => {
       const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : a.timestamp.getTime()) : 0;
-      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : a.timestamp.getTime()) : 0;
+      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : b.timestamp.getTime()) : 0;
       return timeA - timeB;
     });
     
@@ -412,8 +412,8 @@ export default function ChatPage() {
   const handleDeleteForMe = async (message: Message) => {
     if (!selectedChat || !user || !firestore) return;
     
-    const collectionPath = selectedChat.type === 'group' && selectedChat.group
-        ? `groups/${selectedChat.group.id}/messages`
+    const collectionPath = selectedChat.type === 'group'
+        ? `groups/${selectedChat.id}/messages`
         : `chats/${selectedChat.id}/messages`;
     
     if (!collectionPath) return;
@@ -435,8 +435,8 @@ export default function ChatPage() {
   const handleDeleteForEveryone = async (message: Message) => {
     if (!selectedChat || !firestore || !user) return;
     
-    const collectionPath = selectedChat.type === 'group' && selectedChat.group
-        ? `groups/${selectedChat.group.id}/messages`
+    const collectionPath = selectedChat.type === 'group'
+        ? `groups/${selectedChat.id}/messages`
         : `chats/${selectedChat.id}/messages`;
 
     if (!collectionPath) return;
