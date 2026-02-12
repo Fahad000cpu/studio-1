@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -15,6 +14,10 @@ service cloud.firestore {
       return 'memberIds' in request.resource.data && 
              request.resource.data.memberIds is list && 
              request.auth.uid in request.resource.data.memberIds;
+    }
+
+    function isUserInGroup(groupId) {
+      return request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
     }
 
     // --- USER PROFILE RULES ---
@@ -87,8 +90,9 @@ service cloud.firestore {
                       request.resource.data.senderId == request.auth.uid &&
                       isSenderInMemberList();
 
-      // UPDATE: A member can update a message for deletion.
-      allow update: if request.auth != null && isUserInMemberList() && (
+      // UPDATE: A member of the group can update a message for deletion.
+      // We use isUserInGroup to support old messages without denormalized memberIds.
+      allow update: if request.auth != null && isUserInGroup(groupId) && (
           // Case 1: User is "deleting for me" - Simplified rule to be compatible with arrayUnion
           (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
@@ -113,7 +117,7 @@ service cloud.firestore {
     match /groups/{groupId} {
       // Allow reading a group document if the user is a member.
       allow get: if request.auth != null && isUserInMemberList();
-      allow list: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      allow list: if request.auth != null && request.query.where.size() > 0 && request.query.where[0][2] == request.auth.uid;
 
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
