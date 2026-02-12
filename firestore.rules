@@ -47,54 +47,75 @@ service cloud.firestore {
 
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
-      // READ: Allow reading if the user's UID is part of the chatId.
-      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
+      // READ: Allow reading if the user's UID is part of the memberIds list.
+      allow read: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND in the member list.
       allow create: if request.auth != null &&
                       request.resource.data.senderId == request.auth.uid &&
                       isSenderInMemberList();
 
-      // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
-      allow update: if request.auth != null &&
-                      (request.auth.uid in resource.data.memberIds) &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
+      // UPDATE: A member can update a message for deletion.
+      allow update: if request.auth != null && isUserInMemberList() && (
+          // Case 1: User is "deleting for me"
+          (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
+              request.resource.data.deletedFor == resource.data.deletedFor.concat([request.auth.uid])
+          ) ||
+          // Case 2: Sender is "deleting for everyone" (tombstoning)
+          (
+              request.auth.uid == resource.data.senderId &&
+              request.time < resource.data.timestamp + duration.value(15, 'm') &&
+              request.resource.data.messageType == 'deleted' &&
+              request.resource.data.senderId == resource.data.senderId &&
+              request.resource.data.timestamp == resource.data.timestamp &&
+              request.resource.data.chatId == resource.data.chatId &&
+              request.resource.data.memberIds == resource.data.memberIds
+          )
+      );
 
-      // DELETE: The sender of the message can delete it for everyone, BUT ONLY WITHIN 15 MINUTES.
-      allow delete: if request.auth != null && 
-                       request.auth.uid == resource.data.senderId &&
-                       request.time < resource.data.timestamp + duration.value(15, 'm');
+      // DELETE: Not allowed directly. Use update for tombstoning.
+      allow delete: if false;
     }
 
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
-       // GET (Single Doc): Allow reading if the user is in the message's member list.
-      allow get: if request.auth != null && isUserInMemberList();
-      
-      // LIST (Collection): Allow listing messages if the user is a member of the parent group.
-      allow list: if request.auth != null && request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
+       // READ: Allow reading if the user is in the message's member list.
+      allow read: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
                       request.resource.data.senderId == request.auth.uid &&
                       isSenderInMemberList();
 
-      // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
-      allow update: if request.auth != null &&
-                      isUserInMemberList() &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
+      // UPDATE: A member can update a message for deletion.
+      allow update: if request.auth != null && isUserInMemberList() && (
+          // Case 1: User is "deleting for me"
+          (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
+              request.resource.data.deletedFor == resource.data.deletedFor.concat([request.auth.uid])
+          ) ||
+          // Case 2: Sender is "deleting for everyone" (tombstoning)
+          (
+              request.auth.uid == resource.data.senderId &&
+              request.time < resource.data.timestamp + duration.value(15, 'm') &&
+              request.resource.data.messageType == 'deleted' &&
+              request.resource.data.senderId == resource.data.senderId &&
+              request.resource.data.timestamp == resource.data.timestamp &&
+              request.resource.data.groupId == resource.data.groupId &&
+              request.resource.data.memberIds == resource.data.memberIds
+          )
+      );
 
-      // DELETE: The sender of the message can delete it for everyone, BUT ONLY WITHIN 15 MINUTES.
-      allow delete: if request.auth != null && 
-                       request.auth.uid == resource.data.senderId &&
-                       request.time < resource.data.timestamp + duration.value(15, 'm');
+      // DELETE: Not allowed directly. Use update for tombstoning.
+      allow delete: if false;
     }
 
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
       // Allow reading a group document if the user is a member.
       allow get: if request.auth != null && isUserInMemberList();
-      allow list: if request.auth != null; // List is constrained by client query `where('memberIds', 'array-contains', user.uid)`
+      allow list: if request.auth != null && request.auth.uid in resource.data.memberIds;
 
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 

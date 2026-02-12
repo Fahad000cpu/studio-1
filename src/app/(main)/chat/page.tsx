@@ -14,7 +14,6 @@ import {
   arrayUnion,
   addDoc,
   updateDoc,
-  deleteDoc,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -413,26 +412,61 @@ export default function ChatPage() {
   
   const handleDeleteForMe = async (message: Message) => {
     if (!selectedChat || !user || !firestore) return;
-    const collectionPath = message.chatId 
-      ? `chats/${message.chatId}/messages` 
-      : `groups/${message.groupId}/messages`;
+    
+    const collectionPath = message.groupId
+        ? `groups/${message.groupId}/messages`
+        : `chats/${message.chatId}/messages`;
+    
+    if (!collectionPath) return;
+
     const messageRef = doc(firestore, collectionPath, message.id);
-    await updateDoc(messageRef, { deletedFor: arrayUnion(user.uid) });
+    
+    try {
+        await updateDoc(messageRef, { deletedFor: arrayUnion(user.uid) });
+    } catch (error) {
+        console.error("Error deleting message for me:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not delete this message for you.'
+        });
+    }
   };
 
   const handleDeleteForEveryone = async (message: Message) => {
-    if (!selectedChat || !firestore) return;
-    const collectionPath = message.chatId
-      ? `chats/${message.chatId}/messages`
-      : `groups/${message.groupId}/messages`;
+    if (!selectedChat || !firestore || !user) return;
+    
+    const collectionPath = message.groupId
+        ? `groups/${message.groupId}/messages`
+        : `chats/${message.chatId}/messages`;
+
+    if (!collectionPath) return;
+
     const messageRef = doc(firestore, collectionPath, message.id);
-    await deleteDoc(messageRef);
+    
+    try {
+        await updateDoc(messageRef, {
+            text: '🚫 This message was deleted',
+            messageType: 'deleted',
+            mediaUrl: null,
+            textColor: null
+        });
+    } catch (error) {
+        console.error("Error deleting message for everyone:", error);
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: 'Could not delete this message. You may not have permission or the time limit has expired.'
+        });
+    }
   };
 
   const renderMessageContent = (msg: Message) => {
-    const messageStyle = msg.textColor ? { color: msg.textColor } : {};
+    const messageStyle = msg.textColor && msg.messageType !== 'deleted' ? { color: msg.textColor } : {};
 
     switch (msg.messageType) {
+      case 'deleted':
+        return <p className="italic text-muted-foreground">{msg.text}</p>;
       case 'image': return msg.mediaUrl ? <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer"><Image src={msg.mediaUrl} alt="Sent image" width={200} height={200} className="rounded-md object-cover"/></a> : null;
       case 'video': return msg.mediaUrl ? <video src={msg.mediaUrl} controls className="rounded-md max-w-xs" /> : null;
       case 'audio': return msg.mediaUrl ? <audio controls src={msg.mediaUrl} className="max-w-full h-10" /> : null;
@@ -556,28 +590,30 @@ export default function ChatPage() {
             
             return (
               <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                 <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align={msg.own ? "end" : "start"}>
-                        <DropdownMenuItem onClick={() => handleDeleteForMe(msg)}>
-                            <Trash className="mr-2 h-4 w-4" />
-                            <span>Delete for me</span>
-                        </DropdownMenuItem>
-                        {isDeletableForEveryone && (
-                            <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}>
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    <span>Delete for everyone</span>
-                                </DropdownMenuItem>
-                            </>
-                        )}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                 {msg.messageType !== 'deleted' && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align={msg.own ? "end" : "start"}>
+                            <DropdownMenuItem onClick={() => handleDeleteForMe(msg)}>
+                                <Trash className="mr-2 h-4 w-4" />
+                                <span>Delete for me</span>
+                            </DropdownMenuItem>
+                            {isDeletableForEveryone && (
+                                <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        <span>Delete for everyone</span>
+                                    </DropdownMenuItem>
+                                </>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                 )}
                 
                 <Avatar className="w-8 h-8">
                     <AvatarImage src={avatarSrc} />
@@ -591,7 +627,7 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
                     <span>{getMessageTimestamp(msg.timestamp)}</span>
-                    {msg.own && (<Check className="h-4 w-4" />)}
+                    {msg.own && msg.messageType !== 'deleted' && (<Check className="h-4 w-4" />)}
                   </div>
                 </div>
               </div>

@@ -10,7 +10,7 @@ export type Message = {
   timestamp?: Timestamp | Date;
   own: boolean;
   status?: 'sending' | 'sent' | 'failed';
-  messageType: 'text' | 'image' | 'video' | 'file' | 'audio' | 'link';
+  messageType: 'text' | 'image' | 'video' | 'file' | 'audio' | 'link' | 'deleted';
   mediaUrl?: string | null;
   textColor?: string;
   chatId?: string;
