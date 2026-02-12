@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -56,9 +57,11 @@ service cloud.firestore {
 
       // UPDATE: A member can update a message for deletion.
       allow update: if request.auth != null && isUserInMemberList() && (
-          // Case 1: User is "deleting for me" - Simplified rule to be compatible with arrayUnion
+          // Case 1: User is "deleting for me".
+          // This rule is more robust. It checks that only 'deletedFor' is being changed.
           (
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+              request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
+              'deletedFor' in request.resource.data.diff(resource.data).affectedKeys()
           ) ||
           // Case 2: Sender is "deleting for everyone" (tombstoning)
           (
@@ -85,9 +88,11 @@ service cloud.firestore {
 
       // UPDATE: A member of the group can update a message for deletion.
       allow update: if request.auth != null && isUserInMemberList() && (
-          // Case 1: User is "deleting for me" - Simplified rule to be compatible with arrayUnion
+          // Case 1: User is "deleting for me".
+          // This rule is more robust. It checks that only 'deletedFor' is being changed.
           (
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+              request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
+              'deletedFor' in request.resource.data.diff(resource.data).affectedKeys()
           ) ||
           // Case 2: Sender is "deleting for everyone" (tombstoning)
           (

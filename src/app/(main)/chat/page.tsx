@@ -229,24 +229,32 @@ export default function ChatPage() {
     return new Map(allUsersData.map(u => [u.id, u]));
   }, [allUsersData]);
   
-  const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
-    if (!messagesData || !user?.uid) return [];
+  const [messages, setMessages] = useState<(Message & { sender?: UserProfile })[]>([]);
+
+  useEffect(() => {
+    if (!messagesData || !user?.uid) {
+        setMessages([]);
+        return;
+    };
     
     const filteredMessages = messagesData.filter(msg => !msg.deletedFor?.includes(user.uid!));
 
-    // Sort messages on the client side to ensure correct order
     const sortedMessages = filteredMessages.sort((a, b) => {
-      const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : a.timestamp.getTime()) : 0;
-      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : b.timestamp.getTime()) : 0;
+      const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()) : 0;
+      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) : 0;
       return timeA - timeB;
     });
     
-    return sortedMessages.map(msg => ({
+    const enrichedMessages = sortedMessages.map(msg => ({
         ...msg,
         own: msg.senderId === user?.uid,
         sender: allUsersMap.get(msg.senderId),
     }));
+
+    setMessages(enrichedMessages);
+
   }, [messagesData, user?.uid, allUsersMap]);
+
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -274,6 +282,7 @@ export default function ChatPage() {
       messageType: isLink ? 'link' : 'text',
       mediaUrl: null,
       textColor: textColor || null,
+      deletedFor: [],
     };
     
     let finalPayload: any;
@@ -324,6 +333,7 @@ export default function ChatPage() {
         timestamp: serverTimestamp(),
         messageType: type,
         mediaUrl: downloadURL,
+        deletedFor: [],
       };
       
       let finalPayload: any;
@@ -604,11 +614,13 @@ export default function ChatPage() {
             
             return (
               <div key={msg.id} className={cn('group flex items-end gap-2 py-2 max-w-[85%]', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                <Avatar className="w-8 h-8 shrink-0">
-                  <AvatarImage src={avatarSrc} />
-                  <AvatarFallback>{avatarFallback}</AvatarFallback>
-                </Avatar>
-                <div className={cn('flex flex-1 min-w-0 flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
+                {!msg.own && (
+                  <Avatar className="w-8 h-8 shrink-0">
+                    <AvatarImage src={avatarSrc} />
+                    <AvatarFallback>{avatarFallback}</AvatarFallback>
+                  </Avatar>
+                )}
+                <div className={cn('flex-1 min-w-0 flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
                   <div className={cn('rounded-lg p-3 break-words', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                     {renderMessageContent(msg)}
@@ -619,7 +631,7 @@ export default function ChatPage() {
                   </div>
                 </div>
                 {msg.messageType !== 'deleted' && (
-                  <div className="shrink-0 z-10">
+                  <div className="shrink-0 z-10 self-center">
                     <DropdownMenu>
                       <DropdownMenuTrigger className="flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <MoreVertical className="h-4 w-4" />
