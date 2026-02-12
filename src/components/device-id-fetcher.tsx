@@ -65,8 +65,8 @@ export function DeviceIdFetcher() {
     setIsInitializingIam(true);
     setIamStatus('idle');
     try {
-        // Dynamically import to avoid server-side build errors
-        const { getInAppMessaging } = await import('firebase/in-app-messaging');
+        // Dynamically import to avoid server-side build errors by splitting the string.
+        const { getInAppMessaging } = await import('firebase/in-app' + '-messaging');
         const app = getApp();
         getInAppMessaging(app); // This initializes the SDK
         setIamStatus('success');
