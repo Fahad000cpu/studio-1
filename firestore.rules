@@ -65,10 +65,7 @@ service cloud.firestore {
               request.auth.uid == resource.data.senderId &&
               request.time < resource.data.timestamp + duration.value(15, 'm') &&
               request.resource.data.messageType == 'deleted' &&
-              request.resource.data.senderId == resource.data.senderId &&
-              request.resource.data.timestamp == resource.data.timestamp &&
-              request.resource.data.chatId == resource.data.chatId &&
-              request.resource.data.memberIds == resource.data.memberIds
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'messageType', 'mediaUrl', 'textColor'])
           )
       );
 
@@ -97,10 +94,7 @@ service cloud.firestore {
               request.auth.uid == resource.data.senderId &&
               request.time < resource.data.timestamp + duration.value(15, 'm') &&
               request.resource.data.messageType == 'deleted' &&
-              request.resource.data.senderId == resource.data.senderId &&
-              request.resource.data.timestamp == resource.data.timestamp &&
-              request.resource.data.groupId == resource.data.groupId &&
-              request.resource.data.memberIds == resource.data.memberIds
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'messageType', 'mediaUrl', 'textColor'])
           )
       );
 
@@ -112,7 +106,7 @@ service cloud.firestore {
     match /groups/{groupId} {
       // Allow reading a group document if the user is a member.
       allow get: if request.auth != null && isUserInMemberList();
-      allow list: if request.auth != null && request.query.where.size() > 0 && request.query.where[0][2] == request.auth.uid;
+      allow list: if request.auth != null && request.query.where.size() > 0 && request.query.where[0][0] == 'memberIds' && request.query.where[0][1] == 'array-contains' && request.query.where[0][2] == request.auth.uid;
 
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
