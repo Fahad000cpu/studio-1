@@ -591,28 +591,30 @@ export default function ChatPage() {
             return (
               <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
                  {msg.messageType !== 'deleted' && (
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
-                                <MoreVertical className="h-4 w-4" />
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align={msg.own ? "end" : "start"}>
-                            <DropdownMenuItem onClick={() => handleDeleteForMe(msg)}>
-                                <Trash className="mr-2 h-4 w-4" />
-                                <span>Delete for me</span>
-                            </DropdownMenuItem>
-                            {isDeletableForEveryone && (
-                                <>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}>
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        <span>Delete for everyone</span>
-                                    </DropdownMenuItem>
-                                </>
-                            )}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <div className="shrink-0">
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
+                                  <MoreVertical className="h-4 w-4" />
+                              </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align={msg.own ? "end" : "start"}>
+                              <DropdownMenuItem onClick={() => handleDeleteForMe(msg)}>
+                                  <Trash className="mr-2 h-4 w-4" />
+                                  <span>Delete for me</span>
+                              </DropdownMenuItem>
+                              {isDeletableForEveryone && (
+                                  <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}>
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          <span>Delete for everyone</span>
+                                      </DropdownMenuItem>
+                                  </>
+                              )}
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                  )}
                 
                 <Avatar className="w-8 h-8">
