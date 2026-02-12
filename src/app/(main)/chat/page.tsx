@@ -220,8 +220,7 @@ export default function ChatPage() {
       return firestoreQuery(
         messagesCollectionGroup,
         where('groupId', '==', selectedChat.id),
-        where('memberIds', 'array-contains', user.uid),
-        orderBy('timestamp', 'asc')
+        where('memberIds', 'array-contains', user.uid)
       );
     }
     
@@ -239,7 +238,16 @@ export default function ChatPage() {
   
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
-    return messagesData
+    
+    const getMillis = (ts: Timestamp | Date | undefined | null): number => {
+        if (!ts) return 0;
+        if (ts instanceof Timestamp) return ts.toMillis();
+        return ts.getTime();
+    };
+    
+    const sortedMessages = [...messagesData].sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
+
+    return sortedMessages
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
