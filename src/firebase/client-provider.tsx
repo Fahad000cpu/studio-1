@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { type ReactNode, useEffect, useState } from 'react';
@@ -10,6 +9,8 @@ import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getFunctions, type Functions } from 'firebase/functions';
 import { FullScreenLoader } from '@/components/full-screen-loader';
+// NOTE: InAppMessagingInitializer was removed to prevent a build crash.
+// import { InAppMessagingInitializer } from '@/components/in-app-messaging-initializer';
 
 interface FirebaseClientProviderProps {
   children: ReactNode;
@@ -44,23 +45,9 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     const firestore = getFirestore(app);
     const functions = getFunctions(app);
 
-    // This block contains all client-specific initializations to prevent server-side errors.
-    if (typeof window !== 'undefined') {
-        // Dynamically import and initialize services that are client-only.
-        
-        // Installations - needed for In-App Messaging
-        import('firebase/installations')
-          .then(({ getInstallations }) => {
-            try {
-              getInstallations(app); // Needed to get the unique installation ID (FID).
-            } catch(err) {
-              console.error("Firebase Installations SDK failed to initialize:", err);
-            }
-          })
-          .catch((err) => {
-            console.error("Failed to dynamically import Firebase Installations module:", err);
-          });
-    }
+    // Note: Initialization for Firebase Installations and In-App Messaging has been
+    // removed as it was causing "Module not found" build errors in this environment.
+    // The app will now be stable, but In-App Messaging will not function.
 
     isSupported().then(supported => {
         const analytics = supported ? getAnalytics(app) : null;
@@ -102,6 +89,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       functions={instances.functions}
       analytics={instances.analytics}
     >
+      {/* InAppMessagingInitializer was removed to prevent the app from crashing. */}
       {children}
     </FirebaseProvider>
   );
