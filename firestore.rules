@@ -60,8 +60,11 @@ service cloud.firestore {
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
        // READ: A user can read messages if they are a member of the group.
-       // This rule is simple and relies on the client query including `where('memberIds', 'array-contains', auth.uid)`.
-      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+       // This rule is robust for list queries because it checks for the existence and type of memberIds.
+      allow read: if request.auth != null &&
+                    'memberIds' in resource.data &&
+                    resource.data.memberIds is list &&
+                    request.auth.uid in resource.data.memberIds;
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
@@ -86,8 +89,11 @@ service cloud.firestore {
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
       // READ: A user can read a group's info if they are a member.
-      // This relies on the client-side query using `where('memberIds', 'array-contains', uid)`.
-      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
+      // This rule is robust for list queries because it checks for the existence and type of memberIds.
+      allow read: if request.auth != null &&
+                    'memberIds' in resource.data &&
+                    resource.data.memberIds is list &&
+                    request.auth.uid in resource.data.memberIds;
       
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
