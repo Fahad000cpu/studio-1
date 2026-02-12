@@ -47,8 +47,10 @@ service cloud.firestore {
 
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
-      // READ: User can read messages if they are a member.
-      allow read: if request.auth != null && isUserInMemberList();
+      // LIST: The client query MUST use an array-contains filter on memberIds.
+      allow list: if request.auth.uid in resource.data.memberIds;
+      // GET: Allow reading a single message if user is a member. More robust check.
+      allow get: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND in the member list.
       allow create: if request.auth != null &&
@@ -68,8 +70,10 @@ service cloud.firestore {
 
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
-       // READ: A user can read messages if they are a member of the group.
-      allow read: if request.auth != null && isUserInMemberList();
+       // LIST: The client query must use an array-contains filter on memberIds.
+      allow list: if request.auth.uid in resource.data.memberIds;
+       // GET: Allow reading a single message if user is a member. More robust check.
+      allow get: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
@@ -89,11 +93,10 @@ service cloud.firestore {
 
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
-      // READ: A user can read a group's info if they are a member.
-      allow read: if request.auth != null &&
-                    'memberIds' in resource.data &&
-                    resource.data.memberIds is list &&
-                    request.auth.uid in resource.data.memberIds;
+      // LIST: The client query must use an array-contains filter on memberIds.
+      allow list: if request.auth.uid in resource.data.memberIds;
+      // GET: Allow reading a single message if user is a member. More robust check.
+      allow get: if request.auth != null && isUserInMemberList();
       
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
