@@ -212,7 +212,7 @@ export default function ChatPage() {
       return firestoreQuery(
         collection(firestore, collectionPath), 
         where('memberIds', 'array-contains', user.uid),
-        orderBy('timestamp', 'asc') // Now we can order by timestamp
+        orderBy('timestamp', 'asc')
       );
     }
   
@@ -230,13 +230,13 @@ export default function ChatPage() {
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     
-    return messagesData
-        .map(msg => ({
-            ...msg,
-            own: msg.senderId === user?.uid,
-            sender: allUsersMap.get(msg.senderId),
-        }))
-        .filter(msg => !msg.deletedFor?.includes(user.uid!));
+    const filteredMessages = messagesData.filter(msg => !msg.deletedFor?.includes(user.uid!));
+    
+    return filteredMessages.map(msg => ({
+        ...msg,
+        own: msg.senderId === user?.uid,
+        sender: allUsersMap.get(msg.senderId),
+    }));
   }, [messagesData, user?.uid, allUsersMap]);
 
   useEffect(() => {
@@ -601,7 +601,7 @@ export default function ChatPage() {
             value={newMessage} 
             onChange={(e) => setNewMessage(e.target.value)} 
             disabled={!selectedChat || isUploading || isRecording} 
-            style={{color: textColor || undefined}}
+            style={{color: textColor}}
             />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
@@ -611,7 +611,7 @@ export default function ChatPage() {
             <Popover>
                 <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" type="button" disabled={!selectedChat || isUploading || isRecording}>
-                        <Palette className="w-5 h-5" style={{ color: textColor || 'hsl(var(--foreground))' }}/>
+                        <Palette className="w-5 h-5"/>
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2">
