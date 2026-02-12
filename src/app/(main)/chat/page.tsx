@@ -211,8 +211,7 @@ export default function ChatPage() {
         return firestoreQuery(
             messagesCollectionGroup,
             where('chatId', '==', selectedChat.id),
-            where('memberIds', 'array-contains', user.uid),
-            orderBy('timestamp', 'asc')
+            where('memberIds', 'array-contains', user.uid)
         );
     }
     
