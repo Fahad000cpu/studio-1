@@ -16,10 +16,6 @@ service cloud.firestore {
              request.auth.uid in request.resource.data.memberIds;
     }
 
-    function isUserInGroup(groupId) {
-      return request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
-    }
-
     // --- USER PROFILE RULES ---
     match /users/{userId} {
       // Any authenticated user can read profiles.
@@ -91,7 +87,7 @@ service cloud.firestore {
                       isSenderInMemberList();
 
       // UPDATE: A member of the group can update a message for deletion.
-      allow update: if request.auth != null && isUserInGroup(groupId) && (
+      allow update: if request.auth != null && isUserInMemberList() && (
           // Case 1: User is "deleting for me" - Simplified rule to be compatible with arrayUnion
           (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
