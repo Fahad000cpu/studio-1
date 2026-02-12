@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
@@ -209,8 +208,7 @@ export default function ChatPage() {
       return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
     } else { // group chat
       const collectionPath = `groups/${selectedChat.id}/messages`;
-      // Firestore limitation: Cannot use orderBy on a different field than the one used in array-contains filter.
-      // So, we fetch without server-side sorting and sort on the client.
+      // We apply the where filter for security rules, but sorting must happen client-side
       return firestoreQuery(
         collection(firestore, collectionPath), 
         where('memberIds', 'array-contains', user.uid)
@@ -618,7 +616,7 @@ export default function ChatPage() {
             <Popover>
                 <PopoverTrigger asChild>
                     <Button variant="ghost" size="icon" type="button" disabled={!selectedChat || isUploading || isRecording}>
-                        <Palette className="w-5 h-5"/>
+                        <Palette className="w-5 h-5" style={{ color: textColor || undefined }} />
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-2">
@@ -658,5 +656,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
