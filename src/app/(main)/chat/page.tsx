@@ -621,7 +621,7 @@ export default function ChatPage() {
                 {msg.messageType !== 'deleted' && (
                   <div className="shrink-0 z-10">
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="flex items-center justify-center h-8 w-8 rounded-full hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <DropdownMenuTrigger className="flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                         <MoreVertical className="h-4 w-4" />
                         <span className="sr-only">Message options</span>
                       </DropdownMenuTrigger>
