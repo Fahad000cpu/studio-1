@@ -32,11 +32,35 @@ service cloud.firestore {
       allow read, write: if request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // --- COLLECTION GROUP: MESSAGES ---
-    match /{path=**}/messages/{messageId} {
-      // A user can read a message if their UID is in the message's memberIds list.
-      // This is the secure pattern for collection group queries.
-      // We must check for the existence and type of memberIds to make the rule safe.
+    // --- 1-on-1 Chat Messages ---
+    match /chats/{chatId}/messages/{messageId} {
+      // READ: A user can read a message if their UID is in the message's memberIds list.
+      allow read: if request.auth != null && 
+                    'memberIds' in resource.data &&
+                    resource.data.memberIds is list &&
+                    request.auth.uid in resource.data.memberIds;
+
+      // CREATE: User can create a message if they are the sender AND are in the member list they provide.
+      allow create: if request.auth != null &&
+                      request.resource.data.senderId == request.auth.uid &&
+                      'memberIds' in request.resource.data &&
+                      request.resource.data.memberIds is list &&
+                      request.auth.uid in request.resource.data.memberIds;
+
+      // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
+      allow update: if request.auth != null &&
+                      'memberIds' in resource.data &&
+                      resource.data.memberIds is list &&
+                      request.auth.uid in resource.data.memberIds &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
+
+      // DELETE: The sender of the message can delete it for everyone.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
+    }
+
+    // --- Group Chat Messages ---
+    match /groups/{groupId}/messages/{messageId} {
+      // READ: A user can read a message if their UID is in the message's memberIds list.
       allow read: if request.auth != null && 
                     'memberIds' in resource.data &&
                     resource.data.memberIds is list &&
