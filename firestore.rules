@@ -4,6 +4,19 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // --- HELPER FUNCTIONS ---
+    function isUserInMemberList() {
+      return 'memberIds' in resource.data && 
+             resource.data.memberIds is list && 
+             request.auth.uid in resource.data.memberIds;
+    }
+    
+    function isSenderInMemberList() {
+      return 'memberIds' in request.resource.data && 
+             request.resource.data.memberIds is list && 
+             request.auth.uid in request.resource.data.memberIds;
+    }
+
     // --- USER PROFILE RULES ---
     match /users/{userId} {
       // Any authenticated user can read profiles.
@@ -35,23 +48,16 @@ service cloud.firestore {
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
       // READ: User can read messages if they are a member.
-      allow read: if request.auth != null &&
-                    'memberIds' in resource.data &&
-                    resource.data.memberIds is list &&
-                    request.auth.uid in resource.data.memberIds;
+      allow read: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND in the member list.
       allow create: if request.auth != null &&
                       request.resource.data.senderId == request.auth.uid &&
-                      'memberIds' in request.resource.data &&
-                      request.resource.data.memberIds is list &&
-                      request.auth.uid in request.resource.data.memberIds;
+                      isSenderInMemberList();
 
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
-                      'memberIds' in resource.data &&
-                      resource.data.memberIds is list &&
-                      request.auth.uid in resource.data.memberIds &&
+                      isUserInMemberList() &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
       // DELETE: The sender of the message can delete it for everyone, BUT ONLY WITHIN 15 MINUTES.
@@ -63,24 +69,16 @@ service cloud.firestore {
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
        // READ: A user can read messages if they are a member of the group.
-       // This rule is robust for list queries because it checks for the existence and type of memberIds.
-      allow read: if request.auth != null &&
-                    'memberIds' in resource.data &&
-                    resource.data.memberIds is list &&
-                    request.auth.uid in resource.data.memberIds;
+      allow read: if request.auth != null && isUserInMemberList();
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
                       request.resource.data.senderId == request.auth.uid &&
-                      'memberIds' in request.resource.data &&
-                      request.resource.data.memberIds is list &&
-                      request.auth.uid in request.resource.data.memberIds;
+                      isSenderInMemberList();
 
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
-                      'memberIds' in resource.data &&
-                      resource.data.memberIds is list &&
-                      request.auth.uid in resource.data.memberIds &&
+                      isUserInMemberList() &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
       // DELETE: The sender of the message can delete it for everyone, BUT ONLY WITHIN 15 MINUTES.
@@ -92,7 +90,6 @@ service cloud.firestore {
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
       // READ: A user can read a group's info if they are a member.
-      // This rule is robust for list queries because it checks for the existence and type of memberIds.
       allow read: if request.auth != null &&
                     'memberIds' in resource.data &&
                     resource.data.memberIds is list &&
