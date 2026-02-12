@@ -87,7 +87,7 @@ export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState<ChatListItem | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [textColor, setTextColor] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(isUploading);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
@@ -237,7 +237,7 @@ export default function ChatPage() {
     // Sort messages on the client side to ensure correct order
     const sortedMessages = filteredMessages.sort((a, b) => {
       const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : a.timestamp.getTime()) : 0;
-      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : b.timestamp.getTime()) : 0;
+      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : a.timestamp.getTime()) : 0;
       return timeA - timeB;
     });
     
@@ -413,8 +413,8 @@ export default function ChatPage() {
   const handleDeleteForMe = async (message: Message) => {
     if (!selectedChat || !user || !firestore) return;
     
-    const collectionPath = selectedChat.type === 'group'
-        ? `groups/${selectedChat.group?.id}/messages`
+    const collectionPath = selectedChat.type === 'group' && selectedChat.group
+        ? `groups/${selectedChat.group.id}/messages`
         : `chats/${selectedChat.id}/messages`;
     
     if (!collectionPath) return;
@@ -436,8 +436,8 @@ export default function ChatPage() {
   const handleDeleteForEveryone = async (message: Message) => {
     if (!selectedChat || !firestore || !user) return;
     
-    const collectionPath = selectedChat.type === 'group'
-        ? `groups/${selectedChat.group?.id}/messages`
+    const collectionPath = selectedChat.type === 'group' && selectedChat.group
+        ? `groups/${selectedChat.group.id}/messages`
         : `chats/${selectedChat.id}/messages`;
 
     if (!collectionPath) return;
@@ -594,9 +594,9 @@ export default function ChatPage() {
                     <div className="shrink-0 z-10">
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-                                  <MoreVertical className="h-4 w-4" />
-                              </Button>
+                            <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                <MoreVertical className="h-4 w-4" />
+                            </button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align={msg.own ? "end" : "start"}>
                               <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
@@ -698,3 +698,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
