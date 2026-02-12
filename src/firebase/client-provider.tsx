@@ -9,7 +9,6 @@ import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getFunctions, type Functions } from 'firebase/functions';
-import { getInstallations } from 'firebase/installations';
 import { FullScreenLoader } from '@/components/full-screen-loader';
 
 interface FirebaseClientProviderProps {
@@ -45,8 +44,23 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     const firestore = getFirestore(app);
     const functions = getFunctions(app);
 
-    // Explicitly initialize Installations which will in turn initialize In-App Messaging
-    getInstallations(app);
+    // This block contains all client-specific initializations to prevent server-side errors.
+    if (typeof window !== 'undefined') {
+        // Dynamically import and initialize services that are client-only.
+        
+        // Installations - needed for In-App Messaging
+        import('firebase/installations')
+          .then(({ getInstallations }) => {
+            try {
+              getInstallations(app); // Needed to get the unique installation ID (FID).
+            } catch(err) {
+              console.error("Firebase Installations SDK failed to initialize:", err);
+            }
+          })
+          .catch((err) => {
+            console.error("Failed to dynamically import Firebase Installations module:", err);
+          });
+    }
 
     isSupported().then(supported => {
         const analytics = supported ? getAnalytics(app) : null;
