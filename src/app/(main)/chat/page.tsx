@@ -204,26 +204,24 @@ export default function ChatPage() {
 
   const messagesQuery = useMemoFirebase(() => {
     if (!firestore || !selectedChat || !user) return null;
-    
+  
     const messagesCollectionGroup = collectionGroup(firestore, 'messages');
     
+    let q = firestoreQuery(
+      messagesCollectionGroup,
+      where('memberIds', 'array-contains', user.uid),
+      orderBy('timestamp', 'asc')
+    );
+  
     if (selectedChat.type === 'user' && selectedChat.contact) {
-        return firestoreQuery(
-            messagesCollectionGroup,
-            where('chatId', '==', selectedChat.id),
-            where('memberIds', 'array-contains', user.uid)
-        );
+      q = firestoreQuery(q, where('chatId', '==', selectedChat.id));
+    } else if (selectedChat.type === 'group') {
+      q = firestoreQuery(q, where('groupId', '==', selectedChat.id));
+    } else {
+      return null;
     }
     
-    if (selectedChat.type === 'group') {
-      return firestoreQuery(
-        messagesCollectionGroup,
-        where('groupId', '==', selectedChat.id),
-        where('memberIds', 'array-contains', user.uid)
-      );
-    }
-    
-    return null;
+    return q;
   }, [firestore, selectedChat, user]);
 
 
@@ -238,15 +236,8 @@ export default function ChatPage() {
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     
-    const getMillis = (ts: Timestamp | Date | undefined | null): number => {
-        if (!ts) return 0;
-        if (ts instanceof Timestamp) return ts.toMillis();
-        return ts.getTime();
-    };
-    
-    const sortedMessages = [...messagesData].sort((a, b) => getMillis(a.timestamp) - getMillis(b.timestamp));
-
-    return sortedMessages
+    // The data is already sorted by timestamp from the Firestore query
+    return messagesData
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,

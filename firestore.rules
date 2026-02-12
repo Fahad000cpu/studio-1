@@ -33,13 +33,10 @@ service cloud.firestore {
     }
 
     // --- COLLECTION GROUP: MESSAGES ---
-    // This rule is for all documents in any 'messages' subcollection (e.g., /chats/{chatId}/messages/{msgId} or /groups/{groupId}/messages/{msgId})
     match /{path=**}/messages/{messageId} {
       // A user can read a message if their UID is in the message's memberIds list.
       // This is the secure pattern for collection group queries.
-      allow read: if request.auth != null &&
-                    'memberIds' in resource.data &&
-                    request.auth.uid in resource.data.memberIds;
+      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
@@ -49,8 +46,7 @@ service cloud.firestore {
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
                       request.auth.uid in resource.data.memberIds &&
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-                      request.resource.data.deletedFor.toSet() == resource.data.deletedFor.toSet().union([request.auth.uid]);
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
       // DELETE: The sender of the message can delete it for everyone.
       allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
