@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -82,10 +81,13 @@ service cloud.firestore {
       
       // --- NESTED: GROUP MESSAGES ---
       match /messages/{messageId} {
-        // READ: User can read a message if they are in its memberIds list.
-        // This is enforced by the client query using `where('memberIds', 'array-contains', uid)`.
-        allow read: if request.auth != null && 
-                     request.auth.uid in resource.data.memberIds;
+        // READ (single doc): User can get a message if they are in its memberIds list.
+        allow get: if request.auth != null && 
+                    request.auth.uid in resource.data.memberIds;
+
+        // READ (list): User can list messages if they are a member of the parent group.
+        allow list: if request.auth != null && 
+                     request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
 
         // CREATE: User can create a message if they are the sender AND are in the member list they provide.
         allow create: if request.auth != null &&
@@ -130,5 +132,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
