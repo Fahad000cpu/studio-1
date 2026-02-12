@@ -56,20 +56,20 @@ service cloud.firestore {
                       isSenderInMemberList();
 
       // UPDATE: A member can update a message for deletion.
-      allow update: if request.auth != null && isUserInMemberList() && (
-          // Case 1: User is "deleting for me".
-          // This rule is more robust. It checks that only 'deletedFor' is being changed.
-          (
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
-          ) ||
-          // Case 2: Sender is "deleting for everyone" (tombstoning)
-          (
-              request.auth.uid == resource.data.senderId &&
-              request.time < resource.data.timestamp + duration.value(15, 'm') &&
-              request.resource.data.messageType == 'deleted' &&
-              request.resource.data.diff(resource.data).affectedKeys().disjoint(['senderId', 'timestamp', 'chatId', 'groupId', 'memberIds', 'deletedFor'])
-          )
-      );
+      allow update: if request.auth != null && isUserInMemberList() &&
+        (
+            // Case 1: User is "deleting for me".
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+            ||
+            // Case 2: Sender is "deleting for everyone" (tombstoning).
+            (
+                request.auth.uid == resource.data.senderId &&
+                request.time < resource.data.timestamp + duration.value(15, 'm') &&
+                request.resource.data.messageType == 'deleted' &&
+                request.resource.data.diff(resource.data).affectedKeys().hasAll(['messageType', 'text']) &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messageType', 'text', 'mediaUrl', 'textColor'])
+            )
+        );
 
       // DELETE: Not allowed directly. Use update for tombstoning.
       allow delete: if false;
@@ -86,20 +86,20 @@ service cloud.firestore {
                       isSenderInMemberList();
 
       // UPDATE: A member of the group can update a message for deletion.
-      allow update: if request.auth != null && isUserInMemberList() && (
-          // Case 1: User is "deleting for me".
-          // This rule is more robust. It checks that only 'deletedFor' is being changed.
-          (
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
-          ) ||
-          // Case 2: Sender is "deleting for everyone" (tombstoning)
-          (
-              request.auth.uid == resource.data.senderId &&
-              request.time < resource.data.timestamp + duration.value(15, 'm') &&
-              request.resource.data.messageType == 'deleted' &&
-              request.resource.data.diff(resource.data).affectedKeys().disjoint(['senderId', 'timestamp', 'chatId', 'groupId', 'memberIds', 'deletedFor'])
-          )
-      );
+      allow update: if request.auth != null && isUserInMemberList() &&
+        (
+            // Case 1: User is "deleting for me".
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+            ||
+            // Case 2: Sender is "deleting for everyone" (tombstoning).
+            (
+                request.auth.uid == resource.data.senderId &&
+                request.time < resource.data.timestamp + duration.value(15, 'm') &&
+                request.resource.data.messageType == 'deleted' &&
+                request.resource.data.diff(resource.data).affectedKeys().hasAll(['messageType', 'text']) &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messageType', 'text', 'mediaUrl', 'textColor'])
+            )
+        );
 
       // DELETE: Not allowed directly. Use update for tombstoning.
       allow delete: if false;
