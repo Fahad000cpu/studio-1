@@ -209,10 +209,11 @@ export default function ChatPage() {
       return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
     } else { // group chat
       const collectionPath = `groups/${selectedChat.id}/messages`;
+      // Firestore limitation: Cannot use orderBy on a different field than the one used in array-contains filter.
+      // So, we fetch without server-side sorting and sort on the client.
       return firestoreQuery(
         collection(firestore, collectionPath), 
-        where('memberIds', 'array-contains', user.uid),
-        orderBy('timestamp', 'asc')
+        where('memberIds', 'array-contains', user.uid)
       );
     }
   
@@ -231,8 +232,15 @@ export default function ChatPage() {
     if (!messagesData || !user?.uid) return [];
     
     const filteredMessages = messagesData.filter(msg => !msg.deletedFor?.includes(user.uid!));
+
+    // Sort messages on the client side to ensure correct order
+    const sortedMessages = filteredMessages.sort((a, b) => {
+      const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : a.timestamp.getTime()) : 0;
+      const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : b.timestamp.getTime()) : 0;
+      return timeA - timeB;
+    });
     
-    return filteredMessages.map(msg => ({
+    return sortedMessages.map(msg => ({
         ...msg,
         own: msg.senderId === user?.uid,
         sender: allUsersMap.get(msg.senderId),
@@ -650,3 +658,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
