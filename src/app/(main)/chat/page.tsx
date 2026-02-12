@@ -608,7 +608,7 @@ export default function ChatPage() {
                   <AvatarImage src={avatarSrc} />
                   <AvatarFallback>{avatarFallback}</AvatarFallback>
                 </Avatar>
-                <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
+                <div className={cn('flex flex-1 min-w-0 flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
                   <div className={cn('rounded-lg p-3 break-words', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                     {renderMessageContent(msg)}
@@ -619,7 +619,7 @@ export default function ChatPage() {
                   </div>
                 </div>
                 {msg.messageType !== 'deleted' && (
-                  <div className="shrink-0 self-center">
+                  <div className="shrink-0">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -713,5 +713,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
