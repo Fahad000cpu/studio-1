@@ -91,9 +91,7 @@ service cloud.firestore {
                       isSenderInMemberList();
 
       // UPDATE: A member of the group can update a message for deletion.
-      // This rule is simpler and relies on the fact that the user must be in the message's
-      // memberIds list to even see it and attempt an update.
-      allow update: if request.auth != null && isUserInMemberList() && (
+      allow update: if request.auth != null && isUserInGroup(groupId) && (
           // Case 1: User is "deleting for me" - Simplified rule to be compatible with arrayUnion
           (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
