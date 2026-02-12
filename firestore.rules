@@ -60,7 +60,10 @@ service cloud.firestore {
           // Case 1: User is "deleting for me"
           (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-              request.resource.data.deletedFor == resource.data.deletedFor.concat([request.auth.uid])
+              (
+                ('deletedFor' in resource.data && request.resource.data.deletedFor == resource.data.deletedFor.concat([request.auth.uid])) || 
+                (!('deletedFor' in resource.data) && request.resource.data.deletedFor == [request.auth.uid])
+              )
           ) ||
           // Case 2: Sender is "deleting for everyone" (tombstoning)
           (
@@ -93,7 +96,10 @@ service cloud.firestore {
           // Case 1: User is "deleting for me"
           (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-              request.resource.data.deletedFor == resource.data.deletedFor.concat([request.auth.uid])
+              (
+                ('deletedFor' in resource.data && request.resource.data.deletedFor == resource.data.deletedFor.concat([request.auth.uid])) || 
+                (!('deletedFor' in resource.data) && request.resource.data.deletedFor == [request.auth.uid])
+              )
           ) ||
           // Case 2: Sender is "deleting for everyone" (tombstoning)
           (
