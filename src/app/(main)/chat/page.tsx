@@ -597,60 +597,68 @@ export default function ChatPage() {
 
       <ScrollArea className="flex-grow p-4 bg-background/30" ref={scrollAreaRef}>
         <div className="flex flex-col gap-1">
-          {messages.map((msg, index) => {
+          {messages.map((msg) => {
             const avatarSrc = msg.sender?.profilePictureUrl || `https://picsum.photos/seed/${msg.senderId}/200`;
             const avatarFallback = getInitials(msg.sender?.name);
             const isDeletableForEveryone = msg.own && msg.timestamp && (Date.now() - (msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : msg.timestamp).getTime()) < 15 * 60 * 1000;
             
             return (
-              <div key={msg.id || index} className={cn('group flex items-end max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                <Avatar className="w-8 h-8 shrink-0">
-                    <AvatarImage src={avatarSrc} />
-                    <AvatarFallback>{avatarFallback}</AvatarFallback>
-                </Avatar>
-
-                <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
-                  {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
-                  
-                  <div className={cn("flex items-start gap-2", msg.own ? 'flex-row-reverse' : 'flex-row')}>
-                      <div className={cn('flex-1 min-w-0 rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
-                          {renderMessageContent(msg)}
-                      </div>
-
-                      {msg.messageType !== 'deleted' && (
-                        <div className="shrink-0 z-10">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button className="flex items-center justify-center h-7 w-7 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring">
-                                        <MoreVertical className="h-4 w-4" />
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align={msg.own ? "end" : "start"}>
-                                    <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
-                                        <Trash className="mr-2 h-4 w-4" />
-                                        <span>Delete for me</span>
-                                    </DropdownMenuItem>
-                                    {isDeletableForEveryone && (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onSelect={() => handleDeleteForEveryone(msg)}>
+                <div key={msg.id} className={cn('group flex items-end max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+                    <Avatar className="w-8 h-8 shrink-0">
+                        <AvatarImage src={avatarSrc} />
+                        <AvatarFallback>{avatarFallback}</AvatarFallback>
+                    </Avatar>
+                    <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
+                        {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
+                        <div className="flex items-center gap-2">
+                           <div
+                            className={cn(
+                                'max-w-full rounded-lg',
+                                msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3',
+                                (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2',
+                                msg.own
+                                ? 'glass text-primary-foreground rounded-br-none'
+                                : 'bg-muted rounded-bl-none'
+                            )}
+                            >
+                            {renderMessageContent(msg)}
+                            </div>
+                            {msg.messageType !== 'deleted' && (
+                                <div className="shrink-0 self-center">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align={msg.own ? 'end' : 'start'}>
+                                            <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
+                                                <Trash className="mr-2 h-4 w-4" />
+                                                <span>Delete for me</span>
+                                            </DropdownMenuItem>
+                                            {isDeletableForEveryone && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                                onSelect={() => handleDeleteForEveryone(msg)}
+                                                >
                                                 <Trash2 className="mr-2 h-4 w-4" />
                                                 <span>Delete for everyone</span>
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                                </DropdownMenuItem>
+                                            </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            )}
                         </div>
-                      )}
-                  </div>
-                  
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
-                    <span>{getMessageTimestamp(msg.timestamp)}</span>
-                    {msg.own && msg.messageType !== 'deleted' && (<Check className="h-4 w-4" />)}
-                  </div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
+                            <span>{getMessageTimestamp(msg.timestamp)}</span>
+                            {msg.own && msg.messageType !== 'deleted' && <Check className="h-4 w-4" />}
+                        </div>
+                    </div>
                 </div>
-              </div>
             );
           })}
            {isUploading && (
