@@ -34,13 +34,10 @@ service cloud.firestore {
 
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
-      // READ: A user can read a message if their UID is in the message's memberIds list.
-      allow read: if request.auth != null && 
-                    'memberIds' in resource.data &&
-                    resource.data.memberIds is list &&
-                    request.auth.uid in resource.data.memberIds;
+      // READ: User can read messages if their UID is part of the chatId.
+      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
 
-      // CREATE: User can create a message if they are the sender AND are in the member list they provide.
+      // CREATE: User can create a message if they are the sender AND in the member list.
       allow create: if request.auth != null &&
                       request.resource.data.senderId == request.auth.uid &&
                       'memberIds' in request.resource.data &&
@@ -49,9 +46,7 @@ service cloud.firestore {
 
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
-                      'memberIds' in resource.data &&
-                      resource.data.memberIds is list &&
-                      request.auth.uid in resource.data.memberIds &&
+                      resource.data.memberIds.includes(request.auth.uid) &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
       // DELETE: The sender of the message can delete it for everyone.
@@ -60,11 +55,9 @@ service cloud.firestore {
 
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
-      // READ: A user can read a message if their UID is in the message's memberIds list.
-      allow read: if request.auth != null && 
-                    'memberIds' in resource.data &&
-                    resource.data.memberIds is list &&
-                    request.auth.uid in resource.data.memberIds;
+       // READ: A user can read messages if they are a member of the parent group.
+      allow read: if request.auth != null &&
+                    get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.includes(request.auth.uid);
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
@@ -75,9 +68,7 @@ service cloud.firestore {
 
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
-                      'memberIds' in resource.data &&
-                      resource.data.memberIds is list &&
-                      request.auth.uid in resource.data.memberIds &&
+                      resource.data.memberIds.includes(request.auth.uid) &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
       // DELETE: The sender of the message can delete it for everyone.

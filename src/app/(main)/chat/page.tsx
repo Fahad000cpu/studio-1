@@ -15,7 +15,6 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
-  collectionGroup,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -203,28 +202,15 @@ export default function ChatPage() {
 
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedChat || !user) return null;
+    if (!firestore || !selectedChat) return null;
   
-    const messagesCollectionGroup = collectionGroup(firestore, 'messages');
+    const collectionPath = selectedChat.type === 'user'
+      ? `chats/${selectedChat.id}/messages`
+      : `groups/${selectedChat.id}/messages`;
     
-    // NOTE: We cannot use orderBy('timestamp') here in combination with `array-contains`
-    // on a collection group query. Firestore limitations require a specific composite index
-    // that is often not feasible. We will sort the messages on the client side.
-    let q = firestoreQuery(
-      messagesCollectionGroup,
-      where('memberIds', 'array-contains', user.uid)
-    );
+    return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
   
-    if (selectedChat.type === 'user' && selectedChat.contact) {
-      q = firestoreQuery(q, where('chatId', '==', selectedChat.id));
-    } else if (selectedChat.type === 'group') {
-      q = firestoreQuery(q, where('groupId', '==', selectedChat.id));
-    } else {
-      return null;
-    }
-    
-    return q;
-  }, [firestore, selectedChat, user]);
+  }, [firestore, selectedChat]);
 
 
   const { data: messagesData } = useCollection<Message>(messagesQuery);
@@ -238,14 +224,7 @@ export default function ChatPage() {
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     
-    // Sort messages on the client-side as we cannot combine 'array-contains' and 'orderBy' in a single collection group query on the server.
-    const sortedData = [...messagesData].sort((a, b) => {
-        const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : new Date(a.timestamp).getTime()) : 0;
-        const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : new Date(b.timestamp).getTime()) : 0;
-        return timeA - timeB;
-    });
-
-    return sortedData
+    return messagesData
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
