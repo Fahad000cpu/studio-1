@@ -60,8 +60,7 @@ service cloud.firestore {
           // Case 1: User is "deleting for me".
           // This rule is more robust. It checks that only 'deletedFor' is being changed.
           (
-              request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
-              'deletedFor' in request.resource.data.diff(resource.data).affectedKeys()
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
           ) ||
           // Case 2: Sender is "deleting for everyone" (tombstoning)
           (
@@ -91,8 +90,7 @@ service cloud.firestore {
           // Case 1: User is "deleting for me".
           // This rule is more robust. It checks that only 'deletedFor' is being changed.
           (
-              request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
-              'deletedFor' in request.resource.data.diff(resource.data).affectedKeys()
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
           ) ||
           // Case 2: Sender is "deleting for everyone" (tombstoning)
           (
