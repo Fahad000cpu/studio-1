@@ -34,8 +34,11 @@ service cloud.firestore {
 
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
-      // READ: User can read messages if their UID is part of the chatId.
-      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
+      // READ: User can read messages if they are a member.
+      allow read: if request.auth != null &&
+                    'memberIds' in resource.data &&
+                    resource.data.memberIds is list &&
+                    request.auth.uid in resource.data.memberIds;
 
       // CREATE: User can create a message if they are the sender AND in the member list.
       allow create: if request.auth != null &&

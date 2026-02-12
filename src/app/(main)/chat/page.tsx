@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
@@ -203,17 +204,20 @@ export default function ChatPage() {
   const messagesQuery = useMemoFirebase(() => {
     if (!firestore || !selectedChat || !user) return null;
   
-    if (selectedChat.type === 'user') {
+    if (selectedChat.type === 'user' && selectedChat.contact) {
       const collectionPath = `chats/${selectedChat.id}/messages`;
-      return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
-    } else { // group chat
+      return firestoreQuery(
+        collection(firestore, collectionPath),
+        where('memberIds', 'array-contains', user.uid)
+      );
+    } else if (selectedChat.type === 'group') {
       const collectionPath = `groups/${selectedChat.id}/messages`;
-      // We apply the where filter for security rules, but sorting must happen client-side
       return firestoreQuery(
         collection(firestore, collectionPath), 
         where('memberIds', 'array-contains', user.uid)
       );
     }
+    return null;
   
   }, [firestore, selectedChat, user]);
 
@@ -554,7 +558,7 @@ export default function ChatPage() {
               <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-50 group-hover:opacity-100 transition-opacity">
                             <MoreVertical className="h-4 w-4" />
                         </Button>
                     </DropdownMenuTrigger>
