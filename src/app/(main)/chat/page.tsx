@@ -87,7 +87,7 @@ export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState<ChatListItem | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [textColor, setTextColor] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading, setIsUploading] = useState(isUploading);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
@@ -612,34 +612,36 @@ export default function ChatPage() {
                 <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
                   
-                  <div className={cn("flex items-center gap-2", msg.own ? 'flex-row-reverse' : 'flex-row')}>
+                  <div className={cn("flex items-start gap-2", msg.own ? 'flex-row-reverse' : 'flex-row')}>
                       <div className={cn('flex-1 min-w-0 rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                           {renderMessageContent(msg)}
                       </div>
 
                       {msg.messageType !== 'deleted' && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align={msg.own ? "end" : "start"}>
-                                <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
-                                    <Trash className="mr-2 h-4 w-4" />
-                                    <span>Delete for me</span>
-                                </DropdownMenuItem>
-                                {isDeletableForEveryone && (
-                                    <>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onSelect={() => handleDeleteForEveryone(msg)}>
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            <span>Delete for everyone</span>
-                                        </DropdownMenuItem>
-                                    </>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="shrink-0 z-10">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button className="flex items-center justify-center h-7 w-7 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                                        <MoreVertical className="h-4 w-4" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align={msg.own ? "end" : "start"}>
+                                    <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
+                                        <Trash className="mr-2 h-4 w-4" />
+                                        <span>Delete for me</span>
+                                    </DropdownMenuItem>
+                                    {isDeletableForEveryone && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onSelect={() => handleDeleteForEveryone(msg)}>
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                <span>Delete for everyone</span>
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
                       )}
                   </div>
                   
