@@ -600,9 +600,8 @@ export default function ChatPage() {
             className="pr-40" 
             value={newMessage} 
             onChange={(e) => setNewMessage(e.target.value)} 
-            disabled={!selectedChat || isUploading || isRecording} 
-            style={{color: textColor}}
-            />
+            disabled={!selectedChat || isUploading || isRecording}
+          />
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" className="hidden" />
             <Button variant="ghost" size="icon" type="button" onClick={handleAttachmentClick} disabled={!selectedChat || isUploading || isRecording}><Paperclip className="w-5 h-5" /></Button>
