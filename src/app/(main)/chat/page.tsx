@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
@@ -412,11 +413,18 @@ export default function ChatPage() {
   const handleDeleteForMe = async (message: Message) => {
     if (!selectedChat || !user || !firestore) return;
     
-    const collectionPath = selectedChat.type === 'group'
-        ? `groups/${selectedChat.id}/messages`
-        : `chats/${selectedChat.id}/messages`;
+    let collectionPath: string | undefined;
+    if (selectedChat.type === 'group') {
+        collectionPath = `groups/${selectedChat.id}/messages`;
+    } else if (selectedChat.type === 'user') {
+        collectionPath = `chats/${selectedChat.id}/messages`;
+    }
     
-    if (!collectionPath) return;
+    if (!collectionPath) {
+        console.error("Could not determine collection path for deletion.");
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete this message.' });
+        return;
+    }
 
     const messageRef = doc(firestore, collectionPath, message.id);
     
@@ -435,11 +443,18 @@ export default function ChatPage() {
   const handleDeleteForEveryone = async (message: Message) => {
     if (!selectedChat || !firestore || !user) return;
     
-    const collectionPath = selectedChat.type === 'group'
-        ? `groups/${selectedChat.id}/messages`
-        : `chats/${selectedChat.id}/messages`;
+    let collectionPath: string | undefined;
+    if (selectedChat.type === 'group') {
+        collectionPath = `groups/${selectedChat.id}/messages`;
+    } else if (selectedChat.type === 'user') {
+        collectionPath = `chats/${selectedChat.id}/messages`;
+    }
 
-    if (!collectionPath) return;
+    if (!collectionPath) {
+        console.error("Could not determine collection path for deletion.");
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete this message.' });
+        return;
+    }
 
     const messageRef = doc(firestore, collectionPath, message.id);
     
@@ -589,43 +604,45 @@ export default function ChatPage() {
             
             return (
               <div key={msg.id || index} className={cn('group flex items-end max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                 {msg.messageType !== 'deleted' && (
-                    <div className="shrink-0 z-10">
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                <MoreVertical className="h-4 w-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align={msg.own ? "end" : "start"}>
-                              <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
-                                  <Trash className="mr-2 h-4 w-4" />
-                                  <span>Delete for me</span>
-                              </DropdownMenuItem>
-                              {isDeletableForEveryone && (
-                                  <>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onSelect={() => handleDeleteForEveryone(msg)}>
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          <span>Delete for everyone</span>
-                                      </DropdownMenuItem>
-                                  </>
-                              )}
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                 )}
-                
-                <Avatar className="w-8 h-8">
+                <Avatar className="w-8 h-8 shrink-0">
                     <AvatarImage src={avatarSrc} />
                     <AvatarFallback>{avatarFallback}</AvatarFallback>
                 </Avatar>
 
-                <div className={cn('flex flex-1 min-w-0 flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
+                <div className={cn('flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
-                  <div className={cn('rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
-                    {renderMessageContent(msg)}
+                  
+                  <div className={cn("flex items-center gap-2", msg.own ? 'flex-row-reverse' : 'flex-row')}>
+                      <div className={cn('flex-1 min-w-0 rounded-lg', msg.messageType !== 'audio' && msg.messageType !== 'video' && 'p-3', (msg.messageType === 'audio' || msg.messageType === 'video') && 'p-2', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
+                          {renderMessageContent(msg)}
+                      </div>
+
+                      {msg.messageType !== 'deleted' && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                                    <MoreVertical className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align={msg.own ? "end" : "start"}>
+                                <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
+                                    <Trash className="mr-2 h-4 w-4" />
+                                    <span>Delete for me</span>
+                                </DropdownMenuItem>
+                                {isDeletableForEveryone && (
+                                    <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onSelect={() => handleDeleteForEveryone(msg)}>
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            <span>Delete for everyone</span>
+                                        </DropdownMenuItem>
+                                    </>
+                                )}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                   </div>
+                  
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-1">
                     <span>{getMessageTimestamp(msg.timestamp)}</span>
                     {msg.own && msg.messageType !== 'deleted' && (<Check className="h-4 w-4" />)}
