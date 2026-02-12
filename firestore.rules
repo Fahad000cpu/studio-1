@@ -58,8 +58,9 @@ service cloud.firestore {
       // UPDATE: A member can update a message for deletion.
       allow update: if request.auth != null && isUserInMemberList() &&
         (
-            // Case 1: User is "deleting for me".
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+            // Case 1: User is "deleting for me". Check that ONLY the deletedFor field is being changed.
+            request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
+            'deletedFor' in request.resource.data.diff(resource.data).affectedKeys()
             ||
             // Case 2: Sender is "deleting for everyone" (tombstoning).
             (
@@ -88,8 +89,9 @@ service cloud.firestore {
       // UPDATE: A member of the group can update a message for deletion.
       allow update: if request.auth != null && isUserInMemberList() &&
         (
-            // Case 1: User is "deleting for me".
-            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+            // Case 1: User is "deleting for me". Check that ONLY the deletedFor field is being changed.
+            request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
+            'deletedFor' in request.resource.data.diff(resource.data).affectedKeys()
             ||
             // Case 2: Sender is "deleting for everyone" (tombstoning).
             (
