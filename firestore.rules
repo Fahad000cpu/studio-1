@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -31,25 +32,26 @@ service cloud.firestore {
       allow read, write: if request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
-    // --- 1-on-1 CHAT MESSAGES ---
-    match /chats/{chatId}/messages/{messageId} {
-      // A user can read messages in a chat ONLY if their UID is part of the chatId.
-      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
+    // --- COLLECTION GROUP: MESSAGES ---
+    // This rule is for all documents in any 'messages' subcollection (e.g., /chats/{chatId}/messages/{msgId} or /groups/{groupId}/messages/{msgId})
+    match /{path=**}/messages/{messageId} {
+      // A user can read a message (get or list) if their UID is in the message's memberIds list.
+      // This works for collection group queries because Firestore evaluates it against each potential document.
+      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
 
-      // A user can create a message if they are the sender and part of the chat.
-      allow create: if request.auth != null && 
-                      request.auth.uid in chatId.split('_') &&
-                      request.resource.data.senderId == request.auth.uid;
-      
-      // The sender of the message can delete it for everyone.
-      allow delete: if request.auth != null && 
-                      request.auth.uid == resource.data.senderId;
+      // CREATE: User can create a message if they are the sender AND are in the member list they provide.
+      allow create: if request.auth != null &&
+                      request.resource.data.senderId == request.auth.uid &&
+                      request.auth.uid in request.resource.data.memberIds;
 
-      // A user in the chat can update a message, but only to add themselves to the 'deletedFor' list.
-      allow update: if request.auth != null && 
-                      request.auth.uid in chatId.split('_') &&
+      // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
+      allow update: if request.auth != null &&
+                      request.auth.uid in resource.data.memberIds &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
                       request.resource.data.deletedFor.toSet() == resource.data.deletedFor.toSet().union([request.auth.uid]);
+
+      // DELETE: The sender of the message can delete it for everyone.
+      allow delete: if request.auth != null && request.auth.uid == resource.data.senderId;
     }
 
     // --- GROUP CHAT RULES ---
@@ -78,32 +80,6 @@ service cloud.firestore {
 
       // The creator or an admin can delete a group.
       allow delete: if (request.auth != null && resource.data.creatorId == request.auth.uid) || (request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
-      
-      // --- NESTED: GROUP MESSAGES ---
-      match /messages/{messageId} {
-        // READ (single doc): User can get a message if they are in its memberIds list.
-        allow get: if request.auth != null && 
-                    request.auth.uid in resource.data.memberIds;
-
-        // READ (list): User can list messages if they are a member of the parent group.
-        allow list: if request.auth != null && 
-                     request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds;
-
-        // CREATE: User can create a message if they are the sender AND are in the member list they provide.
-        allow create: if request.auth != null &&
-                       request.resource.data.senderId == request.auth.uid &&
-                       request.auth.uid in request.resource.data.memberIds;
-
-        // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
-        allow update: if request.auth != null &&
-                       request.auth.uid in resource.data.memberIds &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-                       request.resource.data.deletedFor.toSet() == resource.data.deletedFor.toSet().union([request.auth.uid]);
-
-        // DELETE: The sender of the message can delete it for everyone.
-        allow delete: if request.auth != null && 
-                       request.auth.uid == resource.data.senderId;
-      }
     }
 
     // --- STATUS UPDATE RULES ---

@@ -14,6 +14,7 @@ export type Message = {
   mediaUrl?: string | null;
   textColor?: string;
   chatId?: string;
+  groupId?: string; // For group chat messages
   deletedFor?: string[];
   memberIds?: string[]; // For group chat messages
 };

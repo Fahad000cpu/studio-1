@@ -15,6 +15,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  collectionGroup,
 } from 'firebase/firestore';
 import { format, isToday, isYesterday, formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -204,25 +205,29 @@ export default function ChatPage() {
   const messagesQuery = useMemoFirebase(() => {
     if (!firestore || !selectedChat || !user) return null;
     
-    const path = selectedChat.type === 'user' 
-        ? `chats/${selectedChat.id}/messages` 
-        : `groups/${selectedChat.id}/messages`;
+    const messagesCollectionGroup = collectionGroup(firestore, 'messages');
     
-    const messagesCollectionRef = collection(firestore, path);
-
+    if (selectedChat.type === 'user' && selectedChat.contact) {
+        return firestoreQuery(
+            messagesCollectionGroup,
+            where('chatId', '==', selectedChat.id),
+            where('memberIds', 'array-contains', user.uid),
+            orderBy('timestamp', 'asc')
+        );
+    }
+    
     if (selectedChat.type === 'group') {
-      // For groups, we must query securely by filtering for messages where the user is a member.
-      // This matches the security rule `allow read: if request.auth.uid in resource.data.memberIds;`
       return firestoreQuery(
-        messagesCollectionRef,
+        messagesCollectionGroup,
+        where('groupId', '==', selectedChat.id),
         where('memberIds', 'array-contains', user.uid),
         orderBy('timestamp', 'asc')
       );
     }
     
-    // For 1-on-1 chats, security is handled by the path, so a simple ordered query is fine.
-    return firestoreQuery(messagesCollectionRef, orderBy('timestamp', 'asc'));
+    return null;
   }, [firestore, selectedChat, user]);
+
 
   const { data: messagesData } = useCollection<Message>(messagesQuery);
 
@@ -271,16 +276,28 @@ export default function ChatPage() {
       textColor: textColor || null,
     };
     
-    let finalPayload: any = basePayload;
-    const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
-    const messagesCollection = collection(firestore, collectionPath);
-    
-    if (selectedChat.type === 'user') {
-      finalPayload = { ...basePayload, recipientId: selectedChat.contact?.id, chatId: selectedChat.id };
+    let finalPayload: any;
+    let collectionPath: string;
+
+    if (selectedChat.type === 'user' && selectedChat.contact) {
+      collectionPath = `chats/${selectedChat.id}/messages`;
+      finalPayload = { 
+          ...basePayload, 
+          chatId: selectedChat.id,
+          memberIds: [user.uid, selectedChat.contact.id] 
+      };
+    } else if (selectedChat.type === 'group' && selectedChat.group) {
+      collectionPath = `groups/${selectedChat.id}/messages`;
+      finalPayload = { 
+          ...basePayload, 
+          groupId: selectedChat.id,
+          memberIds: selectedChat.group.memberIds
+      };
     } else {
-      finalPayload = { ...basePayload, memberIds: selectedChat.group?.memberIds };
+      return;
     }
 
+    const messagesCollection = collection(firestore, collectionPath);
     await addDoc(messagesCollection, finalPayload);
     
     const notificationText = isLink ? '🔗 Link' : messageText;
@@ -309,16 +326,29 @@ export default function ChatPage() {
         mediaUrl: downloadURL,
       };
       
-      let finalPayload: any = basePayload;
-      const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
-      const messagesCollection = collection(firestore, collectionPath);
+      let finalPayload: any;
+      let collectionPath: string;
 
-      if (selectedChat.type === 'user') {
-        finalPayload = { ...basePayload, recipientId: selectedChat.contact?.id, chatId: selectedChat.id };
+      if (selectedChat.type === 'user' && selectedChat.contact) {
+        collectionPath = `chats/${selectedChat.id}/messages`;
+        finalPayload = {
+            ...basePayload,
+            chatId: selectedChat.id,
+            memberIds: [user.uid, selectedChat.contact.id] 
+        };
+      } else if (selectedChat.type === 'group' && selectedChat.group) {
+        collectionPath = `groups/${selectedChat.id}/messages`;
+        finalPayload = {
+            ...basePayload,
+            groupId: selectedChat.id,
+            memberIds: selectedChat.group.memberIds
+        };
       } else {
-        finalPayload = { ...basePayload, memberIds: selectedChat.group?.memberIds };
+        setIsUploading(false);
+        return;
       }
-
+      
+      const messagesCollection = collection(firestore, collectionPath);
       await addDoc(messagesCollection, finalPayload);
 
       let body = 'Sent a file';
@@ -380,17 +410,21 @@ export default function ChatPage() {
     }
   };
   
-  const handleDeleteForMe = async (messageId: string) => {
+  const handleDeleteForMe = async (message: Message) => {
     if (!selectedChat || !user || !firestore) return;
-    const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
-    const messageRef = doc(firestore, collectionPath, messageId);
+    const collectionPath = message.chatId 
+      ? `chats/${message.chatId}/messages` 
+      : `groups/${message.groupId}/messages`;
+    const messageRef = doc(firestore, collectionPath, message.id);
     await updateDoc(messageRef, { deletedFor: arrayUnion(user.uid) });
   };
 
-  const handleDeleteForEveryone = async (messageId: string) => {
+  const handleDeleteForEveryone = async (message: Message) => {
     if (!selectedChat || !firestore) return;
-    const collectionPath = selectedChat.type === 'user' ? `chats/${selectedChat.id}/messages` : `groups/${selectedChat.id}/messages`;
-    const messageRef = doc(firestore, collectionPath, messageId);
+    const collectionPath = message.chatId
+      ? `chats/${message.chatId}/messages`
+      : `groups/${message.groupId}/messages`;
+    const messageRef = doc(firestore, collectionPath, message.id);
     await deleteDoc(messageRef);
   };
 
@@ -519,7 +553,7 @@ export default function ChatPage() {
             const avatarFallback = getInitials(msg.sender?.name);
             return (
               <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                 <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align={msg.own ? "end" : "start"}><DropdownMenuItem onClick={() => handleDeleteForMe(msg.id)}><Trash className="mr-2 h-4 w-4" /><span>Delete for me</span></DropdownMenuItem>{msg.own && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg.id)}><Trash2 className="mr-2 h-4 w-4" /><span>Delete for everyone</span></DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>
+                 <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align={msg.own ? "end" : "start"}><DropdownMenuItem onClick={() => handleDeleteForMe(msg)}><Trash className="mr-2 h-4 w-4" /><span>Delete for me</span></DropdownMenuItem>{msg.own && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => handleDeleteForEveryone(msg)}><Trash2 className="mr-2 h-4 w-4" /><span>Delete for everyone</span></DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu>
                 
                 <Avatar className="w-8 h-8">
                     <AvatarImage src={avatarSrc} />
@@ -603,5 +637,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
