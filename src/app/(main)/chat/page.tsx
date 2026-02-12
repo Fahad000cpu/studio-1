@@ -437,7 +437,7 @@ export default function ChatPage() {
     if (!selectedChat || !firestore || !user) return;
     
     const collectionPath = selectedChat.type === 'group'
-        ? `groups/${selectedChat.id}/messages`
+        ? `groups/${selectedChat.group?.id}/messages`
         : `chats/${selectedChat.id}/messages`;
 
     if (!collectionPath) return;
@@ -589,7 +589,7 @@ export default function ChatPage() {
             const isDeletableForEveryone = msg.own && msg.timestamp && (Date.now() - (msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : msg.timestamp).getTime()) < 15 * 60 * 1000;
             
             return (
-              <div key={msg.id || index} className={cn('group flex items-start max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+              <div key={msg.id || index} className={cn('group flex items-end max-w-[75%] gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
                  {msg.messageType !== 'deleted' && (
                     <div className="shrink-0">
                       <DropdownMenu>
