@@ -46,6 +46,7 @@ service cloud.firestore {
 
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
+                      'memberIds' in resource.data &&
                       resource.data.memberIds.includes(request.auth.uid) &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
@@ -55,9 +56,11 @@ service cloud.firestore {
 
     // --- Group Chat Messages ---
     match /groups/{groupId}/messages/{messageId} {
-       // READ: A user can read messages if they are a member of the parent group.
+       // READ: A user can read messages if they are a member of the group.
+       // This relies on the client query including `where('memberIds', 'array-contains', auth.uid)`.
       allow read: if request.auth != null &&
-                    get(/databases/$(database)/documents/groups/$(groupId)).data.memberIds.includes(request.auth.uid);
+                    'memberIds' in resource.data &&
+                    resource.data.memberIds.includes(request.auth.uid);
 
       // CREATE: User can create a message if they are the sender AND are in the member list they provide.
       allow create: if request.auth != null &&
@@ -68,6 +71,7 @@ service cloud.firestore {
 
       // UPDATE: A member can update a message, but only to add themselves to the 'deletedFor' list.
       allow update: if request.auth != null &&
+                      'memberIds' in resource.data &&
                       resource.data.memberIds.includes(request.auth.uid) &&
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']);
 
@@ -133,3 +137,5 @@ service cloud.firestore {
     }
   }
 }
+
+    

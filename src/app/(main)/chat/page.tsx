@@ -202,15 +202,19 @@ export default function ChatPage() {
 
 
   const messagesQuery = useMemoFirebase(() => {
-    if (!firestore || !selectedChat) return null;
+    if (!firestore || !selectedChat || !user) return null;
   
-    const collectionPath = selectedChat.type === 'user'
-      ? `chats/${selectedChat.id}/messages`
-      : `groups/${selectedChat.id}/messages`;
-    
-    return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
+    if (selectedChat.type === 'user') {
+      const collectionPath = `chats/${selectedChat.id}/messages`;
+      return firestoreQuery(collection(firestore, collectionPath), orderBy('timestamp', 'asc'));
+    } else { // group chat
+      const collectionPath = `groups/${selectedChat.id}/messages`;
+      // No orderBy here to avoid composite index requirement with array-contains.
+      // We sort on the client-side for group messages.
+      return firestoreQuery(collection(firestore, collectionPath), where('memberIds', 'array-contains', user.uid));
+    }
   
-  }, [firestore, selectedChat]);
+  }, [firestore, selectedChat, user]);
 
 
   const { data: messagesData } = useCollection<Message>(messagesQuery);
@@ -224,14 +228,26 @@ export default function ChatPage() {
   const messages: (Message & { sender?: UserProfile })[] = useMemo(() => {
     if (!messagesData || !user?.uid) return [];
     
-    return messagesData
+    // Create a mutable copy for sorting
+    const sortedMessages = [...messagesData];
+
+    // For group chats, sort client-side as we removed orderBy from the query
+    if (selectedChat?.type === 'group') {
+      sortedMessages.sort((a, b) => {
+        const timeA = a.timestamp ? (a.timestamp instanceof Timestamp ? a.timestamp.toMillis() : (a.timestamp as Date).getTime()) : 0;
+        const timeB = b.timestamp ? (b.timestamp instanceof Timestamp ? b.timestamp.toMillis() : (b.timestamp as Date).getTime()) : 0;
+        return timeA - timeB;
+      });
+    }
+
+    return sortedMessages
         .map(msg => ({
             ...msg,
             own: msg.senderId === user?.uid,
             sender: allUsersMap.get(msg.senderId),
         }))
         .filter(msg => !msg.deletedFor?.includes(user.uid!));
-  }, [messagesData, user?.uid, allUsersMap]);
+  }, [messagesData, user?.uid, allUsersMap, selectedChat?.type]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -622,3 +638,5 @@ export default function ChatPage() {
     </div>
   );
 }
+
+    
