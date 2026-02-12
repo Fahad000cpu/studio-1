@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, FormEvent, useRef, useCallback } from 'react';
@@ -87,7 +86,7 @@ export default function ChatPage() {
   const [selectedChat, setSelectedChat] = useState<ChatListItem | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [textColor, setTextColor] = useState('');
-  const [isUploading, setIsUploading] = useState(isUploading);
+  const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isGroupSheetOpen, setIsGroupSheetOpen] = useState(false);
@@ -698,5 +697,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
-    
