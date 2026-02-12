@@ -393,22 +393,28 @@ export default function LoginPage() {
         <AlertDialog open={isProviderErrorOpen} onOpenChange={setIsProviderErrorOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                <AlertDialogTitle>Sign-In Configuration Error (Error 403)</AlertDialogTitle>
-                <AlertDialogDescription>
-                    <div className="space-y-3 text-left">
-                        <p>Partner, yeh "403 error" code ki galti nahi, balki **Google Cloud project ke setup** ki samasya hai. Aksar yeh tab hota hai jab aapka "OAuth consent screen" publish nahi hua hota.</p>
-                        <p className="font-bold">Ise theek karne ke liye, kripya yeh check karein:</p>
-                        <ol className="list-decimal list-inside space-y-2">
-                            <li>Apne project ke <a href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener noreferrer" className="underline font-semibold text-primary">OAuth consent screen</a> par jaayein. (Sahi project chuna hua hai, yeh sunishchit karein).</li>
-                            <li>Wahan, **"Publishing status"** check karein. Agar yeh **"Testing"** hai, to **"PUBLISH APP"** button par click karke ise live karein.</li>
-                            <li>Yadi aap ise "Testing" mein rakhna chahte hain, to sunishchit karein ki aapka email address "Test users" ki list mein joda gaya hai.</li>
-                        </ol>
-                        <p className="mt-4 text-xs text-muted-foreground">Yeh Google aur Facebook dono sign-in ke liye zaroori ho sakta hai.</p>
-                    </div>
-                </AlertDialogDescription>
+                    <AlertDialogTitle>Sign-In Configuration Error</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        <div className="space-y-3 text-left">
+                            <p>This sign-in failed due to a likely misconfiguration in your Google Cloud or Facebook Developer project, not a bug in the app code.</p>
+                            <p className="font-bold">Please check the following in your project's cloud console:</p>
+                            <ol className="list-decimal list-inside space-y-2">
+                                <li>
+                                    Go to the <strong>OAuth consent screen</strong> page.
+                                </li>
+                                <li>
+                                    Ensure the <strong>"Publishing status"</strong> is <strong>"In production"</strong>. If it's "Testing", you must add your Google account's email to the "Test users" list.
+                                </li>
+                                <li>
+                                    For both Google & Facebook, ensure your app's domain is listed in the <strong>"Authorized domains"</strong> section of the Firebase Console (Authentication → Settings).
+                                </li>
+                            </ol>
+                            <p className="mt-4 text-xs text-muted-foreground">This is a necessary security step for all social sign-in providers.</p>
+                        </div>
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                <AlertDialogAction onClick={() => setIsProviderErrorOpen(false)}>Samajh Gaya</AlertDialogAction>
+                    <AlertDialogAction onClick={() => setIsProviderErrorOpen(false)}>I Understand</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>

@@ -233,7 +233,6 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!messagesData || !user?.uid) {
-        setMessages([]);
         return;
     };
     
@@ -610,17 +609,17 @@ export default function ChatPage() {
           {messages.map((msg) => {
             const avatarSrc = msg.sender?.profilePictureUrl || `https://picsum.photos/seed/${msg.senderId}/200`;
             const avatarFallback = getInitials(msg.sender?.name);
-            const isDeletableForEveryone = msg.own && msg.timestamp && (Date.now() - (msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : msg.timestamp).getTime()) < 15 * 60 * 1000;
+            const isDeletableForEveryone = msg.own && msg.timestamp && (Date.now() - (msg.timestamp instanceof Timestamp ? msg.timestamp.toDate() : new Date(msg.timestamp)).getTime()) < 15 * 60 * 1000;
             
             return (
-              <div key={msg.id} className={cn('group flex items-end gap-2 py-2 max-w-[85%]', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+              <div key={msg.id} className={cn('group flex items-end gap-2 py-2', msg.own ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
                 {!msg.own && (
                   <Avatar className="w-8 h-8 shrink-0">
                     <AvatarImage src={avatarSrc} />
                     <AvatarFallback>{avatarFallback}</AvatarFallback>
                   </Avatar>
                 )}
-                <div className={cn('flex-1 min-w-0 flex flex-col gap-1', msg.own ? 'items-end' : 'items-start')}>
+                <div className={cn('flex-1 min-w-0 flex flex-col gap-1 max-w-[85%]', msg.own ? 'items-end' : 'items-start')}>
                   {!msg.own && selectedChat.type === 'group' && <p className="text-xs text-muted-foreground px-1">{msg.sender?.name || 'Unknown'}</p>}
                   <div className={cn('rounded-lg p-3 break-words', msg.own ? 'glass text-primary-foreground rounded-br-none' : 'bg-muted rounded-bl-none')}>
                     {renderMessageContent(msg)}
@@ -633,9 +632,11 @@ export default function ChatPage() {
                 {msg.messageType !== 'deleted' && (
                   <div className="shrink-0 z-10 self-center">
                     <DropdownMenu>
-                      <DropdownMenuTrigger className="flex items-center justify-center h-8 w-8 rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        <MoreVertical className="h-4 w-4" />
-                        <span className="sr-only">Message options</span>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Message options</span>
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align={msg.own ? 'end' : 'start'}>
                         <DropdownMenuItem onSelect={() => handleDeleteForMe(msg)}>
