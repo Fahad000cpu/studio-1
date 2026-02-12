@@ -47,7 +47,7 @@ service cloud.firestore {
     // --- 1-on-1 Chat Messages ---
     match /chats/{chatId}/messages/{messageId} {
       // READ: Allow reading if the user's UID is part of the memberIds list.
-      allow read: if request.auth != null && isUserInMemberList();
+      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
 
       // CREATE: User can create a message if they are the sender AND in the member list.
       allow create: if request.auth != null &&
@@ -65,7 +65,7 @@ service cloud.firestore {
               request.auth.uid == resource.data.senderId &&
               request.time < resource.data.timestamp + duration.value(15, 'm') &&
               request.resource.data.messageType == 'deleted' &&
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'messageType', 'mediaUrl', 'textColor'])
+              request.resource.data.diff(resource.data).affectedKeys().disjoint(['senderId', 'timestamp', 'chatId', 'groupId', 'memberIds', 'deletedFor'])
           )
       );
 
@@ -94,7 +94,7 @@ service cloud.firestore {
               request.auth.uid == resource.data.senderId &&
               request.time < resource.data.timestamp + duration.value(15, 'm') &&
               request.resource.data.messageType == 'deleted' &&
-              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['text', 'messageType', 'mediaUrl', 'textColor'])
+              request.resource.data.diff(resource.data).affectedKeys().disjoint(['senderId', 'timestamp', 'chatId', 'groupId', 'memberIds', 'deletedFor'])
           )
       );
 
