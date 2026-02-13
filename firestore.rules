@@ -59,9 +59,9 @@ service cloud.firestore {
       allow update: if request.auth != null && request.auth.uid in chatId.split('_') &&
         (
             // Case 1: User is "deleting for me".
+            // This is the most robust check: ensure the only key affected is 'deletedFor'.
             (
-                request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+                request.resource.data.diff(resource.data).affectedKeys() == ['deletedFor'].toSet()
             )
             ||
             // Case 2: Sender is "deleting for everyone" (tombstoning).
@@ -92,9 +92,9 @@ service cloud.firestore {
       allow update: if request.auth != null && isUserInMemberList() &&
         (
             // Case 1: User is "deleting for me".
+            // This is the most robust check: ensure the only key affected is 'deletedFor'.
             (
-                request.resource.data.diff(resource.data).affectedKeys().size() == 1 &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor'])
+                request.resource.data.diff(resource.data).affectedKeys() == ['deletedFor'].toSet()
             )
             ||
             // Case 2: Sender is "deleting for everyone" (tombstoning).

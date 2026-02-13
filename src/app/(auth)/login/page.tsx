@@ -394,22 +394,25 @@ export default function LoginPage() {
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Sign-In Configuration Error</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        <div className="space-y-3 text-left">
-                            <p>This sign-in failed due to a likely misconfiguration in your Google Cloud or Facebook Developer project, not a bug in the app code.</p>
-                            <p className="font-bold">Please check the following in your project's cloud console:</p>
-                            <ol className="list-decimal list-inside space-y-2">
+                    <AlertDialogDescription asChild>
+                        <div className="space-y-4 text-left text-sm pt-2">
+                            <p>This sign-in failed. This is almost always a **configuration problem** in the cloud console, not a bug in the app's code.</p>
+                            <p className="font-bold">Please check the following in your provider's developer console (e.g., Google Cloud):</p>
+                            <ol className="list-decimal list-inside space-y-3">
                                 <li>
-                                    Go to the <strong>OAuth consent screen</strong> page.
+                                    <span className="font-semibold">OAuth Consent Screen:</span> Ensure the "Publishing status" is **"In production"**. If it's "Testing", you MUST add your account's email to the "Test users" list.
                                 </li>
                                 <li>
-                                    Ensure the <strong>"Publishing status"</strong> is <strong>"In production"</strong>. If it's "Testing", you must add your Google account's email to the "Test users" list.
+                                    <span className="font-semibold">Authorized Redirect URIs (for 404/redirect errors):</span> In your OAuth Client ID settings, ensure you have an entry in "Authorized redirect URIs" that looks like this:
+                                    <div className="mt-2 p-2 bg-muted rounded-md font-mono text-xs break-all">
+                                    https://{auth.config.authDomain}/__/auth/handler
+                                    </div>
                                 </li>
                                 <li>
-                                    For both Google & Facebook, ensure your app's domain is listed in the <strong>"Authorized domains"</strong> section of the Firebase Console (Authentication → Settings).
+                                    <span className="font-semibold">Authorized Domains (Firebase):</span> Ensure your app's domain is listed in the Firebase Console under **Authentication → Settings → Authorized domains**.
                                 </li>
                             </ol>
-                            <p className="mt-4 text-xs text-muted-foreground">This is a necessary security step for all social sign-in providers.</p>
+                            <p className="mt-4 text-xs text-muted-foreground">These are necessary security steps for all social sign-in providers.</p>
                         </div>
                     </AlertDialogDescription>
                 </AlertDialogHeader>
