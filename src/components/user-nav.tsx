@@ -4,10 +4,8 @@
 import { LogOut, Settings } from "lucide-react";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import { doc, updateDoc, arrayRemove } from "firebase/firestore";
-import { getApp } from "firebase/app";
 
-import { useAuth, useUser, useFirestore } from "@/firebase";
+import { useAuth, useUser } from "@/firebase";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,46 +22,14 @@ import { getInitials } from "@/lib/utils";
 export function UserNav() {
   const auth = useAuth();
   const { user } = useUser();
-  const firestore = useFirestore();
   const router = useRouter();
 
   const handleLogout = async () => {
-    try {
-      // Check if user and service worker are available
-      if (user && firestore && typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-        const swRegistration = await navigator.serviceWorker.ready;
-        
-        // Dynamically import messaging functions to avoid issues on server
-        const { getMessaging, getToken, isSupported } = await import("firebase/messaging");
-        const supported = await isSupported();
-
-        if (supported) {
-            const app = getApp();
-            const messaging = getMessaging(app);
-
-            // Attempt to get the current token
-            const currentToken = await getToken(messaging, {
-              serviceWorkerRegistration: swRegistration,
-            }).catch(() => null); // Return null if it fails
-
-            if (currentToken) {
-              const userDocRef = doc(firestore, 'users', user.uid);
-              // Fire-and-forget the update. No need to await.
-              // This makes logout feel faster and prevents it from failing if the DB update has an issue.
-              updateDoc(userDocRef, {
-                fcmTokens: arrayRemove(currentToken),
-              }).catch((err) => {
-                console.error('Failed to remove FCM token on logout:', err);
-              });
-            }
-        }
-      }
-    } catch (error) {
-      console.error('Error during FCM token removal on logout:', error);
-    } finally {
-      // Always sign out the user, regardless of whether token removal succeeded
-      await signOut(auth);
-    }
+    // The complex logic for removing the FCM token on the client was removed.
+    // This was causing sign-out to fail intermittently. Token cleanup is now
+    // handled by the server when a notification fails to send to an invalid token.
+    // This new approach is more robust and ensures sign-out always works.
+    await signOut(auth);
   };
 
   if (!user) {
