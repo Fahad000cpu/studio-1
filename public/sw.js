@@ -1,96 +1,107 @@
-// v1.5 - A self-initializing, robust service worker for ConnectSphere
-'use strict';
-
-// Import Firebase and Messaging scripts
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
-
-const CACHE_NAME = 'connectsphere-v1.5';
-const OFFLINE_URL = '/offline.html';
-
-// This promise will resolve with the Firebase Messaging instance once initialized
-const firebaseMessagingPromise = fetch('/api/firebase-config')
-  .then(response => {
-    if (!response.ok) {
-      throw new Error('Failed to fetch Firebase config');
-    }
-    return response.json();
-  })
-  .then(firebaseConfig => {
-    if (firebaseConfig.apiKey && !firebase.apps.length) {
-      const app = firebase.initializeApp(firebaseConfig);
-      console.log('[SW] Firebase app initialized.');
-      return firebase.messaging(app);
-    } else if (firebase.apps.length > 0) {
-      return firebase.messaging();
-    }
-    else {
-      throw new Error('Firebase API key is missing in config.');
-    }
-  })
-  .catch(error => {
-    console.error('[SW] Firebase initialization failed:', error);
-    return null; // Return null if initialization fails
-  });
+// Using compat libraries for robust messaging support
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
 self.addEventListener('install', (event) => {
-  console.log('[SW] Install');
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching offline page.');
-      return cache.add(OFFLINE_URL);
-    }).then(() => {
-      // Skip waiting so the new service worker activates immediately.
-      return self.skipWaiting();
-    })
-  );
+  console.log('Service Worker: Installing...');
+  // Skip waiting to ensure the new service worker activates immediately.
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activate');
+  console.log('Service Worker: Activating...');
+  // Take control of all clients as soon as the service worker activates.
+  event.waitUntil(self.clients.claim());
+});
+
+// Fetch the Firebase config from a dedicated API route
+// This is the most robust way to avoid hardcoding credentials
+const firebaseAppPromise = fetch('/api/firebase-config')
+  .then(response => response.json())
+  .then(config => {
+    // Check if Firebase is already initialized to avoid errors
+    if (!firebase.apps.length) {
+      console.log('Service Worker: Initializing Firebase App...');
+      return firebase.initializeApp(config);
+    }
+    return firebase.app(); // Return the already initialized app
+  })
+  .catch(error => {
+    console.error('Service Worker: Failed to fetch Firebase config or initialize app.', error);
+  });
+
+// Handle incoming push notifications
+self.addEventListener('push', (event) => {
+  console.log('[Service Worker] Push Received.');
+  
+  // The push data is expected to be a JSON string.
+  const payload = event.data ? event.data.json() : {};
+  
+  // The actual notification data is in `payload.data` because we are sending data-only messages.
+  const notificationData = payload.data || {};
+
+  const title = notificationData.title || 'New Notification';
+  const options = {
+    body: notificationData.body || 'You have a new message.',
+    icon: notificationData.icon || '/icons/icon-192x192.png', // A default icon
+    badge: '/icons/icon-72x72.png', // A default badge
+    data: {
+      url: notificationData.url || '/', // The URL to open on click
+    },
+  };
+
+  // Wait until the notification is shown.
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Handle notification click events
+self.addEventListener('notificationclick', (event) => {
+  console.log('[Service Worker] Notification click Received.');
+
+  // Close the notification
+  event.notification.close();
+
+  const urlToOpen = event.notification.data.url || '/';
+
+  // This looks for an existing window/tab with the same URL and focuses it.
+  // If not found, it opens a new window/tab.
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('[SW] Deleting old cache:', cache);
-            return caches.delete(cache);
-          }
-        })
-      );
-    }).then(() => {
-      // Tell the active service worker to take control of the page immediately.
-      return self.clients.claim();
+    self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    }).then((clientList) => {
+      // Check if there's a window open with the app's origin
+      for (const client of clientList) {
+        // You can add more specific URL checks here if needed
+        if (client.url.startsWith(self.origin) && 'focus' in client) {
+          // If a window is found, navigate it to the correct URL and focus it.
+          client.navigate(urlToOpen);
+          return client.focus();
+        }
+      }
+      // If no window is found, open a new one
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(urlToOpen);
+      }
     })
   );
 });
 
-self.addEventListener('fetch', (event) => {
-  // Only apply this logic to navigation requests
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        // If the fetch fails (e.g., offline), serve the offline page from the cache.
-        return caches.match(OFFLINE_URL);
-      })
-    );
-  }
-});
-
-// Setup background message handler
-firebaseMessagingPromise.then(messaging => {
-  if (messaging) {
+// Initialize the messaging service with the firebaseAppPromise
+firebaseAppPromise.then(app => {
+  if (app) {
+    const messaging = firebase.messaging(app);
+    // The onBackgroundMessage is useful for compat, but the 'push' event listener is more standard.
+    // It's good to have for certain edge cases.
     messaging.onBackgroundMessage((payload) => {
-      console.log('[SW] Background message received: ', payload);
+      console.log('[firebase-messaging-sw.js] Received background message (compat handler)', payload);
       
-      const data = payload.data || {};
-      const notificationTitle = data.title || 'New Notification';
+      const notificationTitle = payload.data.title;
       const notificationOptions = {
-        body: data.body || 'You have a new message!',
-        icon: '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
+        body: payload.data.body,
+        icon: payload.data.icon || '/icons/icon-192x192.png',
         data: {
-            url: data.url || '/' // Default URL if none is provided
+            url: payload.data.url || '/',
         }
       };
 
@@ -98,32 +109,3 @@ firebaseMessagingPromise.then(messaging => {
     });
   }
 });
-
-
-self.addEventListener('notificationclick', (event) => {
-    console.log('[SW] Notification click received.');
-    event.notification.close();
-    
-    const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
-  
-    event.waitUntil(
-      clients.matchAll({
-        type: 'window',
-        includeUncontrolled: true,
-      }).then((clientList) => {
-        for (const client of clientList) {
-          if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
-            // If we want to navigate that specific window to the URL:
-            if(client.navigate) {
-                client.navigate(urlToOpen);
-            }
-            return client.focus();
-          }
-        }
-        // If no window is open, open a new one.
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
-    );
-  });
