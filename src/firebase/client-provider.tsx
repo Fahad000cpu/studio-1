@@ -12,16 +12,12 @@ import { FullScreenLoader } from '@/components/full-screen-loader';
 // NOTE: InAppMessagingInitializer was removed to prevent a build crash.
 // import { InAppMessagingInitializer } from '@/components/in-app-messaging-initializer';
 
-interface FirebaseClientProviderProps {
-  children: ReactNode;
-}
-
 interface FirebaseInstances {
   app: FirebaseApp;
   auth: Auth;
   firestore: Firestore;
   functions: Functions;
-  analytics: Analytics | null; // Can be null
+  analytics: Analytics | null;
 }
 
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
@@ -29,10 +25,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   const [initError, setInitError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (instances || initError) {
-        return;
-    }
-
+    // Initialize core services immediately
     if (!firebaseConfig.apiKey) {
       const errorMessage = "Firebase API Key is missing. Please get your key from the Firebase console (Project settings > General) and add it to the .env file as NEXT_PUBLIC_FIREBASE_API_KEY.";
       console.error(errorMessage);
@@ -45,16 +38,21 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     const firestore = getFirestore(app);
     const functions = getFunctions(app);
 
-    // Note: Initialization for Firebase Installations and In-App Messaging has been
-    // removed as it was causing "Module not found" build errors in this environment.
-    // The app will now be stable, but In-App Messaging will not function.
+    // Set core instances immediately, with analytics as null initially.
+    // This allows the app to render without waiting for the analytics check.
+    setInstances({ app, auth, firestore, functions, analytics: null });
 
+    // Then, check for and initialize analytics in the background.
     isSupported().then(supported => {
-        const analytics = supported ? getAnalytics(app) : null;
-        const newInstances: FirebaseInstances = { app, auth, firestore, functions, analytics };
-        setInstances(newInstances);
+      if (supported) {
+        const analytics = getAnalytics(app);
+        // Update the state with the analytics instance once it's ready.
+        // This will cause a re-render, but the app is already interactive.
+        setInstances(prev => prev ? { ...prev, analytics } : { app, auth, firestore, functions, analytics });
+      }
     });
 
+    // Register service worker in the background.
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker
           .register('/sw.js')
@@ -63,8 +61,8 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     }
   // We want this to run only once on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instances, initError]);
-  
+  }, []);
+
   if (initError) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background p-4">
