@@ -1,4 +1,3 @@
-
 'use server';
 import * as admin from 'firebase-admin';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
@@ -97,6 +96,7 @@ export async function sendChatNotification({ recipientId, groupId, senderId, sen
       
       const body = messageText.length > 100 ? `${messageText.substring(0, 97)}...` : messageText;
 
+      // ** CHANGE: Use a data-only payload to ensure the service worker always handles the message. **
       const messagePayload: admin.messaging.MulticastMessage = {
         tokens,
         data: {

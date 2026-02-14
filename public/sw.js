@@ -1,134 +1,114 @@
 // public/sw.js
 
-const CACHE_NAME = 'connectsphere-cache-v3'; // Incremented version
-const OFFLINE_URL = '/offline.html';
-const urlsToCache = [
+const CACHE_NAME = 'connect-sphere-cache-v4'; // Incremented version
+const OFFLINE_URL = 'offline.html';
+
+// Note: Add URLs for any essential static assets you want to cache.
+// Be cautious about caching too much, especially dynamic content or large assets.
+const URLS_TO_CACHE = [
   '/',
-  '/offline.html',
+  OFFLINE_URL,
   '/manifest.json',
-  // Add other static assets that are crucial for the app shell
 ];
 
+// Install stage: open cache and add assets.
 self.addEventListener('install', (event) => {
+  console.log('[SW] Install event');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Opened cache');
-        // Add all core assets to the cache
-        return cache.addAll(urlsToCache);
+        console.log('[SW] Caching app shell');
+        return cache.addAll(URLS_TO_CACHE);
       })
-      .then(() => {
-        // Force the waiting service worker to become the active service worker.
-        return self.skipWaiting();
+      .catch((error) => {
+        console.error('[SW] Caching failed:', error);
       })
   );
+  self.skipWaiting();
 });
 
+// Activate stage: clean up old caches.
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activate event');
+  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
+          if (!cacheWhitelist.includes(cacheName)) {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
-      );
-    }).then(() => {
-      // Tell the active service worker to take control of the page immediately.
-      return self.clients.claim();
-    })
+      )
+    )
   );
+  return self.clients.claim();
 });
 
-
+// Fetch stage: serve from cache with network fallback for navigation.
 self.addEventListener('fetch', (event) => {
-    // We only want to call event.respondWith() if this is a navigation request
-    // for an HTML page.
-    if (event.request.mode === 'navigate') {
-        event.respondWith(
-            (async () => {
-                try {
-                    // First, try to use the navigation preload response if it's
-                    // supported.
-                    const preloadResponse = await event.preloadResponse;
-                    if (preloadResponse) {
-                        return preloadResponse;
-                    }
-
-                    // Always try the network first.
-                    const networkResponse = await fetch(event.request);
-                    return networkResponse;
-                } catch (error) {
-                    // catch is only triggered if an exception is thrown, which is
-                    // likely due to a network error.
-                    // If fetch() returns a valid HTTP response with a response code in
-                    // the 4xx or 5xx range, the catch() will NOT be called.
-                    console.log('[SW] Fetch failed; returning offline page instead.', error);
-
-                    const cache = await caches.open(CACHE_NAME);
-                    const cachedResponse = await cache.match(OFFLINE_URL);
-                    return cachedResponse;
-                }
-            })()
-        );
-    }
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
+    );
+  } else if (URLS_TO_CACHE.includes(new URL(event.request.url).pathname)) {
+    // For app shell files, use cache first strategy.
+    event.respondWith(
+      caches.match(event.request).then((response) => response || fetch(event.request))
+    );
+  }
 });
 
 
-// PUSH NOTIFICATION HANDLING
+// --- PUSH NOTIFICATION HANDLING ---
+
+// 'push' event: happens when a push message is received.
 self.addEventListener('push', (event) => {
   console.log('[SW] Push Received.');
+
   if (!event.data) {
-    console.log('[SW] Push event but no data');
+    console.error('[SW] Push event but no data');
     return;
   }
   
-  let data;
-  try {
-    data = event.data.json();
-  } catch(e) {
-    console.error('[SW] Push data is not valid JSON:', event.data.text());
-    data = { title: 'New Notification', body: event.data.text() };
-  }
-
+  // The payload is sent as a JSON string, so we need to parse it.
+  const data = event.data.json();
   console.log('[SW] Push data:', data);
 
-  const title = data.title || 'New Message';
+  const title = data.title || 'ConnectSphere';
   const options = {
     body: data.body || 'You have a new message.',
     icon: data.icon || '/logo192.png',
     badge: '/logo192.png',
-    image: data.image || undefined,
+    image: data.image, // URL to an image for rich notifications
     data: {
-      url: data.url || '/',
+      url: data.url || '/', // URL to open on click
     },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+// 'notificationclick' event: happens when user clicks on a notification.
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification click Received.');
-  event.notification.close();
+  event.notification.close(); // Close the notification
 
-  const urlToOpen = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
 
   event.waitUntil(
     clients.matchAll({
       type: 'window',
       includeUncontrolled: true,
     }).then((clientList) => {
-      // Check if there's already a window open with the same path.
+      // If a window for the app is already open, focus it.
       for (const client of clientList) {
-        const clientUrl = new URL(client.url);
-        const notificationUrl = new URL(urlToOpen);
-        if (clientUrl.pathname === notificationUrl.pathname && 'focus' in client) {
+        if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // If not, open a new window.
+      // Otherwise, open a new window.
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }

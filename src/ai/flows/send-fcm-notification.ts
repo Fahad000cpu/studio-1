@@ -32,6 +32,7 @@ export async function sendFcmNotification(input: SendFcmNotificationInput): Prom
 
   const uniqueTokens = [...new Set(tokens)];
 
+  // ** CHANGE: Use a data-only payload to ensure the service worker always handles the message. **
   const message: admin.messaging.MulticastMessage = {
     tokens: uniqueTokens,
     data: {
