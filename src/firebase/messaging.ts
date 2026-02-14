@@ -13,6 +13,20 @@ import { getMessaging, getToken, isSupported } from 'firebase/messaging';
  * This function should only be called from a client component on user interaction.
  */
 export const requestPermission = async (firestore: Firestore, user: User): Promise<string | null> => {
+  const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+
+  // **CRITICAL CHECK**: Ensure the VAPID key is present.
+  if (!vapidKey || vapidKey === 'YOUR_VAPID_KEY_HERE') {
+    console.error("VAPID Key is missing or is a placeholder. Notifications cannot be initialized.");
+    toast({
+        variant: "destructive",
+        title: "Configuration Error: VAPID Key Missing",
+        description: "The developer must provide a VAPID key from the Firebase Console and set it in the .env file as NEXT_PUBLIC_FIREBASE_VAPID_KEY.",
+        duration: 10000,
+    });
+    return null;
+  }
+
   try {
     const supported = await isSupported();
     if (!supported || !navigator.serviceWorker) {
@@ -49,7 +63,7 @@ export const requestPermission = async (firestore: Firestore, user: User): Promi
     
     const currentToken = await getToken(messagingInstance, {
       serviceWorkerRegistration: swRegistration,
-      vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+      vapidKey: vapidKey,
     });
 
     if (currentToken) {
@@ -98,7 +112,15 @@ export const requestPermission = async (firestore: Firestore, user: User): Promi
             description: "Could not set up notifications. Please ensure you are on a secure (HTTPS) connection and try refreshing.",
             duration: 10000,
         });
-    } else {
+    } else if (firebaseError.code === 'messaging/invalid-vapid-key') {
+        toast({
+            variant: "destructive",
+            title: "Invalid VAPID Key",
+            description: "The VAPID key is invalid. Please check the key in your .env file against the one in the Firebase Console.",
+            duration: 10000,
+        });
+    }
+    else {
         toast({
           variant: "destructive",
           title: "An Error Occurred",
