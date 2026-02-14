@@ -15,14 +15,14 @@ import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 export const requestPermission = async (firestore: Firestore, user: User): Promise<string | null> => {
   const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
-  // **CRITICAL CHECK**: Ensure the VAPID key is present.
+  // **CRITICAL CHECK**: Ensure the VAPID key is present and is not the placeholder.
   if (!vapidKey || vapidKey === 'YOUR_VAPID_KEY_HERE') {
     console.error("VAPID Key is missing or is a placeholder. Notifications cannot be initialized.");
     toast({
         variant: "destructive",
         title: "Configuration Error: VAPID Key Missing",
-        description: "The developer must provide a VAPID key from the Firebase Console and set it in the .env file as NEXT_PUBLIC_FIREBASE_VAPID_KEY.",
-        duration: 10000,
+        description: "The developer must provide a VAPID key. Go to your Firebase Console (Project settings > Cloud Messaging > Web Push certificates), generate a key pair, copy the public key, and set it in the .env file as NEXT_PUBLIC_FIREBASE_VAPID_KEY.",
+        duration: 15000,
     });
     return null;
   }

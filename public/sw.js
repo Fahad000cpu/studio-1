@@ -1,72 +1,65 @@
-// Using compat scripts for robust, widespread browser support.
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
+// Using compat libraries for robust messaging handling
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js');
 
-// --- Firebase Initialization ---
-// This configuration MUST match your client-side config.
+// This configuration is automatically populated with your project's details.
+// Make sure these values are correct for your Firebase project.
 const firebaseConfig = {
-  projectId: "studio-6505166944-ae18f",
-  appId: "1:954303139735:web:1cb50131d512627c9d3ed2",
-  storageBucket: "studio-6505166944-ae18f.appspot.com",
-  authDomain: "studio-6505166944-ae18f.firebaseapp.com",
-  messagingSenderId: "9690130479",
-  // No apiKey needed in SW
+  apiKey: "AIzaSyDzOlXqeSrR9nSczZZ0PQRkZezeKbWveL0",
+  authDomain: "connectsphere2132-709496-dcb23.firebaseapp.com",
+  projectId: "connectsphere2132-709496-dcb23",
+  storageBucket: "connectsphere2132-709496-dcb23.firebasestorage.app",
+  messagingSenderId: "729479214132",
+  appId: "1:729479214132:web:68b20e669c923e6a908661",
 };
 
-try {
-    firebase.initializeApp(firebaseConfig);
-} catch (e) {
-    console.error('SW: Firebase app is already initialized.');
-}
-
+firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();
 
-// --- Background Message Handler ---
-// This is triggered when a push notification is received while the app is in the background.
+// This handler is triggered when a push message is received while the app is in the background.
 messaging.onBackgroundMessage((payload) => {
-  console.log('[sw.js] Received background message: ', payload);
+  console.log('[sw.js] Background message received: ', payload);
 
-  // The 'data' property is sent from our server actions.
-  const notificationTitle = payload.data.title || 'New Notification';
+  // The payload from a data-only message comes in the `data` property.
+  const notificationTitle = payload.data.title || 'New Message';
   const notificationOptions = {
-    body: payload.data.body || 'You have a new message.',
-    // Use externally hosted icons that are guaranteed to exist.
-    icon: payload.data.image || 'https://i.ibb.co/3sS7hF1/icon-192x192.png',
-    badge: 'https://i.ibb.co/L8d5Yx2/icon-72x72.png',
-    tag: payload.data.tag || 'connectsphere-notification', // Helps group notifications
+    body: payload.data.body || 'You have a new notification!',
+    icon: payload.data.icon || '/icons/icon-192x192.png',
+    image: payload.data.image, // Optional image
+    badge: '/icons/icon-72x72.png',
+    tag: 'connectsphere-notification',
     data: {
-      url: payload.data.url || '/', // URL to open on click
-    },
+      url: payload.data.url || '/' // Pass the URL to the click handler
+    }
   };
 
+  // Display the notification.
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-// --- Notification Click Handler ---
-// This is triggered when a user clicks on a displayed notification.
+
+// This handler is triggered when a user clicks on the notification.
 self.addEventListener('notificationclick', (event) => {
-  console.log('[sw.js] Notification click received.', event);
+  console.log('[sw.js] Notification click Received.');
 
   event.notification.close();
 
   const urlToOpen = new URL(event.notification.data.url || '/', self.location.origin).href;
 
-  // This looks for an existing window/tab with the same URL and focuses it.
-  // If not found, it opens a new one.
   event.waitUntil(
     clients.matchAll({
       type: 'window',
       includeUncontrolled: true,
     }).then((clientList) => {
-      // Check if there's a client running the app already.
-      const existingClient = clientList.find(client => new URL(client.url, self.location.origin).href === urlToOpen);
-
-      if (existingClient) {
-          return existingClient.focus();
+      // If a window for this app is already open, focus it.
+      for (const client of clientList) {
+        // Check if the client URL has the same path.
+        if (new URL(client.url).pathname === new URL(urlToOpen).pathname && 'focus' in client) {
+          return client.focus();
+        }
       }
-      
-      // If no client is open, open a new window.
+      // Otherwise, open a new window to the correct URL.
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
@@ -74,25 +67,15 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// --- PWA Lifecycle Listeners ---
-// These are essential for the Service Worker to be recognized and activated correctly,
-// which is a prerequisite for generating a push token.
-
+// Basic service worker lifecycle events.
 self.addEventListener('install', (event) => {
-  console.log('[sw.js] Service worker installing...');
-  // self.skipWaiting() ensures the new SW activates immediately, replacing the old one.
-  self.skipWaiting();
+    console.log('[sw.js] Service worker installing...');
+    // self.skipWaiting() ensures the new service worker activates immediately.
+    event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[sw.js] Service worker activating...');
-  // event.waitUntil(clients.claim()) allows the SW to control pages that are already open without a reload.
-  event.waitUntil(clients.claim());
-});
-
-// A minimal fetch listener is required for a PWA to be considered "installable" by some browsers.
-// This basic network-first strategy is safe and non-intrusive.
-self.addEventListener('fetch', (event) => {
-  // We are not intercepting requests for now. This is just to satisfy PWA criteria.
-  return;
+    console.log('[sw.js] Service worker activating...');
+    // self.clients.claim() allows the activated service worker to take control of open clients.
+    event.waitUntil(self.clients.claim());
 });
