@@ -1,108 +1,63 @@
-const CACHE_NAME = 'connectsphere-v1.4'; // Incremented version
-const urlsToCache = [
-  '/',
-  '/offline.html',
-];
+// Final Professional Service Worker for Firebase Cloud Messaging
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
-  self.skipWaiting();
+// Initialize Firebase with your project's configuration
+firebase.initializeApp({
+    "projectId": "studio-6505166944-ae18f",
+    "appId": "1:954303139735:web:1cb50131d512627c9d3ed2",
+    "storageBucket": "studio-6505166944-ae18f.firebasestorage.app",
+    "apiKey": "AIzaSyA3C0VowePTvCbPgpzmcKC9GqAE2M0bscs",
+    "authDomain": "studio-6505166944-ae18f.firebaseapp.com",
+    "messagingSenderId": "954303139735"
 });
 
-self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  return self.clients.claim();
+const messaging = firebase.messaging();
+
+// Required for PWA Installability - a simple fetch handler
+self.addEventListener('fetch', function(event) {
+    // This basic fetch handler is sufficient to make the app installable.
 });
 
-self.addEventListener('fetch', (event) => {
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return caches.match('/offline.html');
-      })
-    );
-  } else {
-    event.respondWith(
-      caches.match(event.request).then((response) => {
-        return response || fetch(event.request);
-      })
-    );
-  }
-});
-
-
-self.addEventListener('push', (event) => {
-  console.log('[Service Worker] Push Received.');
-  let data = {};
-  try {
-    data = event.data.json();
-  } catch (e) {
-    console.error('[Service Worker] Push event but no data', e);
-    return;
-  }
+// Handle Background Messages
+messaging.onBackgroundMessage((payload) => {
+  console.log('[firebase-messaging-sw.js] Background message received: ', payload);
   
-  console.log('[Service Worker] Push data:', data);
-
-  const title = data.title || 'New Notification';
-  const options = {
-    body: data.body || 'Something new happened!',
-    image: data.image,
+  // Extract notification data from the 'data' payload for data-only messages
+  const notificationTitle = payload.data.title || 'New Message';
+  const notificationOptions = {
+    body: payload.data.body || 'You have a new notification!',
+    icon: payload.data.image || 'https://placehold.co/192x192/059669/ffffff?text=PWA', // Use image from data payload if available
+    badge: 'https://placehold.co/72x72/059669/ffffff?text=N',
+    tag: payload.data.tag || 'default-tag',
     data: {
-      url: data.url || '/',
-    },
+        url: payload.data.url || '/' // Pass the URL for the click action
+    }
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-
+// Handle Notification Click
 self.addEventListener('notificationclick', (event) => {
-    console.log('[Service Worker] Notification click Received.');
+  event.notification.close();
+  const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
 
-    event.notification.close();
-
-    const urlToOpen = event.notification.data.url;
-
-    event.waitUntil(
-        clients.matchAll({
-            type: "window",
-            includeUncontrolled: true
-        }).then((clientList) => {
-             const client = clientList.find(c => {
-                // Use URL constructor for robust parsing
-                try {
-                    const clientUrl = new URL(c.url);
-                    const targetUrl = new URL(urlToOpen, self.location.origin);
-                    // Compare just the pathname and search params
-                    return clientUrl.pathname === targetUrl.pathname && clientUrl.search === targetUrl.search;
-                } catch (e) {
-                    return false; // Invalid URL, can't match
-                }
-            });
-
-            if (client && 'focus' in client) {
-                return client.focus();
-            }
-            if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
-            }
-        })
-    );
+  event.waitUntil(
+    self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true,
+    }).then((clientList) => {
+      // Check if a window is already open with the target URL
+      for (const client of clientList) {
+        if (client.url === urlToOpen && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // If not, open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(urlToOpen);
+      }
+    })
+  );
 });
