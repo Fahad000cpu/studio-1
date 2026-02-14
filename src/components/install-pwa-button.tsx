@@ -40,22 +40,30 @@ export const InstallPwaButton = () => {
       return;
     }
     // Show the browser's installation prompt.
-    await installPrompt.prompt();
+    installPrompt.prompt();
   };
+  
+  // Only render the button if the installation prompt is available.
+  if (!installPrompt) {
+    return null;
+  }
 
-  // The button is always rendered. It is only enabled when the browser has fired the
-  // `beforeinstallprompt` event and made the installation prompt available.
   return (
     <TooltipProvider>
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={handleInstallClick} disabled={!installPrompt}>
-                    <Download className="h-5 w-5" />
+                <Button
+                    variant="default"
+                    size="icon"
+                    onClick={handleInstallClick}
+                    className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg bg-accent text-accent-foreground hover:bg-accent/90 z-50"
+                >
+                    <Download className="h-6 w-6" />
                     <span className="sr-only">Install App</span>
                 </Button>
             </TooltipTrigger>
-            <TooltipContent>
-                <p>{installPrompt ? 'Install App' : 'Installation not available'}</p>
+            <TooltipContent side="left">
+                <p>Install ConnectSphere</p>
             </TooltipContent>
         </Tooltip>
     </TooltipProvider>

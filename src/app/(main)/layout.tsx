@@ -112,13 +112,13 @@ export default function MainLayout({
               <div className="w-full flex-1">
                   {/* Can add breadcrumbs or search here */}
               </div>
-              <InstallPwaButton />
               <ThemeToggle />
               <UserNav />
               </header>
               <main className="flex-1">
               {children}
               </main>
+              <InstallPwaButton />
           </SidebarInset>
           </SidebarProvider>
       </div>
