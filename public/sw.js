@@ -1,110 +1,103 @@
-// public/sw.js
+const CACHE_NAME = 'connectsphere-v5'; // Bump version to ensure update
+const OFFLINE_URL = '/offline.html';
 
-const CACHE_NAME = 'connect-sphere-cache-v4'; // Incremented version
-const OFFLINE_URL = 'offline.html';
-
-// Note: Add URLs for any essential static assets you want to cache.
-// Be cautious about caching too much, especially dynamic content or large assets.
-const URLS_TO_CACHE = [
-  '/',
-  OFFLINE_URL,
-  '/manifest.json',
-];
-
-// Install stage: open cache and add assets.
 self.addEventListener('install', (event) => {
-  console.log('[SW] Install event');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Caching app shell');
-        return cache.addAll(URLS_TO_CACHE);
+        console.log('[SW] Opened cache');
+        // Only cache the essential offline page to ensure install succeeds
+        return cache.add(OFFLINE_URL);
       })
-      .catch((error) => {
-        console.error('[SW] Caching failed:', error);
+      .then(() => {
+        console.log('[SW] Install successful, skipping waiting.');
+        return self.skipWaiting();
+      })
+      .catch(error => {
+        console.error('[SW] Cache add failed during install:', error);
       })
   );
-  self.skipWaiting();
 });
 
-// Activate stage: clean up old caches.
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activate event');
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
-    caches.keys().then((cacheNames) =>
-      Promise.all(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
         cacheNames.map((cacheName) => {
-          if (!cacheWhitelist.includes(cacheName)) {
+          if (cacheWhitelist.indexOf(cacheName) === -1) {
             console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
-      )
-    )
+      );
+    }).then(() => {
+        console.log('[SW] Claiming clients.');
+        return self.clients.claim();
+    })
   );
-  return self.clients.claim();
 });
 
-// Fetch stage: serve from cache with network fallback for navigation.
 self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(OFFLINE_URL))
-    );
-  } else if (URLS_TO_CACHE.includes(new URL(event.request.url).pathname)) {
-    // For app shell files, use cache first strategy.
-    event.respondWith(
-      caches.match(event.request).then((response) => response || fetch(event.request))
+      fetch(event.request).catch(() => {
+        return caches.match(OFFLINE_URL);
+      })
     );
   }
 });
 
-
-// --- PUSH NOTIFICATION HANDLING ---
-
-// 'push' event: happens when a push message is received.
 self.addEventListener('push', (event) => {
   console.log('[SW] Push Received.');
-
+  
   if (!event.data) {
     console.error('[SW] Push event but no data');
     return;
   }
   
-  // The payload is sent as a JSON string, so we need to parse it.
-  const data = event.data.json();
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    console.error('[SW] Failed to parse push data:', e);
+    // Fallback notification if parsing fails
+    data = {
+      title: 'New Message',
+      body: 'You have a new message.'
+    };
+  }
+
   console.log('[SW] Push data:', data);
 
-  const title = data.title || 'ConnectSphere';
+  const title = data.title || 'New Message';
   const options = {
     body: data.body || 'You have a new message.',
-    icon: data.icon || '/logo192.png',
-    badge: '/logo192.png',
-    image: data.image, // URL to an image for rich notifications
+    // Icons are removed to prevent errors if they don't exist.
+    // The browser will use a default icon.
+    image: data.image,
     data: {
-      url: data.url || '/', // URL to open on click
+      url: data.url || '/',
     },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// 'notificationclick' event: happens when user clicks on a notification.
 self.addEventListener('notificationclick', (event) => {
   console.log('[SW] Notification click Received.');
-  event.notification.close(); // Close the notification
+
+  event.notification.close();
 
   const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
 
   event.waitUntil(
-    clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true,
-    }).then((clientList) => {
-      // If a window for the app is already open, focus it.
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a window with the same URL path is already open, focus it.
       for (const client of clientList) {
-        if (client.url === urlToOpen && 'focus' in client) {
+        const clientUrl = new URL(client.url);
+        const targetUrl = new URL(urlToOpen);
+        if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
           return client.focus();
         }
       }
