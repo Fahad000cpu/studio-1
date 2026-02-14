@@ -1,22 +1,18 @@
-const CACHE_NAME = 'connectsphere-v5'; // Bump version to ensure update
-const OFFLINE_URL = '/offline.html';
+const CACHE_NAME = 'connectsphere-v1.4'; // Incremented version
+const urlsToCache = [
+  '/',
+  '/offline.html',
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Opened cache');
-        // Only cache the essential offline page to ensure install succeeds
-        return cache.add(OFFLINE_URL);
-      })
-      .then(() => {
-        console.log('[SW] Install successful, skipping waiting.');
-        return self.skipWaiting();
-      })
-      .catch(error => {
-        console.error('[SW] Cache add failed during install:', error);
+        console.log('Opened cache');
+        return cache.addAll(urlsToCache);
       })
   );
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -26,55 +22,47 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('[SW] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    }).then(() => {
-        console.log('[SW] Claiming clients.');
-        return self.clients.claim();
     })
   );
+  return self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
-        return caches.match(OFFLINE_URL);
+        return caches.match('/offline.html');
+      })
+    );
+  } else {
+    event.respondWith(
+      caches.match(event.request).then((response) => {
+        return response || fetch(event.request);
       })
     );
   }
 });
 
+
 self.addEventListener('push', (event) => {
-  console.log('[SW] Push Received.');
-  
-  if (!event.data) {
-    console.error('[SW] Push event but no data');
-    return;
-  }
-  
-  let data;
+  console.log('[Service Worker] Push Received.');
+  let data = {};
   try {
     data = event.data.json();
   } catch (e) {
-    console.error('[SW] Failed to parse push data:', e);
-    // Fallback notification if parsing fails
-    data = {
-      title: 'New Message',
-      body: 'You have a new message.'
-    };
+    console.error('[Service Worker] Push event but no data', e);
+    return;
   }
+  
+  console.log('[Service Worker] Push data:', data);
 
-  console.log('[SW] Push data:', data);
-
-  const title = data.title || 'New Message';
+  const title = data.title || 'New Notification';
   const options = {
-    body: data.body || 'You have a new message.',
-    // Icons are removed to prevent errors if they don't exist.
-    // The browser will use a default icon.
+    body: data.body || 'Something new happened!',
     image: data.image,
     data: {
       url: data.url || '/',
@@ -84,27 +72,37 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+
 self.addEventListener('notificationclick', (event) => {
-  console.log('[SW] Notification click Received.');
+    console.log('[Service Worker] Notification click Received.');
 
-  event.notification.close();
+    event.notification.close();
 
-  const urlToOpen = new URL(event.notification.data.url, self.location.origin).href;
+    const urlToOpen = event.notification.data.url;
 
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window with the same URL path is already open, focus it.
-      for (const client of clientList) {
-        const clientUrl = new URL(client.url);
-        const targetUrl = new URL(urlToOpen);
-        if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
-          return client.focus();
-        }
-      }
-      // Otherwise, open a new window.
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
-  );
+    event.waitUntil(
+        clients.matchAll({
+            type: "window",
+            includeUncontrolled: true
+        }).then((clientList) => {
+             const client = clientList.find(c => {
+                // Use URL constructor for robust parsing
+                try {
+                    const clientUrl = new URL(c.url);
+                    const targetUrl = new URL(urlToOpen, self.location.origin);
+                    // Compare just the pathname and search params
+                    return clientUrl.pathname === targetUrl.pathname && clientUrl.search === targetUrl.search;
+                } catch (e) {
+                    return false; // Invalid URL, can't match
+                }
+            });
+
+            if (client && 'focus' in client) {
+                return client.focus();
+            }
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
 });

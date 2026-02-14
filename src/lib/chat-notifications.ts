@@ -102,7 +102,6 @@ export async function sendChatNotification({ recipientId, groupId, senderId, sen
         data: {
             title: senderName,
             body: body,
-            icon: '/logo192.png', // Standard icon
             url: `/chat?chatWith=${senderId}`,
         },
         webpush: {

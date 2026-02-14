@@ -24,7 +24,7 @@ if (admin.apps.length === 0) {
  * @returns {Promise<SendFcmNotificationOutput>} - The result of the send operation.
  */
 export async function sendFcmNotification(input: SendFcmNotificationInput): Promise<SendFcmNotificationOutput> {
-  const { tokens, title, body, icon, url, image } = input;
+  const { tokens, title, body, url, image } = input;
 
   if (!tokens || tokens.length === 0) {
     return { successCount: 0, failureCount: 0, invalidTokens: [] };
@@ -38,7 +38,6 @@ export async function sendFcmNotification(input: SendFcmNotificationInput): Prom
     data: {
       title,
       body,
-      icon: icon || '/logo192.png',
       image: image || '',
       url: url || '/',
     },
