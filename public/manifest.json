@@ -1,23 +1,21 @@
 {
   "name": "ConnectSphere",
-  "short_name": "Connect",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#0A0A0A",
-  "theme_color": "#2563EB",
-  "description": "A modern PWA chat application built with Next.js and Firebase.",
+  "short_name": "ConnectSphere",
+  "description": "A modern chat application, installable as a PWA.",
   "icons": [
     {
       "src": "/logo192.png",
-      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "sizes": "192x192"
     },
     {
       "src": "/logo512.png",
-      "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "sizes": "512x512"
     }
-  ]
+  ],
+  "start_url": "/discover",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#0ea5e9"
 }

@@ -36,7 +36,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#8A2BE2" />
+        <meta name="theme-color" content="#0ea5e9" />
       </head>
       <body className={cn("font-body antialiased", ptSans.variable, spaceGrotesk.variable)}>
         <FirebaseClientProvider>
