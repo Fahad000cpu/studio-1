@@ -1,41 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ConnectSphere - Offline</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: #111827; /* Dark background */
-            color: #F9FAFB; /* Light text */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            text-align: center;
-            flex-direction: column;
-        }
-        .container {
-            max-width: 400px;
-            padding: 2rem;
-        }
-        h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            color: #3B82F6; /* Primary color */
-        }
-        p {
-            font-size: 1.1rem;
-            color: #D1D5DB; /* Muted text */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ConnectSphere | Offline</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f4f4;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      text-align: center;
+    }
+    .container {
+      max-width: 400px;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 2rem;
+      color: #555;
+    }
+    p {
+      font-size: 1rem;
+      color: #777;
+    }
+    svg {
+        width: 60px;
+        height: 60px;
+        margin-bottom: 1rem;
+        color: #8a2be2; /* Purple */
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>You are Offline</h1>
-        <p>It seems you've lost your connection. Please check your internet and try again.</p>
-    </div>
+  <div class="container">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23" />
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+        <path d="M10.71 5.05A16 16 0 0 1 12 5c.37 0 .74.02 1.1.06" />
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+        <path d="M8.53 16.11a6 6 0 0 1-2.82 2.78" />
+        <path d="M12 20a15.91 15.91 0 0 0 10.58-4" />
+    </svg>
+    <h1>You are Offline</h1>
+    <p>Please check your internet connection. Some features may not be available.</p>
+  </div>
 </body>
 </html>
