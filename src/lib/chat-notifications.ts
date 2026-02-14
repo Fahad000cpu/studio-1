@@ -99,18 +99,27 @@ export async function sendChatNotification({ recipientId, groupId, senderId, sen
 
       const messagePayload: admin.messaging.MulticastMessage = {
         tokens,
-        notification: {
-          title: senderName,
-          body: body,
+        data: {
+            title: senderName,
+            body: body,
+            icon: '/logo192.png', // Standard icon
+            url: `/chat?chatWith=${senderId}`,
         },
         webpush: {
-          fcmOptions: {
-            link: `/chat?chatWith=${senderId}`,
-          },
+            headers: {
+              Urgency: 'high',
+            },
         },
-        data: {
-          url: `/chat?chatWith=${senderId}`,
-        }
+        apns: {
+            payload: {
+              aps: {
+                'content-available': 1,
+              },
+            },
+        },
+        android: {
+            priority: 'high',
+        },
       };
 
       const response = await admin.messaging().sendEachForMulticast(messagePayload);

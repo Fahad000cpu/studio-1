@@ -34,31 +34,28 @@ export async function sendFcmNotification(input: SendFcmNotificationInput): Prom
 
   const message: admin.messaging.MulticastMessage = {
     tokens: uniqueTokens,
-    notification: {
+    data: {
       title,
       body,
-      imageUrl: image,
+      icon: icon || '/logo192.png',
+      image: image || '',
+      url: url || '/',
     },
     webpush: {
-      notification: {
-        icon: icon || '/favicon.ico',
-      },
-      fcmOptions: {
-        link: url || '/',
+      headers: {
+        Urgency: 'high',
       },
     },
     apns: {
       payload: {
         aps: {
           'content-available': 1,
-          'mutable-content': 1,
         },
       },
     },
-    // The data payload ensures the service worker receives the URL for custom click handling
-    data: {
-      url: url || '/',
-    }
+    android: {
+      priority: 'high',
+    },
   };
 
   try {
