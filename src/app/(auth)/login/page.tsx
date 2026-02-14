@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -149,6 +148,10 @@ export default function LoginPage() {
         });
         
     } catch (error: any) {
+        if (error.code === 'auth/unauthorized-domain') {
+            setAuthDomainError(window.location.hostname);
+            return;
+        }
         // If the user closes the popup, it could be because of a config error shown inside the popup window.
         // We also catch generic internal errors which often hide underlying config issues from the provider.
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
@@ -162,10 +165,6 @@ export default function LoginPage() {
                 description: "An account with this email already exists using a different sign-in method. Please log in with your original method.",
                 duration: 10000,
             });
-            return;
-        }
-        if (error.code === 'auth/unauthorized-domain') {
-            setAuthDomainError(window.location.hostname);
             return;
         }
         console.error("Google Sign-In Error:", error);
@@ -196,6 +195,10 @@ export default function LoginPage() {
         });
         
     } catch (error: any) {
+        if (error.code === 'auth/unauthorized-domain') {
+            setAuthDomainError(window.location.hostname);
+            return;
+        }
         // If the user closes the popup, it could be because of a config error shown inside the popup window.
         // We also catch generic internal errors which often hide underlying config issues from the provider.
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
@@ -209,9 +212,6 @@ export default function LoginPage() {
                 description: "An account with this email already exists using a different sign-in method. Please log in with your original method.",
                 duration: 10000,
             });
-        } else if (error.code === 'auth/unauthorized-domain') {
-            setAuthDomainError(window.location.hostname);
-            return;
         } else {
             console.error("Facebook Sign-In Error:", error);
             toast({
@@ -371,15 +371,26 @@ export default function LoginPage() {
             <AlertDialogContent>
                 <AlertDialogHeader>
                 <AlertDialogTitle>Domain Not Authorized</AlertDialogTitle>
-                <AlertDialogDescription>
-                    To enable sign-in with this provider, you need to add your app's domain to the list of authorized domains in the Firebase console.
-                    <br/><br/>
-                    <span className="font-bold">Domain to add:</span>
-                    <div className="mt-2 p-2 bg-muted rounded-md font-mono text-sm break-all">
-                    {authDomainError}
+                <AlertDialogDescription asChild>
+                    <div className="space-y-4 text-left text-sm pt-2">
+                        <p>This is a standard security step. Firebase needs to know which websites are allowed to use its authentication services for your project.</p>
+                        
+                        <p className="font-bold">Please add this domain to your Firebase project:</p>
+                        <div className="mt-2 p-2 bg-muted rounded-md font-mono text-sm break-all">
+                            {authDomainError}
+                        </div>
+
+                        <p className="font-bold mt-4">Steps:</p>
+                        <ol className="list-decimal list-inside space-y-2">
+                            <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-primary">Firebase Console</a>.</li>
+                            <li>Select your project: <code className="bg-muted px-1 py-0.5 rounded">connectsphere2132-709496-dcb23</code></li>
+                            <li>In the left menu, go to <span className="font-semibold">Authentication</span>.</li>
+                            <li>Click the <span className="font-semibold">Settings</span> tab.</li>
+                            <li>Scroll to the <span className="font-semibold">Authorized domains</span> section and click <span className="font-semibold">Add domain</span>.</li>
+                            <li>Copy and paste the domain shown above and click Add.</li>
+                        </ol>
+                        <p className="text-xs text-muted-foreground pt-2">After adding, it might take a minute to take effect. Please try logging in again after that.</p>
                     </div>
-                    <br/>
-                    Go to your Firebase project, then **Authentication → Settings → Authorized domains**, and click **Add domain**.
                 </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -424,7 +435,3 @@ export default function LoginPage() {
     </Card>
   );
 }
-
-    
-
-    
