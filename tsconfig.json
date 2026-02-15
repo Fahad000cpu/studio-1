@@ -33,6 +33,7 @@
     "cs",
     "dataconnect",
     "functions",
-    "salam"
+    "salam",
+    "src/functions"
   ]
 }
