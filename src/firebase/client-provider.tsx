@@ -20,6 +20,10 @@ interface FirebaseInstances {
   analytics: Analytics | null;
 }
 
+interface FirebaseClientProviderProps {
+  children: ReactNode;
+}
+
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   const [instances, setInstances] = useState<FirebaseInstances | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
