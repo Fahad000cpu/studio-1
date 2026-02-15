@@ -166,10 +166,8 @@ export default function SignupPage() {
             setAuthDomainError(window.location.hostname);
             return;
         }
-        // If the user closes the popup, it could be because of a config error shown inside the popup window.
-        // We also catch generic internal errors which often hide underlying config issues from the provider.
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
-            setIsProviderErrorOpen(true); // Show the helpful configuration dialog.
+            setIsProviderErrorOpen(true);
             return;
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
@@ -211,10 +209,8 @@ export default function SignupPage() {
             setAuthDomainError(window.location.hostname);
             return;
         }
-        // If the user closes the popup, it could be because of a config error shown inside the popup window.
-        // We also catch generic internal errors which often hide underlying config issues from the provider.
         if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
-            setIsProviderErrorOpen(true); // Show the helpful configuration dialog.
+            setIsProviderErrorOpen(true);
             return;
         }
         if (error.code === 'auth/account-exists-with-different-credential') {
