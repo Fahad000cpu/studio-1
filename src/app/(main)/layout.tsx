@@ -1,8 +1,7 @@
-
 "use client";
 
 import { useUser, useFirestore, updateDocumentNonBlocking } from "@/firebase";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import Link from 'next/link';
 import { doc } from 'firebase/firestore';
@@ -31,14 +30,23 @@ export default function MainLayout({
 }) {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
+  const pathname = usePathname();
   const firestore = useFirestore();
 
+  const publicPaths = ['/terms-of-service', '/privacy-policy'];
+  const isPublicPath = publicPaths.includes(pathname);
+
   useEffect(() => {
-    // If auth state is resolved and there's no user, redirect to login.
+    // If it's a public path, we don't need to do any auth checks.
+    if (isPublicPath) {
+      return;
+    }
+    
+    // For protected paths, redirect if auth is resolved and there's no user.
     if (!isUserLoading && !user) {
       router.replace("/login");
     }
-  }, [isUserLoading, user, router]);
+  }, [isUserLoading, user, router, isPublicPath]);
 
   useEffect(() => {
     if (!user || !firestore) return;
@@ -75,13 +83,14 @@ export default function MainLayout({
     };
   }, [user, firestore]);
 
-  // While loading or if there's no user, show a loader.
+  // If we are on a protected path and the auth state is loading or there's no user, show a loader.
   // The useEffect above will handle the redirection.
-  if (isUserLoading || !user) {
+  // Don't show a loader for public paths.
+  if (!isPublicPath && (isUserLoading || !user)) {
     return <FullScreenLoader message="Loading your sphere..." />;
   }
 
-  // If we get here, the user is authenticated and we can render the app.
+  // If we get here, the user is authenticated OR it's a public path, so render the app.
   return (
       <div className="relative min-h-screen">
       <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
