@@ -1,9 +1,11 @@
-// A professional, production-ready service worker for Firebase Cloud Messaging.
-// This version is self-contained and does not fetch config, preventing race conditions.
+// Service Worker for Firebase Cloud Messaging
+
+// Importing Firebase App and Messaging modules
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
-// --- IMPORTANT: This config is for the "connectsphere2132-709496-dcb23" project ---
+// --- Your Web App's Firebase Configuration ---
+// This is hardcoded for reliability in the service worker environment.
 const firebaseConfig = {
   apiKey: "AIzaSyDzOlXqeSrR9nSczZZ0PQRkZezeKbWveL0",
   authDomain: "connectsphere2132-709496-dcb23.firebaseapp.com",
@@ -15,62 +17,56 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-try {
+if (firebase.apps.length === 0) {
   firebase.initializeApp(firebaseConfig);
-} catch (e) {
-  console.error("Firebase initialization failed in Service Worker. This can happen on repeated initializations.", e);
 }
-
 
 const messaging = firebase.messaging();
 
-// --- Background Message Handling ---
-// This function is triggered when a notification is received while the app is in the background.
+// Handle Background Messages: This is where we show the notification.
 messaging.onBackgroundMessage((payload) => {
   console.log('[sw.js] Background message received: ', payload);
   
-  // The payload from a DATA message comes in the `data` property.
-  const notificationTitle = payload.data.title || 'New ConnectSphere Message';
+  // Extract notification data from the payload.
+  // We prioritize the 'data' object for custom payloads sent from the server action.
+  const notificationTitle = payload.data?.title || payload.notification?.title || 'New Message';
   const notificationOptions = {
-    body: payload.data.body,
-    icon: payload.data.icon || '/logo192.png',
-    badge: '/logo72.png',
-    image: payload.data.image, // Optional image
+    body: payload.data?.body || payload.notification?.body || 'You have a new notification!',
+    icon: payload.data?.image || payload.notification?.image || 'https://i.ibb.co/6gqCnsd/logo-192.png',
+    badge: 'https://i.ibb.co/Ld9zCns/logo-512.png',
     tag: 'connectsphere-notification',
+    // Store the URL to open on click in the data property
     data: {
-      url: payload.data.url || '/' // URL to open on click
+      url: payload.data?.url || '/' // Default to opening the app's root
     }
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
-
-// --- Notification Click Event Handling ---
-// This function is triggered when a user clicks on a notification.
+// Handle Notification Clicks
 self.addEventListener('notificationclick', (event) => {
   console.log('[sw.js] Notification clicked: ', event.notification);
+  
+  // Close the notification
   event.notification.close();
 
+  // Get the URL from the notification's data
   const urlToOpen = event.notification.data?.url || '/';
 
-  // This code ensures that when a notification is clicked, it focuses an existing app window
-  // or opens a new one, preventing multiple tabs of the same app.
+  // Open the app or focus the existing window
   event.waitUntil(
     clients.matchAll({
       type: 'window',
-      includeUncontrolled: true,
+      includeUncontrolled: true
     }).then((clientList) => {
-      // Check if a window is already open at the target URL.
+      // If a window for the app is already open, focus it
       for (const client of clientList) {
-        // Use URL objects for robust comparison, ignoring hash.
-        const clientUrl = new URL(client.url);
-        const targetUrl = new URL(urlToOpen, self.location.origin);
-        if (clientUrl.pathname === targetUrl.pathname && 'focus' in client) {
+        if (client.url.startsWith(self.location.origin) && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window is found, open a new one.
+      // Otherwise, open a new window
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }
@@ -78,16 +74,8 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-// --- PWA Lifecycle Events ---
-// These ensure the service worker updates correctly.
-self.addEventListener('install', (event) => {
-  console.log('[sw.js] Service worker installed.');
-  // Skip waiting to activate the new service worker immediately.
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', (event) => {
-  console.log('[sw.js] Service worker activated.');
-  // Take control of all open pages at once.
-  event.waitUntil(clients.claim());
+// A basic fetch listener is needed for PWA installability prompts.
+self.addEventListener('fetch', (event) => {
+  // We don't need to do anything special here for notifications to work.
+  // This just ensures the service worker is active.
 });

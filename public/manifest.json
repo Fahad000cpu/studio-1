@@ -3,26 +3,20 @@
   "short_name": "ConnectSphere",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0F172A",
-  "theme_color": "#0EA5E9",
+  "background_color": "#f5f5f5",
+  "theme_color": "#0ea5e9",
   "description": "A modern chat application.",
+  "gcm_sender_id": "103953800507",
   "icons": [
     {
-      "src": "https://i.ibb.co/2Z4xLNx/logo72.png",
-      "sizes": "72x72",
+      "src": "https://i.ibb.co/6gqCnsd/logo-192.png",
+      "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "https://i.ibb.co/3zd4FfN/logo192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "https://i.ibb.co/W2zM4kL/logo512.png",
+      "src": "https://i.ibb.co/Ld9zCns/logo-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "gcm_sender_id": "103953800507"
+  ]
 }
