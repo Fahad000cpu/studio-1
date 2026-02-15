@@ -17,7 +17,7 @@ export default function DiscoverPage() {
           <div>
             <h1 className="text-3xl font-bold font-headline tracking-tight">Discover People</h1>
             <p className="text-muted-foreground">
-              Connect with people in the community.
+              Discover people near you and connect with the community.
             </p>
           </div>
           <div className="relative">
