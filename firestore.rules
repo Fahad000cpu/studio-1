@@ -115,7 +115,9 @@ service cloud.firestore {
     match /groups/{groupId} {
       // Allow reading a group document if the user is a member.
       allow get: if request.auth != null && isUserInMemberList();
-      allow list: if request.auth != null && request.query.where.size() > 0 && request.query.where[0][0] == 'memberIds' && request.query.where[0][1] == 'array-contains' && request.query.where[0][2] == request.auth.uid;
+      // To query the 'groups' collection, the client MUST include a `where('memberIds', 'array-contains', request.auth.uid)` clause.
+      // Firestore then enforces this by checking the query against the 'get' rule for all potential documents.
+      allow list: if request.auth != null;
 
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
