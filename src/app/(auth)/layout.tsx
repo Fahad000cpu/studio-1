@@ -23,65 +23,72 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isUserLoading } = useUser();
+  const { user, isUserLoading: isAuthSessionLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
   const router = useRouter();
+  
+  // This new state tracks if we are actively checking for a redirect result.
+  const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
   const [authDomainError, setAuthDomainError] = useState<string | null>(null);
 
+  // This effect runs ONLY ONCE on mount to check for a sign-in redirect result.
   useEffect(() => {
-    // If auth state is resolved and a user exists, redirect to the main app.
-    if (!isUserLoading && user) {
-      router.replace("/discover");
-    }
-  }, [isUserLoading, user, router]);
-
-  useEffect(() => {
-    const handleRedirect = async () => {
-      try {
-        const result = await getRedirectResult(auth);
+    getRedirectResult(auth)
+      .then(async (result) => {
         if (result) {
-          // This means the user has just come back from a redirect sign-in.
-          // The other useEffect will now detect the new `user` object and redirect.
+          // A user successfully signed in via redirect.
+          // We ensure their profile is created or updated.
+          // The main `useUser` hook will then pick up the authenticated state.
           const user = result.user;
           await handleUserProfileUpdate(firestore, user, {
-              name: user.displayName,
-              email: user.email,
-              phoneNumber: user.phoneNumber,
-              photoURL: user.photoURL,
+            name: user.displayName,
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            photoURL: user.photoURL,
           });
         }
-      } catch (error: any) {
+      })
+      .catch((error: any) => {
+        // Handle specific errors that can happen during the redirect itself.
         if (error.code === 'auth/unauthorized-domain') {
             setAuthDomainError(window.location.hostname);
-            return;
+        } else {
+            console.error("Redirect Sign-In Error:", error);
+            toast({
+                variant: "destructive",
+                title: "Sign-In Failed",
+                description: error.message || "Could not complete sign-in. Please try again.",
+                duration: 10000,
+            });
         }
-        console.error("Redirect Sign-In Error:", error);
-        toast({
-            variant: "destructive",
-            title: "Sign-In Failed",
-            description: error.message || "Could not complete sign-in. Please try again.",
-            duration: 10000,
-        });
-      }
-    };
-    
-    // Only check for redirect result after initial auth state is resolved.
-    if (!isUserLoading) {
-      handleRedirect();
+      })
+      .finally(() => {
+        // Whether there was a result or not, we are done checking for the redirect.
+        setIsCheckingRedirect(false);
+      });
+  // The empty dependency array ensures this effect runs only once on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth, firestore, toast]);
+
+  // This effect handles redirecting a user who is confirmed to be logged in.
+  useEffect(() => {
+    // It waits for BOTH the initial session check AND the one-time redirect check to complete.
+    if (!isAuthSessionLoading && !isCheckingRedirect && user) {
+      router.replace("/discover");
     }
-  }, [auth, firestore, toast, isUserLoading]);
+  }, [isAuthSessionLoading, isCheckingRedirect, user, router]);
 
+  // The overall loading state is true if we're either checking the session or the redirect.
+  const isLoading = isAuthSessionLoading || isCheckingRedirect;
 
-  // If auth is loading, or if a user exists (and is about to be redirected), show a loader.
-  if (isUserLoading || user) {
-    return (
-      <FullScreenLoader message={isUserLoading ? "Session load ho raha hai..." : "Redirect kar rahe hain..."} />
-    );
+  // Show a loader while we're authenticating or if the user object is present (meaning a redirect is imminent).
+  if (isLoading || user) {
+     return <FullScreenLoader message="Authenticating your session..." />;
   }
 
-  // If we get here, it's safe to show the login/signup page.
+  // If we get here, loading is complete and there's no user, so it's safe to show the login/signup page.
   return (
     <>
       <main className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">
