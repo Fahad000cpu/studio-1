@@ -113,11 +113,10 @@ service cloud.firestore {
 
     // --- GROUP CHAT RULES ---
     match /groups/{groupId} {
-      // Allow reading a group document if the user is a member.
-      allow get: if request.auth != null && isUserInMemberList();
-      // To query the 'groups' collection, the client MUST include a `where('memberIds', 'array-contains', request.auth.uid)` clause.
-      // Firestore then enforces this by checking the query against the 'get' rule for all potential documents.
-      allow list: if request.auth != null;
+      // A user can read a group doc (get) or query the collection (list)
+      // if they are a member of the group.
+      // For list, this requires the client to use a query like: .where('memberIds', 'array-contains', currentUserId)
+      allow read: if request.auth != null && isUserInMemberList();
 
       // A user can create a group IF they are the creator AND are in the member list.
       allow create: if request.auth != null && 
