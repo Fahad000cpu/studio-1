@@ -8,7 +8,7 @@ import { FullScreenLoader } from "@/components/full-screen-loader";
 /**
  * The root page of the application, which acts as a gatekeeper.
  * It's a client component that waits for the authentication state to be determined,
- * then redirects the user to the appropriate page (`/discover` or `/login`).
+ * then redirects the user to the appropriate page (`/discover` or `/signup`).
  * This centralized approach prevents routing race conditions between different layouts.
  */
 export default function RootPage() {
@@ -22,8 +22,8 @@ export default function RootPage() {
       if (user) {
         router.replace("/discover");
       } else {
-        // If no user is logged in, redirect them to the login page.
-        router.replace("/login");
+        // If no user is logged in, redirect them to the signup page.
+        router.replace("/signup");
       }
     }
     // The effect depends on the user's loading status, the user object itself, and the router.
