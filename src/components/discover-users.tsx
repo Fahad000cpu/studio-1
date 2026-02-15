@@ -1,11 +1,10 @@
-
 'use client';
 
 import * as React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useUser, useFirestore } from '@/firebase';
-import { collection, query, orderBy, limit, getDocs, startAfter, type DocumentData, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase'; // Import useDoc
+import { collection, query, orderBy, getDocs, doc, GeoPoint } from 'firebase/firestore'; // Import doc, GeoPoint
 import type { UserProfile } from '@/types';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import {
@@ -15,15 +14,15 @@ import {
 } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { MessageSquarePlus, Loader2 } from 'lucide-react';
+import { MessageSquarePlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getInitials } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast'; // Import useToast
 
 interface DiscoverUsersProps {
   searchTerm: string;
 }
 
-const PAGE_SIZE = 8;
 const userPlaceholders = PlaceHolderImages.filter(p => p.id.startsWith('user-'));
 const getPlaceholderImage = (id: string) => {
     const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -31,71 +30,96 @@ const getPlaceholderImage = (id: string) => {
     return placeholder || userPlaceholders[0];
 }
 
+// Haversine distance calculation
+function getDistance(geo1: GeoPoint, geo2: GeoPoint) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = toRad(geo2.latitude - geo1.latitude);
+  const dLon = toRad(geo2.longitude - geo1.longitude);
+  const lat1 = toRad(geo1.latitude);
+  const lat2 = toRad(geo2.latitude);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+
 export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   const router = useRouter();
-  const { user } = useUser();
+  const { user: authUser } = useUser();
   const firestore = useFirestore();
+  const { toast } = useToast();
 
-  const [users, setUsers] = React.useState<UserProfile[]>([]);
+  const [allUsers, setAllUsers] = React.useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [lastDoc, setLastDoc] = React.useState<QueryDocumentSnapshot<DocumentData> | null>(null);
-  const [hasMore, setHasMore] = React.useState(true);
 
-  const fetchUsers = React.useCallback(async (lastVisible: QueryDocumentSnapshot<DocumentData> | null) => {
-    if (!firestore || !user) return;
-    
-    lastVisible ? setIsLoadingMore(true) : setIsLoading(true);
-
-    try {
-      const usersCollectionRef = collection(firestore, 'users');
-      let q = query(
-        usersCollectionRef, 
-        orderBy('name', 'asc'), 
-        limit(PAGE_SIZE)
-      );
-
-      if (lastVisible) {
-        q = query(q, startAfter(lastVisible));
-      }
-      
-      const querySnapshot = await getDocs(q);
-      const newUsers = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as UserProfile))
-        .filter(u => u.id !== user.uid);
-
-      setUsers(prev => lastVisible ? [...prev, ...newUsers] : newUsers);
-      setLastDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
-      setHasMore(querySnapshot.docs.length === PAGE_SIZE);
-
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    } finally {
-      setIsLoading(false);
-      setIsLoadingMore(false);
-    }
-  }, [firestore, user]);
-
+  // Fetch current user's full profile to get coordinates
+  const currentUserDocRef = useMemoFirebase(
+    () => (authUser ? doc(firestore, 'users', authUser.uid) : null),
+    [authUser, firestore]
+  );
+  const { data: currentUserProfile, isLoading: isCurrentUserLoading } = useDoc<UserProfile>(currentUserDocRef);
+  
   React.useEffect(() => {
-    fetchUsers(null);
-  }, [fetchUsers]);
+    if (!firestore || !authUser) return;
 
-  const handleLoadMore = () => {
-    if (lastDoc) {
-      fetchUsers(lastDoc);
+    const fetchAllUsers = async () => {
+      setIsLoading(true);
+      try {
+        const usersCollectionRef = collection(firestore, 'users');
+        const q = query(usersCollectionRef, orderBy('name', 'asc'));
+        
+        const querySnapshot = await getDocs(q);
+        const fetchedUsers = querySnapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() } as UserProfile))
+          .filter(u => u.id !== authUser.uid);
+        
+        setAllUsers(fetchedUsers);
+
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast({
+          variant: "destructive",
+          title: "Error fetching users",
+          description: "Could not load user data. Please try again later."
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchAllUsers();
+  }, [firestore, authUser, toast]);
+
+  const sortedAndFilteredUsers = React.useMemo(() => {
+    let usersToSort = [...allUsers];
+
+    // Sort by distance if current user's location is available
+    if (currentUserProfile?.coordinates) {
+      usersToSort.sort((a, b) => {
+        const distA = a.coordinates ? getDistance(currentUserProfile.coordinates!, a.coordinates) : Infinity;
+        const distB = b.coordinates ? getDistance(currentUserProfile.coordinates!, b.coordinates) : Infinity;
+        return distA - distB;
+      });
     }
-  };
 
-  const filteredUsers = React.useMemo(() => {
-    if (!searchTerm) return users;
+    // Apply search term filter
+    if (!searchTerm) {
+      return usersToSort;
+    }
     
     const searchTermLower = searchTerm.toLowerCase();
-    return users.filter(u => {
+    return usersToSort.filter(u => {
       const nameMatch = (u.name || '').toLowerCase().includes(searchTermLower);
       const emailMatch = (u.email || '').toLowerCase().includes(searchTermLower);
       return nameMatch || emailMatch;
     });
-  }, [users, searchTerm]);
+
+  }, [allUsers, currentUserProfile, searchTerm]);
+
 
   const handleStartChat = (selectedUser: UserProfile) => {
     router.push(`/chat?chatWith=${selectedUser.id}`);
@@ -121,7 +145,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
     ))
   );
 
-  if (isLoading) {
+  if (isLoading || isCurrentUserLoading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
         {renderSkeletons()}
@@ -132,7 +156,7 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-12">
-        {filteredUsers.map((userProfile) => {
+        {sortedAndFilteredUsers.map((userProfile) => {
           const placeholder = getPlaceholderImage(userProfile.id);
           
           return (
@@ -171,18 +195,9 @@ export default function DiscoverUsers({ searchTerm }: DiscoverUsersProps) {
               </Card>
           );
         })}
-        {isLoadingMore && renderSkeletons()}
       </div>
 
-      {!searchTerm && hasMore && !isLoadingMore && (
-        <div className="text-center mt-12">
-          <Button onClick={handleLoadMore}>
-            Load More
-          </Button>
-        </div>
-      )}
-      
-      {!isLoading && filteredUsers.length === 0 && (
+      {!isLoading && sortedAndFilteredUsers.length === 0 && (
          <div className="col-span-full text-center py-16">
               <h2 className="text-2xl font-bold font-headline">No Users Found</h2>
               <p className="text-muted-foreground mt-2">Try adjusting your search filters.</p>
