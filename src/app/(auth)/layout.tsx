@@ -29,9 +29,8 @@ export default function AuthLayout({
 
   useEffect(() => {
     const handleRedirect = async () => {
-      // Don't run if user is already logged in, the other effect will handle redirection.
-      if (user) return; 
-
+      // This function now runs regardless of the initial `user` state,
+      // as getRedirectResult is the source of truth after a redirect.
       try {
         const result = await getRedirectResult(auth);
         if (result) {
@@ -70,7 +69,7 @@ export default function AuthLayout({
     if (!isUserLoading) {
       handleRedirect();
     }
-  }, [auth, firestore, toast, isUserLoading, user]);
+  }, [auth, firestore, toast, isUserLoading]);
 
 
   // If auth is loading, or if a user exists (and is about to be redirected), show a loader.
