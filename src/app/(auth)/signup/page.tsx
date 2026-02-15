@@ -146,20 +146,20 @@ export default function SignupPage() {
   
   const handleGoogleSignIn = async () => {
     const provider = new GoogleAuthProvider();
-    if (isMobile) {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
     try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
 
-        await handleUserProfileUpdate(firestore, user, {
-            name: user.displayName,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            photoURL: user.photoURL,
-        });
+      await handleUserProfileUpdate(firestore, user, {
+          name: user.displayName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          photoURL: user.photoURL,
+      });
 
     } catch (error: any) {
         if (error.code === 'auth/unauthorized-domain') {
@@ -189,46 +189,46 @@ export default function SignupPage() {
 
   const handleFacebookSignIn = async () => {
     const provider = new FacebookAuthProvider();
-    if (isMobile) {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
     try {
-        const result = await signInWithPopup(auth, provider);
-        const user = result.user;
-        
-        await handleUserProfileUpdate(firestore, user, {
-            name: user.displayName,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            photoURL: user.photoURL,
-        });
-        
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+      
+      await handleUserProfileUpdate(firestore, user, {
+          name: user.displayName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          photoURL: user.photoURL,
+      });
+      
     } catch (error: any) {
-        if (error.code === 'auth/unauthorized-domain') {
-            setAuthDomainError(window.location.hostname);
-            return;
-        }
-        if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
-            setIsProviderErrorOpen(true);
-            return;
-        }
-        if (error.code === 'auth/account-exists-with-different-credential') {
-            toast({
-                variant: "destructive",
-                title: "Account Exists",
-                description: "An account with this email already exists using a different sign-in method. Please log in with your original method.",
-                duration: 10000,
-            });
-        } else {
-            console.error("Facebook Sign-In Error:", error);
-            toast({
-                variant: "destructive",
-                title: "Facebook Sign-In Failed",
-                description: error.message || "Could not sign in with Facebook. Ensure it is configured correctly in the Firebase Console.",
-                duration: 10000,
-            });
-        }
+      if (error.code === 'auth/unauthorized-domain') {
+          setAuthDomainError(window.location.hostname);
+          return;
+      }
+      if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/internal-error' || (error.message && (error.message.includes('403') || error.message.includes('access_denied')))) {
+          setIsProviderErrorOpen(true);
+          return;
+      }
+      if (error.code === 'auth/account-exists-with-different-credential') {
+          toast({
+              variant: "destructive",
+              title: "Account Exists",
+              description: "An account with this email already exists using a different sign-in method. Please log in with your original method.",
+              duration: 10000,
+          });
+      } else {
+          console.error("Facebook Sign-In Error:", error);
+          toast({
+              variant: "destructive",
+              title: "Facebook Sign-In Failed",
+              description: error.message || "Could not sign in with Facebook. Ensure it is configured correctly in the Firebase Console.",
+              duration: 10000,
+          });
+      }
     }
   };
 
