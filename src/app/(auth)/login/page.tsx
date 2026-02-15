@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -338,6 +339,24 @@ export default function LoginPage() {
           <Link href="/signup" className="underline">
             Sign up
           </Link>
+        </div>
+
+        <div className="mt-4 px-8 text-center text-xs text-muted-foreground">
+          By continuing, you agree to our{" "}
+          <Link
+            href="/terms-of-service"
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link
+            href="/privacy-policy"
+            className="underline underline-offset-4 hover:text-primary"
+          >
+            Privacy Policy
+          </Link>
+          .
         </div>
 
         <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>

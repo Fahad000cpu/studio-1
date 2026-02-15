@@ -1,8 +1,10 @@
+
 "use client";
 
 import { useUser, useFirestore, updateDocumentNonBlocking } from "@/firebase";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import Link from 'next/link';
 import { doc } from 'firebase/firestore';
 import { MainNav } from "@/components/main-nav";
 import { UserNav } from "@/components/user-nav";
@@ -100,10 +102,15 @@ export default function MainLayout({
               <MainNav />
               </SidebarContent>
               <SidebarFooter>
-              <Separator className="my-2" />
-              <div className="p-2 flex items-center justify-center group-data-[collapsible=icon]:hidden">
-                  <span className="text-xs text-muted-foreground">© 2024 ConnectSphere</span>
-              </div>
+                <Separator className="my-2" />
+                <div className="p-2 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+                  <span>© 2024 ConnectSphere</span>
+                  <div className="flex items-center gap-2">
+                    <Link href="/terms-of-service" className="underline-offset-4 hover:underline hover:text-foreground">Terms</Link>
+                    <Separator orientation="vertical" className="h-4 bg-muted-foreground/50" />
+                    <Link href="/privacy-policy" className="underline-offset-4 hover:underline hover:text-foreground">Privacy</Link>
+                  </div>
+                </div>
               </SidebarFooter>
           </Sidebar>
           <SidebarInset>
