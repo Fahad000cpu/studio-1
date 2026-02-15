@@ -396,10 +396,10 @@ export default function SignupPage() {
         <AlertDialog open={!!authDomainError} onOpenChange={() => setAuthDomainError(null)}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                <AlertDialogTitle>Domain Not Authorized</AlertDialogTitle>
+                <AlertDialogTitle>Action Required: Authorize Domain</AlertDialogTitle>
                 <AlertDialogDescription asChild>
                     <div className="space-y-4 text-left text-sm pt-2">
-                        <p>This is a standard security step. Firebase needs to know which websites are allowed to use its authentication services for your project.</p>
+                        <p>This is a standard security step. To protect your app, Firebase needs to know which websites are allowed to use its authentication services.</p>
                         
                         <p className="font-bold">Please add this domain to your Firebase project:</p>
                         <div className="mt-2 p-2 bg-muted rounded-md font-mono text-sm break-all">
