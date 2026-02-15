@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useUser, useAuth, useFirestore, updateDocumentNonBlocking } from "@/firebase";
+import { useUser, useAuth, useFirestore, updateDocumentNonBlocking, useDoc, useMemoFirebase } from "@/firebase";
 import { requestPermission } from '@/firebase/messaging';
 import { updateProfile } from "firebase/auth";
 import { doc, GeoPoint } from "firebase/firestore";
@@ -15,10 +15,11 @@ import { Label } from "@/components/ui/label";
 import { BellRing, MapPin, Camera, Bell, CheckCircle2, XCircle, Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileImageCropper } from "@/components/profile-image-cropper";
-import { uploadToFirebaseStorage } from "@/lib/utils";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import { useNotificationStatus } from "@/hooks/use-notification-status";
 import { cn } from "@/lib/utils";
 import { getInitials } from "@/lib/utils";
+import type { UserProfile } from "@/types";
 
 
 const StatusCheckItem = ({ label, checked }: { label: string; checked: boolean | null }) => (
@@ -36,10 +37,16 @@ const StatusCheckItem = ({ label, checked }: { label: string; checked: boolean |
 
 
 export default function SettingsPage() {
-  const { user, isUserLoading } = useUser();
+  const { user: authUser, isUserLoading: isAuthLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  
+  const userProfileDocRef = useMemoFirebase(
+    () => (authUser ? doc(firestore, 'users', authUser.uid) : null),
+    [authUser, firestore]
+  );
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileDocRef);
 
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
@@ -59,16 +66,20 @@ export default function SettingsPage() {
       isLoading,
       permission
   } = useNotificationStatus();
+  
+  const isUserLoading = isAuthLoading || isProfileLoading;
 
   useEffect(() => {
-    if (user) {
-      setName(user.displayName || "");
-      setBio(user.bio || "");
+    if (authUser) {
+      setName(authUser.displayName || "");
     }
-  }, [user]);
+    if (userProfile) {
+        setBio(userProfile.bio || "");
+    }
+  }, [authUser, userProfile]);
 
   const handleSaveChanges = async () => {
-    if (!user || !auth.currentUser) {
+    if (!authUser || !auth.currentUser) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -80,7 +91,7 @@ export default function SettingsPage() {
     try {
       await updateProfile(auth.currentUser, { displayName: name });
 
-      const userRef = doc(firestore, "users", user.uid);
+      const userRef = doc(firestore, "users", authUser.uid);
       updateDocumentNonBlocking(userRef, { name: name, bio: bio });
 
       toast({
@@ -100,14 +111,14 @@ export default function SettingsPage() {
   };
 
   const handleUpdateLocation = () => {
-    if (!user) return;
+    if (!authUser) return;
     setIsUpdatingLocation(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
           const newLocation = new GeoPoint(latitude, longitude);
-          const userRef = doc(firestore, "users", user.uid);
+          const userRef = doc(firestore, "users", authUser.uid);
           updateDocumentNonBlocking(userRef, {
             coordinates: newLocation,
           });
@@ -138,16 +149,16 @@ export default function SettingsPage() {
   };
 
   const handleAvatarSave = async (imageBlob: Blob) => {
-    if (!user || !auth.currentUser) return;
+    if (!authUser || !auth.currentUser) return;
     
     setIsUploading(true);
     
     try {
-        const downloadURL = await uploadToFirebaseStorage(imageBlob, 'avatars');
+        const downloadURL = await uploadToCloudinary(imageBlob);
 
         await updateProfile(auth.currentUser, { photoURL: downloadURL });
 
-        const userDocRef = doc(firestore, 'users', user.uid);
+        const userDocRef = doc(firestore, 'users', authUser.uid);
         updateDocumentNonBlocking(userDocRef, { profilePictureUrl: downloadURL });
 
         toast({
@@ -158,12 +169,12 @@ export default function SettingsPage() {
         setAvatarKey(Date.now());
         setIsCropperOpen(false);
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error uploading avatar:", error);
         toast({
             variant: "destructive",
             title: "Upload Failed",
-            description: "Could not update your profile picture. Please try again."
+            description: error.message || "Could not update your profile picture. Please try again."
         });
     } finally {
         setIsUploading(false);
@@ -171,7 +182,7 @@ export default function SettingsPage() {
   };
 
   const handleEnableNotifications = async () => {
-    if (!user || !firestore) {
+    if (!authUser || !firestore) {
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -180,7 +191,7 @@ export default function SettingsPage() {
       return;
     }
     setIsRequestingPermission(true);
-    await requestPermission(firestore, user);
+    await requestPermission(firestore, authUser);
     setIsRequestingPermission(false);
   };
 
@@ -205,9 +216,9 @@ export default function SettingsPage() {
              <div className="flex items-center gap-6">
                 <div className="relative group">
                     <Avatar className="h-24 w-24">
-                        <AvatarImage key={avatarKey} src={user?.photoURL || ''} alt={user?.displayName || ''} />
+                        <AvatarImage key={avatarKey} src={authUser?.photoURL || ''} alt={authUser?.displayName || ''} />
                         <AvatarFallback className="text-3xl">
-                            {getInitials(user?.displayName)}
+                            {getInitials(authUser?.displayName)}
                         </AvatarFallback>
                     </Avatar>
                     <Button 
@@ -240,7 +251,7 @@ export default function SettingsPage() {
               <Input
                 id="email"
                 type="email"
-                value={user?.email || ""}
+                value={authUser?.email || ""}
                 disabled
               />
             </div>
