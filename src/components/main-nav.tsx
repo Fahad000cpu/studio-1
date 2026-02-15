@@ -17,9 +17,11 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { useAdmin } from "@/hooks/use-admin";
 
 export function MainNav() {
   const pathname = usePathname();
+  const { isAdmin } = useAdmin();
 
   const menuItems = [
     { href: "/discover", label: "Discover", icon: Users },
@@ -27,8 +29,11 @@ export function MainNav() {
     { href: "/status", label: "Status", icon: ImageIcon },
     { href: "/products", label: "Products", icon: ShoppingBag },
     { href: "/settings", label: "Settings", icon: Settings },
-    { href: "/admin", label: "Admin", icon: Shield },
   ];
+
+  if (isAdmin) {
+    menuItems.push({ href: "/admin", label: "Admin", icon: Shield });
+  }
 
   return (
     <SidebarMenu>
