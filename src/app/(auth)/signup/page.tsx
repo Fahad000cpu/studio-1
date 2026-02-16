@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -10,8 +9,6 @@ import {
   updateProfile,
   createUserWithEmailAndPassword,
   sendEmailVerification,
-  GoogleAuthProvider,
-  signInWithPopup,
 } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
@@ -100,44 +97,11 @@ export default function SignupPage() {
         toast({
             variant: "destructive",
             title: "Signup Failed",
-            description: "Could not create your account. Please try again.",
+            description: `Could not create your account: ${error.message}.`,
         });
       }
     }
   }
-
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      // This will trigger the auth state listener and the layout will redirect
-      // We also ensure the user profile exists.
-      await handleUserProfileUpdate(firestore, result.user, {
-        name: result.user.displayName,
-        email: result.user.email,
-        photoURL: result.user.photoURL,
-      });
-    } catch (error: any) {
-      console.error("Google Sign-In Popup Error:", error);
-      if (error.code === 'auth/popup-closed-by-user') {
-        toast({
-          variant: "destructive",
-          title: "Sign-In Cancelled",
-          description: "You closed the sign-in window. Please try again.",
-        });
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        // Do nothing, another popup was opened.
-      }
-      else {
-        toast({
-          variant: "destructive",
-          title: `Sign-In Failed: ${error.code}`,
-          description: `The operation failed with the following error: ${error.message}. If this is an 'auth/unauthorized-domain' error, please add the current domain to your Firebase project's authorized domains list.`,
-          duration: 15000,
-        });
-      }
-    }
-  };
 
   return (
     <>
@@ -150,22 +114,6 @@ export default function SignupPage() {
         <CardDescription>Join ConnectSphere today!</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4">
-            <Button onClick={signInWithGoogle} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
-                <svg className="mr-2 h-4 w-4" aria-hidden="true" focusable="false" data-prefix="fab" data-icon="google" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512"><path fill="currentColor" d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 126 21.2 177 56.5L357 150c-24.3-23.6-58.2-38.3-97.3-38.3-71.2 0-129.2 57.5-129.2 128.3s58 128.3 129.2 128.3c81.7 0 114.2-59.5 119.5-87.8H248v-65.4h239.5c.3 13.3.6 28.1.6 43.8z"></path></svg>
-                Sign up with Google
-            </Button>
-        </div>
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">
-              Or
-            </span>
-          </div>
-        </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
