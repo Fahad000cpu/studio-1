@@ -130,8 +130,9 @@ export default function SignupPage() {
       else {
         toast({
           variant: "destructive",
-          title: "Sign-In Failed",
-          description: "Could not complete sign-in with Google. Please try again.",
+          title: `Sign-In Failed: ${error.code}`,
+          description: `The operation failed with the following error: ${error.message}. If this is an 'auth/unauthorized-domain' error, please add the current domain to your Firebase project's authorized domains list.`,
+          duration: 15000,
         });
       }
     }
