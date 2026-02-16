@@ -6,7 +6,14 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { updateProfile, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import {
+  updateProfile,
+  createUserWithEmailAndPassword,
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithRedirect,
+  signInWithPopup,
+} from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +40,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -41,11 +49,18 @@ const formSchema = z.object({
   phone: z.string().optional(),
 });
 
+const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <title>Google</title>
+      <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.08-2.58 2.03-4.56 2.03-3.86 0-7-3.15-7-7s3.14-7 7-7c1.93 0 3.38.79 4.3 1.7l2.16-2.16C18.2 3.18 15.83 2 12.48 2 7.42 2 3.44 5.92 3.44 10.92s3.98 8.92 9.04 8.92c5.06 0 8.54-3.57 8.54-8.72 0-.75-.08-1.5-.2-2.2z" fill="currentColor"/>
+    </svg>
+  );
 
 export default function SignupPage() {
   const auth = useAuth();
   const firestore = useFirestore();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
@@ -59,6 +74,42 @@ export default function SignupPage() {
       phone: "",
     },
   });
+
+  const handleGoogleSignIn = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+        return; // Redirect will happen
+      }
+      const result = await signInWithPopup(auth, provider);
+      // For popup sign-in, we need to handle profile update immediately
+      const user = result.user;
+      await handleUserProfileUpdate(firestore, user, {
+        name: user.displayName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        photoURL: user.photoURL,
+      });
+    } catch (error: any) {
+        if (error.code === 'auth/unauthorized-domain') {
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: "This domain must be added to the list of authorized domains in the Firebase Console (Authentication > Settings).",
+                duration: 10000,
+            });
+        } else if (error.code !== 'auth/popup-closed-by-user') {
+            console.error("Google Sign-In Error:", error);
+            toast({
+                variant: "destructive",
+                title: "Sign-In Failed",
+                description: error.message || "Could not sign in with Google.",
+                duration: 10000,
+            });
+        }
+    }
+  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -110,6 +161,24 @@ export default function SignupPage() {
         <CardDescription>Join ConnectSphere today!</CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="grid grid-cols-1 gap-4">
+            <Button variant="outline" onClick={handleGoogleSignIn}>
+                <GoogleIcon className="mr-2 h-4 w-4" />
+                Sign up with Google
+            </Button>
+        </div>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              Or with email
+            </span>
+          </div>
+        </div>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
