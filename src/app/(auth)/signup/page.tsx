@@ -41,15 +41,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-  } from "@/components/ui/alert-dialog";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -73,7 +64,6 @@ export default function SignupPage() {
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
-  const [authDomainError, setAuthDomainError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -89,11 +79,12 @@ export default function SignupPage() {
     const provider = new GoogleAuthProvider();
     try {
       if (isMobile) {
+        // The layout will handle any redirect errors.
         await signInWithRedirect(auth, provider);
-        return; // Redirect will happen
+        return;
       }
+      // Handle popup sign-in for desktop.
       const result = await signInWithPopup(auth, provider);
-      // For popup sign-in, we need to handle profile update immediately
       const user = result.user;
       await handleUserProfileUpdate(firestore, user, {
         name: user.displayName,
@@ -103,7 +94,13 @@ export default function SignupPage() {
       });
     } catch (error: any) {
         if (error.code === 'auth/unauthorized-domain') {
-            setAuthDomainError(window.location.hostname);
+            // For popup errors, a simple toast is sufficient as the layout handles the detailed dialog.
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: "This website's domain is not authorized for sign-in. Please add it in the Firebase console and try again.",
+                duration: 10000,
+            });
         } else if (error.code !== 'auth/popup-closed-by-user') {
             console.error("Google Sign-In Error:", error);
             toast({
@@ -314,35 +311,6 @@ export default function SignupPage() {
         </div>
       </CardContent>
     </Card>
-    <AlertDialog open={!!authDomainError} onOpenChange={() => setAuthDomainError(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Zaroori Kadam: Domain Authorize Karein</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 text-left text-sm pt-2">
-                <p>Yeh ek zaroori suraksha kadam hai. Aapke app ko protect karne ke liye, Firebase ko yeh janna zaroori hai ki kaun si websites uski authentication services istemal kar sakti hain.</p>
-                <p className="font-bold">Kripya is domain ko apne Firebase project mein jodein:</p>
-                <div className="mt-2 p-2 bg-muted rounded-md font-mono text-sm break-all">
-                  {authDomainError}
-                </div>
-                <p className="font-bold mt-4">Steps:</p>
-                <ol className="list-decimal list-inside space-y-2">
-                  <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-primary">Firebase Console</a> par jayein.</li>
-                  <li>Apna project chunein.</li>
-                  <li>Left menu mein, <span className="font-semibold">Authentication</span> par jayein.</li>
-                  <li><span className="font-semibold">Settings</span> tab par click karein.</li>
-                  <li><span className="font-semibold">Authorized domains</span> section tak scroll karein aur <span className="font-semibold">Add domain</span> par click karein.</li>
-                  <li>Upar dikhaye gaye domain ko copy karke paste karein aur Add par click karein.</li>
-                </ol>
-                <p className="text-xs text-muted-foreground pt-2">Jodne ke baad, ise activate hone mein ek minute lag sakta hai. Uske baad kripya dobara login karne ki koshish karein.</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setAuthDomainError(null)}>Main Samajh Gaya</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
       </>
   );
 }
