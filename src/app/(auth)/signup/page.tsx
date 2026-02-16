@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useAuth, useFirestore } from "@/firebase";
-import { Flame, Check, ChevronsUpDown } from "lucide-react";
+import { Flame, Check, ChevronsUpDown, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { countries, type Country } from "@/lib/countries";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -41,6 +41,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { cn } from "@/lib/utils";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -64,6 +65,7 @@ export default function SignupPage() {
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
+  const [domainError, setDomainError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -79,11 +81,9 @@ export default function SignupPage() {
     const provider = new GoogleAuthProvider();
     try {
       if (isMobile) {
-        // The layout will handle any redirect errors.
         await signInWithRedirect(auth, provider);
         return;
       }
-      // Handle popup sign-in for desktop.
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       await handleUserProfileUpdate(firestore, user, {
@@ -94,12 +94,7 @@ export default function SignupPage() {
       });
     } catch (error: any) {
         if (error.code === 'auth/unauthorized-domain') {
-            toast({
-                variant: "destructive",
-                title: "Domain Not Authorized",
-                description: `This domain is not authorized for Google Sign-In. Please add it in your Firebase project settings.`,
-                duration: 10000,
-            });
+            setDomainError(window.location.hostname);
         } else if (error.code !== 'auth/popup-closed-by-user') {
             console.error("Google Sign-In Error:", error);
             toast({
@@ -152,8 +147,50 @@ export default function SignupPage() {
     }
   }
 
+  const copyToClipboard = () => {
+    if(domainError) {
+      navigator.clipboard.writeText(domainError);
+      toast({title: "Domain Copied!", description: `${domainError} has been copied to your clipboard.`});
+    }
+  }
+
   return (
     <>
+    <AlertDialog open={!!domainError} onOpenChange={() => setDomainError(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-headline text-xl">Domain Authorized Nahi Hai</AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-foreground space-y-4">
+              <p>Google Sign-In ke liye is domain ko anumati nahi hai. Kripya ise apne Firebase project mein jodein.</p>
+              
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Yeh domain add karein:</p>
+                <div className="flex items-center justify-between mt-1">
+                  <code className="font-mono text-lg">{domainError}</code>
+                  <Button variant="ghost" size="icon" onClick={copyToClipboard}>
+                      <Copy className="h-5 w-5"/>
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-semibold">Nirdesh (Steps):</p>
+                <ol className="list-decimal list-inside mt-2 text-sm space-y-1">
+                  <li>Apne <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a> par jayein.</li>
+                  <li>Apna project chunein: <strong>connect-sphere-ba19a</strong>.</li>
+                  <li><strong>Authentication</strong> &gt; <strong>Settings</strong> tab &gt; <strong>Authorized domains</strong> par jayein.</li>
+                  <li><strong>Add domain</strong> par click karein aur upar diya gaya domain paste karein.</li>
+                </ol>
+              </div>
+
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDomainError(null)} className="w-full">Main Samajh Gaya</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     <Card className="w-full max-w-md mx-4">
       <CardHeader className="text-center">
          <div className="flex justify-center items-center mb-4">

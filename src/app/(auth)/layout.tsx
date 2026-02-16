@@ -8,6 +8,9 @@ import { getRedirectResult } from "firebase/auth";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Copy } from "lucide-react";
 
 export default function AuthLayout({
   children,
@@ -20,19 +23,13 @@ export default function AuthLayout({
   const { toast } = useToast();
   const router = useRouter();
   
-  // This new state tracks if we are actively checking for a redirect result.
   const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
+  const [domainError, setDomainError] = useState<string | null>(null);
 
-  // This effect runs ONLY ONCE on mount to check for a sign-in redirect result.
   useEffect(() => {
-    // getRedirectResult should only run once on page load.
-    // It captures the result of a signInWithRedirect operation.
     getRedirectResult(auth)
       .then(async (result) => {
         if (result) {
-          // A user successfully signed in via redirect.
-          // The main `useUser` hook will now pick up this new authenticated state.
-          // We just need to ensure their profile is created or updated.
           const user = result.user;
           await handleUserProfileUpdate(firestore, user, {
             name: user.displayName,
@@ -40,19 +37,11 @@ export default function AuthLayout({
             phoneNumber: user.phoneNumber,
             photoURL: user.photoURL,
           });
-          // The `useUser` hook will cause a re-render with the new user object,
-          // which will trigger the redirect effect below.
         }
       })
       .catch((error: any) => {
-        // Handle specific errors that can happen during the redirect itself.
         if (error.code === 'auth/unauthorized-domain') {
-            toast({
-                variant: "destructive",
-                title: "Domain Not Authorized",
-                description: `The domain ${window.location.hostname} is not authorized for this project. Please add it to the Firebase Console.`,
-                duration: 10000,
-            });
+            setDomainError(window.location.hostname);
         } else {
             console.error("Redirect Sign-In Error:", error);
             toast({
@@ -64,35 +53,67 @@ export default function AuthLayout({
         }
       })
       .finally(() => {
-        // Whether there was a result, an error, or nothing, we are done checking for the redirect.
         setIsCheckingRedirect(false);
       });
-  // The empty dependency array ensures this effect runs only once on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth, firestore]);
 
-  // This effect handles redirecting a user who is confirmed to be logged in.
   useEffect(() => {
-    // It waits for BOTH the initial session check AND the one-time redirect check to complete.
     if (!isAuthSessionLoading && !isCheckingRedirect && user) {
       router.replace("/discover");
     }
   }, [isAuthSessionLoading, isCheckingRedirect, user, router]);
 
-  // The overall loading state is true if we're either checking the session OR the redirect.
   const isLoading = isAuthSessionLoading || isCheckingRedirect;
 
-  // Show a loader while we're authenticating. If the user object becomes available,
-  // we continue showing the loader because the redirect effect is about to fire.
-  // This prevents flashing the login page for a split second.
+  const copyToClipboard = () => {
+    if(domainError) {
+      navigator.clipboard.writeText(domainError);
+      toast({title: "Domain Copied!", description: `${domainError} has been copied to your clipboard.`});
+    }
+  }
+
   if (isLoading || user) {
      return <FullScreenLoader message="Authenticating your session..." />;
   }
 
-  // If we get here, all loading is complete and there's definitely no user, 
-  // so it's safe to show the login/signup page.
   return (
     <>
+      <AlertDialog open={!!domainError} onOpenChange={() => setDomainError(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-headline text-xl">Domain Authorized Nahi Hai</AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-foreground space-y-4">
+              <p>Google Sign-In ke liye is domain ko anumati nahi hai. Kripya ise apne Firebase project mein jodein.</p>
+              
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Yeh domain add karein:</p>
+                <div className="flex items-center justify-between mt-1">
+                  <code className="font-mono text-lg">{domainError}</code>
+                  <Button variant="ghost" size="icon" onClick={copyToClipboard}>
+                      <Copy className="h-5 w-5"/>
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-semibold">Nirdesh (Steps):</p>
+                <ol className="list-decimal list-inside mt-2 text-sm space-y-1">
+                  <li>Apne <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a> par jayein.</li>
+                  <li>Apna project chunein: <strong>connect-sphere-ba19a</strong>.</li>
+                  <li><strong>Authentication</strong> &gt; <strong>Settings</strong> tab &gt; <strong>Authorized domains</strong> par jayein.</li>
+                  <li><strong>Add domain</strong> par click karein aur upar diya gaya domain paste karein.</li>
+                </ol>
+              </div>
+
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDomainError(null)} className="w-full">Main Samajh Gaya</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <main className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">
         <div className="absolute inset-0 w-full h-full bg-gradient-animation z-0" />
         <div className="relative z-10 w-full flex justify-center p-4">
