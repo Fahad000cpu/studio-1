@@ -8,6 +8,8 @@ import React, { useState } from "react";
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 import {
   Card,
@@ -36,24 +38,33 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
 
+const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.62-4.55 1.62-3.87 0-7.02-3.15-7.02-7.02s3.15-7.02 7.02-7.02c2.2 0 3.68.86 4.54 1.64l2.43-2.43C18.17 2.1 15.64 1 12.48 1 5.88 1 1 5.88 1 12.48s4.88 11.48 11.48 11.48c6.6 0 11.12-4.39 11.12-11.12 0-.75-.06-1.49-.19-2.22h-11z" fillRule="nonzero" fill="currentColor" />
+    </svg>
+);
+
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [isSendingReset, setIsSendingReset] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const emailForm = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -92,6 +103,30 @@ export default function LoginPage() {
         }
     }
 }
+
+  const signInWithGoogle = async () => {
+    if (!auth || !firestore) return;
+    setIsGoogleLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await handleUserProfileUpdate(firestore, result.user, {
+        name: result.user.displayName,
+        email: result.user.email,
+        photoURL: result.user.photoURL,
+      });
+    } catch (error: any) {
+        console.error("Google Sign-In Error:", error);
+        toast({
+            variant: "destructive",
+            title: `Google Sign-In Failed: ${error.code}`,
+            description: `The operation failed with the following error: ${error.message}. Please check your browser pop-up settings and Firebase configuration.`,
+            duration: 15000,
+        });
+    } finally {
+        setIsGoogleLoading(false);
+    }
+  };
   
   const handlePasswordReset = async () => {
     if (!resetEmail) {
@@ -136,48 +171,72 @@ export default function LoginPage() {
         <CardDescription>Sign in to your ConnectSphere account</CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...emailForm}>
-        <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
-            <FormField
-            control={emailForm.control}
-            name="email"
-            render={({ field }) => (
-                <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
-                </FormControl>
-                <FormMessage />
-                </FormItem>
+        <div className="grid gap-4">
+          <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={isGoogleLoading}>
+            {isGoogleLoading ? (
+                "Signing in..."
+            ) : (
+                <>
+                    <GoogleIcon className="mr-2 h-4 w-4" />
+                    Sign in with Google
+                </>
             )}
-            />
-            <FormField
-            control={emailForm.control}
-            name="password"
-            render={({ field }) => (
-                <FormItem>
-                    <div className="flex items-center justify-between">
-                    <FormLabel>Password</FormLabel>
-                    <button
-                        type="button"
-                        onClick={() => setIsResetAlertOpen(true)}
-                        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-                    >
-                        Forgot password?
-                    </button>
-                </div>
-                <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                </FormControl>
-                <FormMessage />
-                </FormItem>
-            )}
-            />
-            <Button type="submit" className="w-full" disabled={emailForm.formState.isSubmitting}>
-            {emailForm.formState.isSubmitting ? "Logging in..." : "Login"}
-            </Button>
-        </form>
-        </Form>
+          </Button>
+          
+          <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">
+                  Or continue with email
+                  </span>
+              </div>
+          </div>
+
+          <Form {...emailForm}>
+          <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+              <FormField
+              control={emailForm.control}
+              name="email"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                      <Input placeholder="name@example.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  </FormItem>
+              )}
+              />
+              <FormField
+              control={emailForm.control}
+              name="password"
+              render={({ field }) => (
+                  <FormItem>
+                      <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      <button
+                          type="button"
+                          onClick={() => setIsResetAlertOpen(true)}
+                          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                          Forgot password?
+                      </button>
+                  </div>
+                  <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  </FormItem>
+              )}
+              />
+              <Button type="submit" className="w-full" disabled={emailForm.formState.isSubmitting || isGoogleLoading}>
+              {emailForm.formState.isSubmitting ? "Logging in..." : "Login with Email"}
+              </Button>
+          </form>
+          </Form>
+        </div>
 
         <div className="mt-6 text-center text-sm">
           Don&apos;t have an account?{" "}

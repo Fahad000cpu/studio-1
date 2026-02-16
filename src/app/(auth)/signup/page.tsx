@@ -9,6 +9,8 @@ import {
   updateProfile,
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
@@ -44,6 +46,12 @@ const formSchema = z.object({
   phone: z.string().optional(),
 });
 
+const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.62-4.55 1.62-3.87 0-7.02-3.15-7.02-7.02s3.15-7.02 7.02-7.02c2.2 0 3.68.86 4.54 1.64l2.43-2.43C18.17 2.1 15.64 1 12.48 1 5.88 1 1 5.88 1 12.48s4.88 11.48 11.48 11.48c6.6 0 11.12-4.39 11.12-11.12 0-.75-.06-1.49-.19-2.22h-11z" fillRule="nonzero" fill="currentColor"/>
+    </svg>
+);
+
 
 export default function SignupPage() {
   const auth = useAuth();
@@ -52,6 +60,7 @@ export default function SignupPage() {
 
   const [openCountryPicker, setOpenCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<Country>(countries.find(c => c.code === 'IN') || countries[0]);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -103,6 +112,30 @@ export default function SignupPage() {
     }
   }
 
+  const signInWithGoogle = async () => {
+    if (!auth || !firestore) return;
+    setIsGoogleLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await handleUserProfileUpdate(firestore, result.user, {
+        name: result.user.displayName,
+        email: result.user.email,
+        photoURL: result.user.photoURL,
+      });
+    } catch (error: any) {
+        console.error("Google Sign-In Error:", error);
+        toast({
+            variant: "destructive",
+            title: `Google Sign-In Failed: ${error.code}`,
+            description: `The operation failed with the following error: ${error.message}. Please check your browser pop-up settings and Firebase configuration.`,
+            duration: 15000,
+        });
+    } finally {
+        setIsGoogleLoading(false);
+    }
+  };
+
   return (
     <>
     <Card className="w-full max-w-md mx-4">
@@ -114,108 +147,131 @@ export default function SignupPage() {
         <CardDescription>Join ConnectSphere today!</CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Your Name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+        <div className="grid gap-4">
+            <Button variant="outline" className="w-full" onClick={signInWithGoogle} disabled={isGoogleLoading}>
+              {isGoogleLoading ? (
+                  "Signing in..."
+              ) : (
+                  <>
+                      <GoogleIcon className="mr-2 h-4 w-4" />
+                      Sign up with Google
+                  </>
               )}
-            />
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="name@example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="••••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="phone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone Number (Optional)</FormLabel>
-                   <div className="flex gap-2">
-                        <Popover open={openCountryPicker} onOpenChange={setOpenCountryPicker}>
-                            <PopoverTrigger asChild>
-                            <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={openCountryPicker}
-                                className="w-[130px] justify-between"
-                            >
-                                {selectedCountry.flag} {selectedCountry.dial_code}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[300px] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Search country..." />
-                                    <CommandList>
-                                        <CommandEmpty>No country found.</CommandEmpty>
-                                        <CommandGroup>
-                                        {countries.map((country) => (
-                                            <CommandItem
-                                            key={country.code}
-                                            value={`${country.name} (${country.dial_code})`}
-                                            onSelect={() => {
-                                                setSelectedCountry(country)
-                                                setOpenCountryPicker(false)
-                                            }}
-                                            >
-                                            <Check
-                                                className={cn(
-                                                "mr-2 h-4 w-4",
-                                                selectedCountry.code === country.code ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            {country.flag} <span className="ml-2 font-medium">{country.name}</span> <span className="ml-auto text-muted-foreground">{country.dial_code}</span>
-                                            </CommandItem>
-                                        ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                        <FormControl>
-                            <Input placeholder="98765 43210" {...field} />
-                        </FormControl>
-                    </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting ? "Creating Account..." : "Create Account"}
             </Button>
-          </form>
-        </Form>
+            
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">
+                    Or continue with email
+                    </span>
+                </div>
+            </div>
+            <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Your Name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                        <Input placeholder="name@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Phone Number (Optional)</FormLabel>
+                    <div className="flex gap-2">
+                            <Popover open={openCountryPicker} onOpenChange={setOpenCountryPicker}>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={openCountryPicker}
+                                    className="w-[130px] justify-between"
+                                >
+                                    {selectedCountry.flag} {selectedCountry.dial_code}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[300px] p-0">
+                                    <Command>
+                                        <CommandInput placeholder="Search country..." />
+                                        <CommandList>
+                                            <CommandEmpty>No country found.</CommandEmpty>
+                                            <CommandGroup>
+                                            {countries.map((country) => (
+                                                <CommandItem
+                                                key={country.code}
+                                                value={`${country.name} (${country.dial_code})`}
+                                                onSelect={() => {
+                                                    setSelectedCountry(country)
+                                                    setOpenCountryPicker(false)
+                                                }}
+                                                >
+                                                <Check
+                                                    className={cn(
+                                                    "mr-2 h-4 w-4",
+                                                    selectedCountry.code === country.code ? "opacity-100" : "opacity-0"
+                                                    )}
+                                                />
+                                                {country.flag} <span className="ml-2 font-medium">{country.name}</span> <span className="ml-auto text-muted-foreground">{country.dial_code}</span>
+                                                </CommandItem>
+                                            ))}
+                                            </CommandGroup>
+                                        </CommandList>
+                                    </Command>
+                                </PopoverContent>
+                            </Popover>
+                            <FormControl>
+                                <Input placeholder="98765 43210" {...field} />
+                            </FormControl>
+                        </div>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || isGoogleLoading}>
+                {form.formState.isSubmitting ? "Creating Account..." : "Create Account with Email"}
+                </Button>
+            </form>
+            </Form>
+        </div>
         
         <div className="mt-6 text-center text-sm">
           Already have an account?{" "}
