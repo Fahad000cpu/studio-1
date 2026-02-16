@@ -11,25 +11,26 @@ interface UserProfileDetails {
 
 /**
  * Checks if a user profile exists in Firestore and creates it if it doesn't.
- * This is a standalone function that does not use React hooks.
+ * This is an async function that should be awaited to handle errors properly.
  * @param firestore - The Firestore instance.
  * @param user - The Firebase Auth user object.
  * @param details - The user details to save.
  */
-export const handleUserProfileUpdate = (
+export const handleUserProfileUpdate = async (
     firestore: Firestore, 
     user: User, 
     details: UserProfileDetails
-) => {
+): Promise<void> => {
     if (!user || !firestore) {
         console.error("handleUserProfileUpdate called with invalid user or firestore instance.");
-        return;
+        throw new Error("Invalid arguments for user profile update.");
     }
     
     const userRef = doc(firestore, 'users', user.uid);
 
-    // Use a fire-and-forget promise chain.
-    getDoc(userRef).then(userDoc => {
+    try {
+        const userDoc = await getDoc(userRef);
+        
         if (!userDoc.exists()) {
             const userProfile = {
                 id: user.uid,
@@ -43,12 +44,14 @@ export const handleUserProfileUpdate = (
                 createdAt: new Date(),
                 lastActive: new Date(),
             };
-            // Do not await this. Let it run in the background.
-            setDoc(userRef, userProfile).catch(e => {
-                console.error("Error creating user profile in background:", e);
-            });
+            // Await the creation to ensure it completes.
+            await setDoc(userRef, userProfile);
         }
-    }).catch(e => {
-        console.error("Error checking user profile in background:", e);
-    });
+        // If the doc exists, we don't need to do anything for this specific workflow.
+        // A more complex app might merge/update data here.
+    } catch (error) {
+        console.error("Error during handleUserProfileUpdate:", error);
+        // Re-throw the error so the calling function can handle it (e.g., show a toast).
+        throw new Error("Failed to create or check user profile.");
+    }
 };

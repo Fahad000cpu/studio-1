@@ -27,43 +27,59 @@ export default function AuthLayout({
   const [domainError, setDomainError] = useState<string | null>(null);
 
   useEffect(() => {
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result) {
-          const user = result.user;
-          await handleUserProfileUpdate(firestore, user, {
-            name: user.displayName,
-            email: user.email,
-            phoneNumber: user.phoneNumber,
-            photoURL: user.photoURL,
-          });
+    // This effect runs once on mount to check for a sign-in redirect result.
+    const checkRedirect = async () => {
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                const user = result.user;
+                // Await the profile update to ensure it completes before any potential redirection.
+                await handleUserProfileUpdate(firestore, user, {
+                    name: user.displayName,
+                    email: user.email,
+                    phoneNumber: user.phoneNumber,
+                    photoURL: user.photoURL,
+                });
+                // The user object will be updated by the main auth listener,
+                // which will trigger the redirection effect below.
+            }
+        } catch (error: any) {
+            // This comprehensive catch block handles all redirect errors.
+            if (error.code === 'auth/unauthorized-domain') {
+                setDomainError(window.location.hostname);
+            } else if (error.code === 'auth/account-exists-with-different-credential') {
+                toast({
+                    variant: "destructive",
+                    title: "Account Exists",
+                    description: "An account with this email already exists using a different sign-in method (e.g., password).",
+                    duration: 10000,
+                });
+            } else {
+                console.error("Redirect Sign-In Error:", error);
+                toast({
+                    variant: "destructive",
+                    title: "Sign-In Failed",
+                    description: error.message || "Could not complete sign-in. Please try again.",
+                    duration: 10000,
+                });
+            }
+        } finally {
+            // Whether it succeeds or fails, we are done checking.
+            setIsCheckingRedirect(false);
         }
-      })
-      .catch((error: any) => {
-        if (error.code === 'auth/unauthorized-domain') {
-            setDomainError(window.location.hostname);
-        } else {
-            console.error("Redirect Sign-In Error:", error);
-            toast({
-                variant: "destructive",
-                title: "Sign-In Failed",
-                description: error.message || "Could not complete sign-in. Please try again.",
-                duration: 10000,
-            });
-        }
-      })
-      .finally(() => {
-        setIsCheckingRedirect(false);
-      });
+    };
+    checkRedirect();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth, firestore]);
 
   useEffect(() => {
+    // This effect handles redirecting the user once they are authenticated.
     if (!isAuthSessionLoading && !isCheckingRedirect && user) {
       router.replace("/discover");
     }
   }, [isAuthSessionLoading, isCheckingRedirect, user, router]);
 
+  // While either auth state is loading or we're checking for redirect, show a loader.
   const isLoading = isAuthSessionLoading || isCheckingRedirect;
 
   const copyToClipboard = () => {
@@ -73,22 +89,25 @@ export default function AuthLayout({
     }
   }
 
+  // If we are loading, or if the user is already authenticated, show the loader.
+  // The second effect will handle the redirect. This prevents the login form from flashing.
   if (isLoading || user) {
      return <FullScreenLoader message="Authenticating your session..." />;
   }
 
+  // Only render the children (login/signup page) if we are not loading and there is no user.
   return (
     <>
       <AlertDialog open={!!domainError} onOpenChange={() => setDomainError(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-headline text-xl">Domain Authorized Nahi Hai</AlertDialogTitle>
+            <AlertDialogTitle className="font-headline text-xl">Domain Not Authorized</AlertDialogTitle>
             <AlertDialogDescription className="text-base text-foreground space-y-4">
-              <p>Google Sign-In ke liye is domain ko anumati nahi hai. Kripya ise neeche diye gaye project mein jodein.</p>
+              <p>This domain is not authorized for Google Sign-In. Please add it to your project configuration.</p>
               
               <div className="p-3 bg-muted rounded-lg space-y-3 text-left">
                 <div>
-                  <p className="text-sm text-muted-foreground">Yeh domain add karein:</p>
+                  <p className="text-sm text-muted-foreground">Add this domain:</p>
                   <div className="flex items-center justify-between mt-1">
                     <code className="font-mono text-lg">{domainError}</code>
                     <Button variant="ghost" size="icon" onClick={copyToClipboard}>
@@ -97,25 +116,25 @@ export default function AuthLayout({
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Is Firebase Project ID mein:</p>
+                  <p className="text-sm text-muted-foreground">To this Firebase Project ID:</p>
                   <p className="font-mono text-lg font-bold">{auth.app.options.projectId}</p>
                 </div>
               </div>
 
               <div>
-                <p className="font-semibold text-left">Nirdesh (Steps):</p>
+                <p className="font-semibold text-left">Instructions:</p>
                 <ol className="list-decimal list-inside mt-2 text-sm space-y-1 text-left">
-                  <li>Apne <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a> par jayein.</li>
-                  <li>Upar bataye gaye project (`{auth.app.options.projectId}`) ko chunein.</li>
-                  <li><strong>Authentication</strong> &gt; <strong>Settings</strong> tab &gt; <strong>Authorized domains</strong> par jayein.</li>
-                  <li><strong>Add domain</strong> par click karein aur upar diya gaya domain paste karein.</li>
+                  <li>Go to your <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a>.</li>
+                  <li>Select the project shown above (`{auth.app.options.projectId}`).</li>
+                  <li>Go to <strong>Authentication</strong> &gt; <strong>Settings</strong> tab &gt; <strong>Authorized domains</strong>.</li>
+                  <li>Click <strong>Add domain</strong> and paste the domain from above.</li>
                 </ol>
               </div>
 
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setDomainError(null)} className="w-full">Main Samajh Gaya</AlertDialogAction>
+            <AlertDialogAction onClick={() => setDomainError(null)} className="w-full">I Understand</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
