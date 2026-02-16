@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -9,8 +10,6 @@ import {
   updateProfile,
   createUserWithEmailAndPassword,
   sendEmailVerification,
-  GoogleAuthProvider,
-  signInWithRedirect,
 } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
@@ -38,7 +37,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
-import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -46,13 +44,6 @@ const formSchema = z.object({
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   phone: z.string().optional(),
 });
-
-const GoogleIcon = () => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
-      <title>Google</title>
-      <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.36 1.67-4.66 1.67-3.86 0-6.99-3.16-6.99-7.12s3.13-7.12 6.99-7.12c1.93 0 3.21.79 4.18 1.71l2.54-2.54C18.17 2.1 15.64 1 12.48 1 7.23 1 3.19 4.92 3.19 10.19s4.04 9.19 9.29 9.19c2.83 0 4.88-1.02 6.6-2.65 1.8-1.63 2.66-3.9 2.66-6.26 0-.6-.06-1.12-.15-1.62z" />
-    </svg>
-);
 
 
 export default function SignupPage() {
@@ -72,11 +63,6 @@ export default function SignupPage() {
       phone: "",
     },
   });
-
-  const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
-  };
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
@@ -129,15 +115,6 @@ export default function SignupPage() {
         <CardDescription>Join ConnectSphere today!</CardDescription>
       </CardHeader>
       <CardContent>
-        <Button variant="outline" className="w-full" onClick={signInWithGoogle}>
-            <GoogleIcon />
-            Sign up with Google
-        </Button>
-        <div className="flex items-center my-4">
-          <Separator className="flex-grow" />
-          <span className="mx-4 text-xs text-muted-foreground">OR</span>
-          <Separator className="flex-grow" />
-        </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
