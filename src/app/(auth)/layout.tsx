@@ -8,15 +8,6 @@ import { getRedirectResult } from "firebase/auth";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 export default function AuthLayout({
   children,
@@ -31,7 +22,6 @@ export default function AuthLayout({
   
   // This new state tracks if we are actively checking for a redirect result.
   const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
-  const [authDomainError, setAuthDomainError] = useState<string | null>(null);
 
   // This effect runs ONLY ONCE on mount to check for a sign-in redirect result.
   useEffect(() => {
@@ -57,7 +47,12 @@ export default function AuthLayout({
       .catch((error: any) => {
         // Handle specific errors that can happen during the redirect itself.
         if (error.code === 'auth/unauthorized-domain') {
-            setAuthDomainError(window.location.hostname);
+            toast({
+                variant: "destructive",
+                title: "Domain Not Authorized",
+                description: `The domain ${window.location.hostname} is not authorized for this project. Please add it to the Firebase Console.`,
+                duration: 10000,
+            });
         } else {
             console.error("Redirect Sign-In Error:", error);
             toast({
@@ -104,35 +99,6 @@ export default function AuthLayout({
           {children}
         </div>
       </main>
-      <AlertDialog open={!!authDomainError} onOpenChange={() => setAuthDomainError(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Zaroori Kadam: Domain Authorize Karein</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 text-left text-sm pt-2">
-                <p>Yeh ek zaroori suraksha kadam hai. Aapke app ko protect karne ke liye, Firebase ko yeh janna zaroori hai ki kaun si websites uski authentication services istemal kar sakti hain.</p>
-                <p className="font-bold">Kripya is domain ko apne Firebase project mein jodein:</p>
-                <div className="mt-2 p-2 bg-muted rounded-md font-mono text-sm break-all">
-                  {authDomainError}
-                </div>
-                <p className="font-bold mt-4">Steps:</p>
-                <ol className="list-decimal list-inside space-y-2">
-                  <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-primary">Firebase Console</a> par jayein.</li>
-                  <li>Apna project chunein.</li>
-                  <li>Left menu mein, <span className="font-semibold">Authentication</span> par jayein.</li>
-                  <li><span className="font-semibold">Settings</span> tab par click karein.</li>
-                  <li><span className="font-semibold">Authorized domains</span> section tak scroll karein aur <span className="font-semibold">Add domain</span> par click karein.</li>
-                  <li>Upar dikhaye gaye domain ko copy karke paste karein aur Add par click karein.</li>
-                </ol>
-                <p className="text-xs text-muted-foreground pt-2">Jodne ke baad, ise activate hone mein ek minute lag sakta hai. Uske baad kripya dobara login karne ki koshish karein.</p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setAuthDomainError(null)}>Main Samajh Gaya</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }
