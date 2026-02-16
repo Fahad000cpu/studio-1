@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -9,6 +8,8 @@ import React, { useState } from "react";
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  GoogleAuthProvider,
+  signInWithRedirect,
 } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
@@ -42,11 +43,19 @@ import {
 import { useAuth } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
   password: z.string().min(1, { message: "Password is required." }),
 });
+
+const GoogleIcon = () => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
+      <title>Google</title>
+      <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.36 1.67-4.66 1.67-3.86 0-6.99-3.16-6.99-7.12s3.13-7.12 6.99-7.12c1.93 0 3.21.79 4.18 1.71l2.54-2.54C18.17 2.1 15.64 1 12.48 1 7.23 1 3.19 4.92 3.19 10.19s4.04 9.19 9.29 9.19c2.83 0 4.88-1.02 6.6-2.65 1.8-1.63 2.66-3.9 2.66-6.26 0-.6-.06-1.12-.15-1.62z" />
+    </svg>
+);
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -92,7 +101,10 @@ export default function LoginPage() {
         }
     }
 }
-
+  const signInWithGoogle = async () => {
+    const provider = new GoogleAuthProvider();
+    await signInWithRedirect(auth, provider);
+  };
   
   const handlePasswordReset = async () => {
     if (!resetEmail) {
@@ -137,6 +149,15 @@ export default function LoginPage() {
         <CardDescription>Sign in to your ConnectSphere account</CardDescription>
       </CardHeader>
       <CardContent>
+        <Button variant="outline" className="w-full" onClick={signInWithGoogle}>
+          <GoogleIcon />
+          Sign in with Google
+        </Button>
+        <div className="flex items-center my-4">
+          <Separator className="flex-grow" />
+          <span className="mx-4 text-xs text-muted-foreground">OR CONTINUE WITH</span>
+          <Separator className="flex-grow" />
+        </div>
         <Form {...emailForm}>
         <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
             <FormField
