@@ -1,10 +1,12 @@
-
 "use client";
 
-import { useEffect, useState } from "react";
-import { useUser } from "@/firebase";
+import { useEffect } from "react";
+import { useUser, useAuth, useFirestore } from "@/firebase";
 import { FullScreenLoader } from "@/components/full-screen-loader";
 import { useRouter } from "next/navigation";
+import { getRedirectResult } from "firebase/auth";
+import { handleUserProfileUpdate } from "@/lib/auth-helpers";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AuthLayout({
   children,
@@ -12,7 +14,43 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const firestore = useFirestore();
   const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    // This effect handles the result of a redirect-based sign-in (like Google)
+    const handleRedirect = async () => {
+      // Avoid running this if a user session already exists
+      if (user) return;
+      
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          // A user has just signed in via redirect.
+          // Ensure their profile exists in Firestore.
+          await handleUserProfileUpdate(firestore, result.user, {
+            name: result.user.displayName,
+            email: result.user.email,
+            photoURL: result.user.photoURL,
+          });
+          // Toast and redirect are handled by the next effect.
+        }
+      } catch (error: any) {
+        console.error("Google Sign-In Redirect Error:", error);
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: "Could not complete sign-in with Google. Please try again.",
+        });
+      }
+    };
+    
+    if (!isUserLoading && auth && firestore) {
+      handleRedirect();
+    }
+  }, [isUserLoading, auth, firestore, toast, user]);
 
   useEffect(() => {
     // This effect handles redirecting the user once they are authenticated.
@@ -22,7 +60,7 @@ export default function AuthLayout({
   }, [isUserLoading, user, router]);
 
   // If we are loading, or if the user is already authenticated, show the loader.
-  // The second effect will handle the redirect. This prevents the login form from flashing.
+  // The effects above will handle the logic and redirect. This prevents content flashing.
   if (isUserLoading || user) {
      return <FullScreenLoader message="Authenticating your session..." />;
   }
