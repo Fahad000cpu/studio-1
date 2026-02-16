@@ -9,10 +9,8 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   GoogleAuthProvider,
-  signInWithRedirect,
+  signInWithPopup,
 } from "firebase/auth";
-
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -40,9 +38,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAuth } from "@/firebase";
+import { useAuth, useFirestore } from "@/firebase";
 import { Flame } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { handleUserProfileUpdate } from "@/lib/auth-helpers";
+import { Button } from "@/components/ui/button";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -52,6 +52,7 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
@@ -97,7 +98,34 @@ export default function LoginPage() {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // This will trigger the auth state listener and the layout will redirect
+      // We also ensure the user profile exists.
+      await handleUserProfileUpdate(firestore, result.user, {
+        name: result.user.displayName,
+        email: result.user.email,
+        photoURL: result.user.photoURL,
+      });
+    } catch (error: any) {
+      console.error("Google Sign-In Popup Error:", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast({
+          variant: "destructive",
+          title: "Sign-In Cancelled",
+          description: "You closed the sign-in window. Please try again.",
+        });
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // Do nothing, another popup was opened.
+      }
+      else {
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: "Could not complete sign-in with Google. Please try again.",
+        });
+      }
+    }
   };
   
   const handlePasswordReset = async () => {

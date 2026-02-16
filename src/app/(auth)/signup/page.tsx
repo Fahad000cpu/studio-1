@@ -10,7 +10,7 @@ import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
   GoogleAuthProvider,
-  signInWithRedirect,
+  signInWithPopup,
 } from "firebase/auth";
 
 import { Button } from "@/components/ui/button";
@@ -107,7 +107,34 @@ export default function SignupPage() {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    await signInWithRedirect(auth, provider);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // This will trigger the auth state listener and the layout will redirect
+      // We also ensure the user profile exists.
+      await handleUserProfileUpdate(firestore, result.user, {
+        name: result.user.displayName,
+        email: result.user.email,
+        photoURL: result.user.photoURL,
+      });
+    } catch (error: any) {
+      console.error("Google Sign-In Popup Error:", error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        toast({
+          variant: "destructive",
+          title: "Sign-In Cancelled",
+          description: "You closed the sign-in window. Please try again.",
+        });
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        // Do nothing, another popup was opened.
+      }
+      else {
+        toast({
+          variant: "destructive",
+          title: "Sign-In Failed",
+          description: "Could not complete sign-in with Google. Please try again.",
+        });
+      }
+    }
   };
 
   return (

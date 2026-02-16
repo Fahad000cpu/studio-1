@@ -20,10 +20,11 @@ export default function AuthLayout({
   const { toast } = useToast();
 
   useEffect(() => {
-    // This effect handles the result of a redirect-based sign-in (like Google)
+    // This effect handles the result of a redirect-based sign-in.
+    // NOTE: This is less relevant now with signInWithPopup, but is kept for other potential redirect flows.
     const handleRedirect = async () => {
-      // Avoid running this if a user session already exists
-      if (user) return;
+      // Avoid running this if a user session already exists or auth is still loading
+      if (user || isUserLoading || !auth || !firestore) return;
       
       try {
         const result = await getRedirectResult(auth);
@@ -38,18 +39,17 @@ export default function AuthLayout({
           // Toast and redirect are handled by the next effect.
         }
       } catch (error: any) {
-        console.error("Google Sign-In Redirect Error:", error);
+        console.error("Auth Redirect Error:", error);
         toast({
           variant: "destructive",
           title: "Sign-In Failed",
-          description: "Could not complete sign-in with Google. Please try again.",
+          description: error.message || "Could not complete sign-in. Please try again.",
         });
       }
     };
     
-    if (!isUserLoading && auth && firestore) {
-      handleRedirect();
-    }
+    handleRedirect();
+
   }, [isUserLoading, auth, firestore, toast, user]);
 
   useEffect(() => {
