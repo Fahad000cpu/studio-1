@@ -35,12 +35,14 @@ export default function AuthLayout({
 
   // This effect runs ONLY ONCE on mount to check for a sign-in redirect result.
   useEffect(() => {
+    // getRedirectResult should only run once on page load.
+    // It captures the result of a signInWithRedirect operation.
     getRedirectResult(auth)
       .then(async (result) => {
         if (result) {
           // A user successfully signed in via redirect.
-          // We ensure their profile is created or updated.
-          // The main `useUser` hook will then pick up the authenticated state.
+          // The main `useUser` hook will now pick up this new authenticated state.
+          // We just need to ensure their profile is created or updated.
           const user = result.user;
           await handleUserProfileUpdate(firestore, user, {
             name: user.displayName,
@@ -48,6 +50,8 @@ export default function AuthLayout({
             phoneNumber: user.phoneNumber,
             photoURL: user.photoURL,
           });
+          // The `useUser` hook will cause a re-render with the new user object,
+          // which will trigger the redirect effect below.
         }
       })
       .catch((error: any) => {
@@ -65,12 +69,12 @@ export default function AuthLayout({
         }
       })
       .finally(() => {
-        // Whether there was a result or not, we are done checking for the redirect.
+        // Whether there was a result, an error, or nothing, we are done checking for the redirect.
         setIsCheckingRedirect(false);
       });
   // The empty dependency array ensures this effect runs only once on mount.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [auth, firestore, toast]);
+  }, [auth, firestore]);
 
   // This effect handles redirecting a user who is confirmed to be logged in.
   useEffect(() => {
@@ -80,15 +84,18 @@ export default function AuthLayout({
     }
   }, [isAuthSessionLoading, isCheckingRedirect, user, router]);
 
-  // The overall loading state is true if we're either checking the session or the redirect.
+  // The overall loading state is true if we're either checking the session OR the redirect.
   const isLoading = isAuthSessionLoading || isCheckingRedirect;
 
-  // Show a loader while we're authenticating or if the user object is present (meaning a redirect is imminent).
+  // Show a loader while we're authenticating. If the user object becomes available,
+  // we continue showing the loader because the redirect effect is about to fire.
+  // This prevents flashing the login page for a split second.
   if (isLoading || user) {
      return <FullScreenLoader message="Authenticating your session..." />;
   }
 
-  // If we get here, loading is complete and there's no user, so it's safe to show the login/signup page.
+  // If we get here, all loading is complete and there's definitely no user, 
+  // so it's safe to show the login/signup page.
   return (
     <>
       <main className="flex items-center justify-center min-h-screen bg-background relative overflow-hidden">

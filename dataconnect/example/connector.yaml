@@ -13,6 +13,9 @@ generate:
     - outputDir: ../../cs/src/dataconnect-admin-generated
       package: "@dataconnect/admin-generated"
       packageJsonDir: ../../cs
+    - outputDir: ../../connect/src/dataconnect-admin-generated
+      package: "@dataconnect/admin-generated"
+      packageJsonDir: ../../connect
     - outputDir: ../../codecode_1/src/dataconnect-admin-generated
       package: "@dataconnect/admin-generated"
       packageJsonDir: ../../codecode_1

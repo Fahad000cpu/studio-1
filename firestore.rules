@@ -1,167 +1,199 @@
-
 rules_version = '2';
 
 service cloud.firestore {
+
   match /databases/{database}/documents {
 
-    // --- HELPER FUNCTIONS ---
-    function isUserInMemberList() {
-      return 'memberIds' in resource.data && 
-             resource.data.memberIds is list && 
-             request.auth.uid in resource.data.memberIds;
-    }
-    
-    function isSenderInMemberList() {
-      return 'memberIds' in request.resource.data && 
-             request.resource.data.memberIds is list && 
-             request.auth.uid in request.resource.data.memberIds;
+    // Global helper function to check for admin role.
+
+    function isAdmin() {
+
+      // An admin is a user whose UID exists as a document in the /roles_admin collection.
+
+      return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+
     }
 
     // --- USER PROFILE RULES ---
+
+    // Rule for the top-level 'users' collection documents.
+
     match /users/{userId} {
-      // Any authenticated user can read profiles.
+
+      // Allow any authenticated user to read user profiles (for discover page, etc.).
+
       allow get, list: if request.auth != null;
-      
-      // A user can create their own profile.
-      allow create: if request.auth.uid == userId;
 
-      // A user can update their own profile, or an admin can update any profile.
-      allow update: if request.auth.uid == userId || exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      // Allow a user to write to their own profile, or an admin to write to any profile.
 
-      // Only admins can delete user profiles.
-      allow delete: if exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      allow write: if request.auth.uid == userId || isAdmin();
 
-      // --- NEW SUBCOLLECTION RULE for 1-on-1 Chat Metadata ---
-      match /chats/{chatId} {
-        // A user can only read and write to their own chat metadata subcollection.
-        // This is secure because the query path is already scoped to the user's UID.
+    }
+
+    // --- USER CHAT METADATA RULES ---
+
+    // Rule for the 'chats' subcollection within each user document.
+
+    // This is the specific rule that fixes the "permission denied" error for listing chats.
+
+    match /users/{userId}/chats/{chatId} {
+
+        // A user can read (get, list) and write (create, update, delete)
+
+        // documents ONLY within their own 'chats' subcollection.
+
         allow read, write: if request.auth.uid == userId;
-      }
+
     }
 
-    // --- ADMIN ROLE RULES ---
-    match /roles_admin/{userId} {
-      // Only admins can read or write roles.
-      allow read, write: if request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-    }
+    
 
-    // --- 1-on-1 Chat Messages ---
+    // --- TOP-LEVEL COLLECTION RULES ---
+
+    // Rules for one-on-one chat messages stored in the top-level 'chats' collection.
+
     match /chats/{chatId}/messages/{messageId} {
-      // READ: Allow reading if the user's UID is part of the memberIds list.
-      allow read: if request.auth != null && request.auth.uid in chatId.split('_');
 
-      // CREATE: User can create a message if they are the sender AND in the member list.
-      allow create: if request.auth != null &&
-                      request.resource.data.senderId == request.auth.uid &&
-                      isSenderInMemberList();
+      function isChatParticipant() {
 
-      // UPDATE: A member can update a message for deletion.
-      allow update: if request.auth != null && request.auth.uid in chatId.split('_') &&
-        (
-            // Case 1: User is "deleting for me".
-            (
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-                request.auth.uid in request.resource.data.deletedFor
-            )
-            ||
-            // Case 2: Sender is "deleting for everyone" (tombstoning).
-            (
-                request.auth.uid == resource.data.senderId &&
-                request.time < resource.data.timestamp + duration.value(15, 'm') &&
-                request.resource.data.messageType == 'deleted' &&
-                request.resource.data.diff(resource.data).affectedKeys().hasAll(['messageType', 'text']) &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messageType', 'text', 'mediaUrl', 'textColor'])
-            )
-        );
+        return request.auth != null && request.auth.uid in chatId.split('_');
 
-      // DELETE: Not allowed directly. Use update for tombstoning.
-      allow delete: if false;
+      }
+
+      function isSender() {
+
+        return request.auth != null && request.auth.uid == resource.data.senderId;
+
+      }
+
+      // Participants can read messages and create new ones.
+
+      allow read, create: if isChatParticipant();
+
+      
+
+      // "Delete for me" is an update operation. A participant should be able to update their view.
+
+      allow update: if isChatParticipant();
+
+      // Only the original sender can delete the message for everyone.
+
+      allow delete: if isSender();
+
     }
 
-    // --- Group Chat Messages ---
-    match /groups/{groupId}/messages/{messageId} {
-       // READ: Allow reading if the user is in the message's member list.
-      allow read: if request.auth != null && isUserInMemberList();
+    // Rules for status updates.
 
-      // CREATE: User can create a message if they are the sender AND are in the member list they provide.
-      allow create: if request.auth != null &&
-                      request.resource.data.senderId == request.auth.uid &&
-                      isSenderInMemberList();
-
-      // UPDATE: A member of the group can update a message for deletion.
-      allow update: if request.auth != null && isUserInMemberList() &&
-        (
-            // Case 1: User is "deleting for me".
-            (
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedFor']) &&
-                request.auth.uid in request.resource.data.deletedFor
-            )
-            ||
-            // Case 2: Sender is "deleting for everyone" (tombstoning).
-            (
-                request.auth.uid == resource.data.senderId &&
-                request.time < resource.data.timestamp + duration.value(15, 'm') &&
-                request.resource.data.messageType == 'deleted' &&
-                request.resource.data.diff(resource.data).affectedKeys().hasAll(['messageType', 'text']) &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['messageType', 'text', 'mediaUrl', 'textColor'])
-            )
-        );
-
-      // DELETE: Not allowed directly. Use update for tombstoning.
-      allow delete: if false;
-    }
-
-    // --- GROUP CHAT RULES ---
-    match /groups/{groupId} {
-      // A user can read a group doc (get) or query the collection (list) if they are a member of the group.
-      allow read: if request.auth != null && request.auth.uid in resource.data.memberIds;
-
-      // A user can create a group IF they are the creator AND are in the member list.
-      allow create: if request.auth != null && 
-                     request.resource.data.creatorId == request.auth.uid &&
-                     'memberIds' in request.resource.data &&
-                     request.resource.data.memberIds is list &&
-                     request.auth.uid in request.resource.data.memberIds;
-
-      // The creator or an admin can update group details. Members can update to remove themselves.
-      allow update: if request.auth != null && (
-                     (resource.data.creatorId == request.auth.uid) || 
-                     (exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid))) ||
-                     (
-                       'memberIds' in resource.data && resource.data.memberIds is list &&
-                       request.auth.uid in resource.data.memberIds &&
-                       request.resource.data.memberIds == resource.data.memberIds.removeAll([request.auth.uid]) &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
-                     )
-                   );
-
-      // The creator or an admin can delete a group.
-      allow delete: if (request.auth != null && resource.data.creatorId == request.auth.uid) || (request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
-    }
-
-    // --- STATUS UPDATE RULES ---
     match /status_updates/{statusId} {
-      // Any logged-in user can read status updates.
-      allow read: if request.auth != null;
-      
-      // A user can only create a status for themselves.
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      
-      // Anyone can update 'likes' and 'views', but only the owner can change other fields.
-      allow update: if (request.auth != null && (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'views']) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views']))) || 
-                     (request.auth != null && request.auth.uid == resource.data.userId);
-                     
-      // The owner or an admin can delete a status.
-      allow delete: if (request.auth != null && request.auth.uid == resource.data.userId) || (request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
+
+        function isOwner() {
+
+          return request.auth != null && request.auth.uid == resource.data.userId;
+
+        }
+
+        function isCreatingOwnStatus() {
+
+           return request.auth != null && request.auth.uid == request.resource.data.userId;
+
+        }
+
+        function isUpdatingLikesOrViews() {
+
+          let affectedKeys = request.resource.data.diff(resource.data).affectedKeys();
+
+          return affectedKeys.hasOnly(['likes', 'views']) || affectedKeys.hasOnly(['likes']) || affectedKeys.hasOnly(['views']);
+
+        }
+
+        allow read: if request.auth != null;
+
+        allow create: if isCreatingOwnStatus();
+
+        allow update: if request.auth != null && isUpdatingLikesOrViews();
+
+        allow delete: if isOwner();
+
     }
 
-    // --- AFFILIATE PRODUCT RULES ---
-    match /affiliate_products/{productId} {
-      // Any logged-in user can view products.
-      allow read: if request.auth != null;
-      
-      // Only admins can add, update, or delete products.
-      allow write: if request.auth != null && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    
+
+    // Rules for group metadata.
+
+    match /groups/{groupId} {
+
+      function isMember() {
+
+        return request.auth != null && request.auth.uid in resource.data.memberIds;
+
+      }
+
+      function isGroupCreator() {
+
+        return request.auth != null && resource.data.creatorId == request.auth.uid;
+
+      }
+
+      allow get, list: if request.auth != null;
+
+      allow create: if request.auth != null && request.resource.data.creatorId == request.auth.uid;
+
+      allow update: if isMember();
+
+      allow delete: if isGroupCreator();
+
     }
+
+    // Rules for messages within a group.
+
+    match /groups/{groupId}/messages/{messageId} {
+
+      // This rule relies on a denormalized 'memberIds' array on the message document itself for efficient reads.
+
+      function isMember() {
+
+        return request.auth.uid in resource.data.memberIds;
+
+      }
+
+      // This rule checks the incoming document for writes to ensure the creator is a member.
+
+      function isMemberOfNewMessage() {
+
+        return request.auth.uid in request.resource.data.memberIds;
+
+      }
+
+      
+
+      allow get, list: if isMember();
+
+      allow create: if isMemberOfNewMessage() && request.resource.data.senderId == request.auth.uid;
+
+      allow update, delete: if false; // Group messages are immutable for now.
+
+    }
+
+    // Rules for affiliate products.
+
+    match /affiliate_products/{productId} {
+
+      allow read: if request.auth != null;
+
+      allow create, update, delete: if isAdmin();
+
+    }
+
+    // Rules for managing who is an admin. Only other admins can change this.
+
+    match /roles_admin/{userId} {
+
+       allow get, list, create, delete: if isAdmin();
+
+       allow update: if false; // Prevent accidental role changes. Deletion and creation is safer.
+
+    }
+
   }
+
 }

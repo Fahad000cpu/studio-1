@@ -1,47 +1,29 @@
-
 {
   "indexes": [
     {
-      "collectionGroup": "messages",
+      "collectionGroup": "chat_metadata",
       "queryScope": "COLLECTION_GROUP",
       "fields": [
         {
-          "fieldPath": "memberIds",
-          "arrayConfig": "CONTAINS"
-        },
-        {
-          "fieldPath": "chatId",
+          "fieldPath": "participants",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "timestamp",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "messages",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "memberIds",
-          "arrayConfig": "CONTAINS"
-        },
-        {
-          "fieldPath": "groupId",
+          "fieldPath": "participats",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "timestamp",
+          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
-      ]
+      ],
+      "density": "SPARSE_ALL"
     }
   ],
   "fieldOverrides": [
     {
-      "collectionGroup": "groups",
-      "fieldPath": "memberIds",
+      "collectionGroup": "chat_metadata",
+      "fieldPath": "participants",
       "ttl": false,
       "indexes": [
         {
@@ -55,6 +37,18 @@
         {
           "arrayConfig": "CONTAINS",
           "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION_GROUP"
         }
       ]
     }
