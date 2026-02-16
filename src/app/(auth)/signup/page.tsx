@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -42,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { firebaseConfig } from "@/firebase/config";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -161,23 +161,29 @@ export default function SignupPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-headline text-xl">Domain Authorized Nahi Hai</AlertDialogTitle>
             <AlertDialogDescription className="text-base text-foreground space-y-4">
-              <p>Google Sign-In ke liye is domain ko anumati nahi hai. Kripya ise apne Firebase project mein jodein.</p>
+              <p>Google Sign-In ke liye is domain ko anumati nahi hai. Kripya ise neeche diye gaye project mein jodein.</p>
               
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm text-muted-foreground">Yeh domain add karein:</p>
-                <div className="flex items-center justify-between mt-1">
-                  <code className="font-mono text-lg">{domainError}</code>
-                  <Button variant="ghost" size="icon" onClick={copyToClipboard}>
-                      <Copy className="h-5 w-5"/>
-                  </Button>
+              <div className="p-3 bg-muted rounded-lg space-y-3 text-left">
+                <div>
+                  <p className="text-sm text-muted-foreground">Yeh domain add karein:</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <code className="font-mono text-lg">{domainError}</code>
+                    <Button variant="ghost" size="icon" onClick={copyToClipboard}>
+                        <Copy className="h-5 w-5"/>
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Is Firebase Project ID mein:</p>
+                  <p className="font-mono text-lg font-bold">{firebaseConfig.projectId}</p>
                 </div>
               </div>
 
               <div>
-                <p className="font-semibold">Nirdesh (Steps):</p>
-                <ol className="list-decimal list-inside mt-2 text-sm space-y-1">
+                <p className="font-semibold text-left">Nirdesh (Steps):</p>
+                <ol className="list-decimal list-inside mt-2 text-sm space-y-1 text-left">
                   <li>Apne <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a> par jayein.</li>
-                  <li>Apna project chunein: <strong>connect-sphere-ba19a</strong>.</li>
+                  <li>Upar bataye gaye project (`{firebaseConfig.projectId}`) ko chunein.</li>
                   <li><strong>Authentication</strong> &gt; <strong>Settings</strong> tab &gt; <strong>Authorized domains</strong> par jayein.</li>
                   <li><strong>Add domain</strong> par click karein aur upar diya gaya domain paste karein.</li>
                 </ol>
