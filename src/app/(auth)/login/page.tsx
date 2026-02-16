@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -46,7 +47,6 @@ import { Flame, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { handleUserProfileUpdate } from "@/lib/auth-helpers";
-import { firebaseConfig } from "@/firebase/config";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email." }),
@@ -200,7 +200,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Is Firebase Project ID mein:</p>
-                  <p className="font-mono text-lg font-bold">{firebaseConfig.projectId}</p>
+                  <p className="font-mono text-lg font-bold">{auth.app.options.projectId}</p>
                 </div>
               </div>
 
@@ -208,7 +208,7 @@ export default function LoginPage() {
                 <p className="font-semibold text-left">Nirdesh (Steps):</p>
                 <ol className="list-decimal list-inside mt-2 text-sm space-y-1 text-left">
                   <li>Apne <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">Firebase Console</a> par jayein.</li>
-                  <li>Upar bataye gaye project (`{firebaseConfig.projectId}`) ko chunein.</li>
+                  <li>Upar bataye gaye project (`{auth.app.options.projectId}`) ko chunein.</li>
                   <li><strong>Authentication</strong> &gt; <strong>Settings</strong> tab &gt; <strong>Authorized domains</strong> par jayein.</li>
                   <li><strong>Add domain</strong> par click karein aur upar diya gaya domain paste karein.</li>
                 </ol>
