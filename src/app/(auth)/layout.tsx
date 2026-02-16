@@ -118,7 +118,7 @@ export default function AuthLayout({
                 <p className="font-bold mt-4">Steps:</p>
                 <ol className="list-decimal list-inside space-y-2">
                   <li><a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline text-primary">Firebase Console</a> par jayein.</li>
-                  <li>Apna project chunein: <code className="bg-muted px-1 py-0.5 rounded">connectsphere2132-709496-dcb23</code></li>
+                  <li>Apna project chunein.</li>
                   <li>Left menu mein, <span className="font-semibold">Authentication</span> par jayein.</li>
                   <li><span className="font-semibold">Settings</span> tab par click karein.</li>
                   <li><span className="font-semibold">Authorized domains</span> section tak scroll karein aur <span className="font-semibold">Add domain</span> par click karein.</li>
